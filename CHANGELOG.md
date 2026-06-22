@@ -5,8 +5,27 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
+- Expand `harness init` to also register the PostToolUse hooks (so harnesses
+  feed the track automatically once wired)
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.7] - 2026-06-22
+
+### Added
+- **runtime/handle**: `handleHook(id, payload, {now, cwd})` — the full loop.
+  On a PRE event it gates the tool-use (stateless guards → APEX gates from the
+  track) and returns the native response; on a POST event it records the
+  activity. `harness hook <id>` now runs this end-to-end.
+- **runtime/normalize**: `normalizeEvent(id, payload)` → uniform `{phase, tool,
+  input, sessionId, filePath, content, command}` across Claude/Codex/Gemini/
+  Cursor (`tool_name`/`tool_input`) and Cline (nested `preToolUse`).
+- **runtime/respond**: `respond(id, prompt)` maps a portable `Prompt` to each
+  harness's native block/ask response.
+
+### Changed
+- `harness hook` is now async and stateful (was the sync, stateless `dispatchHook`,
+  still exported for simple use).
 
 ## [0.1.6] - 2026-06-22
 
