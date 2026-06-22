@@ -5,8 +5,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
+- Stateful guards: agent-quality threshold, trivial-edit wiring, brainstorm gate,
+  MCP verbosity cap, MCP/WebFetch cache-lookup gate
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
-- typedoc-generated API reference
+
+## [0.1.10] - 2026-06-22
+
+### Added
+- **policy/guards** — five portable enforcement guards composed into `evaluate()`
+  via a `runGuards` chain (first firing guard wins, ahead of git + file-size):
+  - `bashWriteGuard` — blocks `python3 -c` / `sed -i` / redirects to code files.
+  - `installGuard` — asks before `npm/pip/brew/...` installs.
+  - `securityGuard` — blocks `rm -rf /`, fork bombs, `curl | sh`; asks on `sudo`.
+  - `interfaceSeparationGuard` — blocks top-level interface/type/protocol in
+    component/view/controller files (Interface Segregation).
+  - `protectedPathGuard` — hard-denies edits to `.claude/plugins|logs|cache`, `.git/`.
+  Shared `GuardContext` type; all exported via `./policy`. (Authored in parallel by a guard team.)
 
 ## [0.1.9] - 2026-06-22
 

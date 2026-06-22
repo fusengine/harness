@@ -2,6 +2,7 @@ import { isCodeFile } from "../util/project-root";
 import { countLines, evaluateFileSize } from "./file-size";
 import { detectFramework } from "./detect-framework";
 import { matchPatterns, GIT_BLOCKED } from "./patterns";
+import { runGuards } from "./guards";
 import type { Prompt } from "../prompt/types";
 
 /** Harness-agnostic input to {@link evaluate}. */
@@ -29,6 +30,8 @@ export interface PolicyResult {
  * their harness's native response (Claude `permissionDecision`, etc.).
  */
 export function evaluate(ctx: PolicyContext): PolicyResult {
+  const guard = runGuards(ctx);
+  if (guard) return { decision: "deny", message: guard.reason, prompt: guard };
   if (ctx.command && matchPatterns(ctx.command, GIT_BLOCKED)) {
     const reason = `Destructive git command: ${ctx.command}`;
     return {
