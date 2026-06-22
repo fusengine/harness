@@ -6,7 +6,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ### Planned
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
-- typedoc-generated API reference
+
+## [0.1.13] - 2026-06-23
+
+### Documentation
+- Rewrote the **README** as a full quickstart: install, `harness init/hook/check`,
+  the 10 guards + APEX gates, env vars, the subpath-exports table, and library
+  usage — reflecting the complete engine (was the pre-0.1.0 description).
+- Added **typedoc**: `bun run docs:api` generates the API reference to `docs/api/`
+  (288 pages, 0 errors). `typedoc.json` + `docs:api` script.
+- New module guides `docs/guards.md` + `docs/runtime.md`; refreshed `docs/index.md`.
 
 ## [0.1.12] - 2026-06-22
 
