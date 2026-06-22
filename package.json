@@ -1,0 +1,39 @@
+{
+  "name": "@fusengine/harness",
+  "version": "0.1.0",
+  "description": "Harness-agnostic toolkit for AI coding agents: runtime harness detection (Claude Code, Codex, Cursor, Cline, Gemini, Aider...), pure policy core (env config, project/framework detection, SOLID/file-size limits, APEX freshness, guard patterns), cache, project memory, ref routing, state/locks, statusline, and thin per-harness adapters. One Bun-native package, modular subpaths.",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config/index.ts",
+    "./util": "./src/util/index.ts",
+    "./detect": "./src/detect/index.ts",
+    "./policy": "./src/policy/index.ts",
+    "./memory": "./src/memory/index.ts",
+    "./cache": "./src/cache/index.ts",
+    "./freshness": "./src/freshness/index.ts",
+    "./refs": "./src/refs/index.ts",
+    "./state": "./src/state/index.ts",
+    "./statusline": "./src/statusline/index.ts",
+    "./adapters/claude": "./src/adapters/claude/index.ts"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "license": "MIT",
+  "sideEffects": false,
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@vercel/detect-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@vercel/detect-agent": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0",
+    "@types/bun": "latest"
+  }
+}

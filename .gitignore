@@ -1,0 +1,13 @@
+# deps
+node_modules/
+# build
+dist/
+*.tsbuildinfo
+# os
+.DS_Store
+# fuse-lessons dev memory — internal build notes, not package content
+MEMORY/
+# env
+.env
+.env.*
+!.env.example
