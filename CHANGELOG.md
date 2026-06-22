@@ -8,6 +8,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
 
+## [0.1.9] - 2026-06-22
+
+### Added
+- **refs/loader**: `loadRefs(dir)` scans a directory recursively for `.md`
+  reference files and parses each frontmatter into a `RefMeta` (tolerant of
+  kebab/camel keys via `toRefMeta`). The content is the consumer's — point it at
+  ANY refs dir. This activates `solidReadGate` (previously inert without a source).
+- **runtime/handle**: `HandleOptions.refsDir` — when set, `handleHook` loads the
+  refs and feeds them to the gate. `harness hook` reads it from `FUSE_HARNESS_REFS`.
+
 ## [0.1.8] - 2026-06-22
 
 ### Changed

@@ -27,7 +27,7 @@ const cmd = process.argv[2];
 
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
-  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd() });
+  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {
