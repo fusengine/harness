@@ -1,4 +1,5 @@
 import { detectFramework } from "../policy/detect-framework";
+import { loadRefs } from "../refs/loader";
 import type { HarnessId } from "../detect/harness";
 import { activityFor } from "./activity";
 import { gate } from "./gate";
@@ -12,6 +13,8 @@ import { harnessTrackDir } from "./storage";
 export interface HandleOptions {
   now: number;
   cwd: string;
+  /** Directory of SOLID reference `.md` files for `solidReadGate` (else inert). */
+  refsDir?: string;
 }
 
 /** What the hook bin should print + exit with. */
@@ -44,6 +47,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     filePath: event.filePath,
     content: event.content,
     command: event.command,
+    refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
     now: opts.now,
     trackFile: file,
   });
