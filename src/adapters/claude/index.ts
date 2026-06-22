@@ -69,4 +69,4 @@ export function guard(input: ClaudeHookInput): string | null {
 }
 
 /** @deprecated use {@link guard}. Kept for back-compat. */
-export const fileSizeGuard = guard;
+export const fileSizeGuard: typeof guard = guard;

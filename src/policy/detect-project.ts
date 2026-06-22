@@ -8,7 +8,7 @@ export type ProjectType =
   | "java" | "scala" | "elixir" | "ruby" | "generic";
 
 /** Keywords that signal a development task (APEX trigger). */
-export const DEV_KEYWORDS =
+export const DEV_KEYWORDS: RegExp =
   /\b(implement|create|build|fix|add|refactor|develop|feature|bug|update|modify|change|write|code)\b/i;
 
 /** True when the prompt invokes the /apex command. */

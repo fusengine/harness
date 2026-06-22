@@ -1,30 +1,36 @@
 {
   "name": "@fusengine/harness",
   "version": "0.1.0",
-  "description": "Harness-agnostic toolkit for AI coding agents: runtime harness detection (Claude Code, Codex, Cursor, Cline, Gemini, Aider...), pure policy core (env config, project/framework detection, SOLID/file-size limits, APEX freshness, guard patterns), cache, project memory, ref routing, state/locks, statusline, and thin per-harness adapters. One Bun-native package, modular subpaths.",
+  "description": "Harness-agnostic toolkit for AI coding agents: runtime harness detection (Claude Code, Codex, Cursor, Cline, Gemini, Aider...), pure policy core (env config, project/framework detection, SOLID/file-size limits, APEX freshness, guard patterns, portable prompts), cache, project memory, ref routing, state/locks, statusline, and thin per-harness adapters. Bun-native, with a built dist for Node + bundlers.",
   "type": "module",
   "module": "src/index.ts",
-  "types": "src/index.ts",
+  "types": "dist/index.d.mts",
   "exports": {
-    ".": "./src/index.ts",
-    "./config": "./src/config/index.ts",
-    "./util": "./src/util/index.ts",
-    "./detect": "./src/detect/index.ts",
-    "./policy": "./src/policy/index.ts",
-    "./memory": "./src/memory/index.ts",
-    "./cache": "./src/cache/index.ts",
-    "./freshness": "./src/freshness/index.ts",
-    "./refs": "./src/refs/index.ts",
-    "./state": "./src/state/index.ts",
-    "./statusline": "./src/statusline/index.ts",
-    "./adapters/claude": "./src/adapters/claude/index.ts"
+    ".": { "bun": "./src/index.ts", "types": "./dist/index.d.mts", "import": "./dist/index.mjs" },
+    "./config": { "bun": "./src/config/index.ts", "types": "./dist/config/index.d.mts", "import": "./dist/config/index.mjs" },
+    "./util": { "bun": "./src/util/index.ts", "types": "./dist/util/index.d.mts", "import": "./dist/util/index.mjs" },
+    "./detect": { "bun": "./src/detect/index.ts", "types": "./dist/detect/index.d.mts", "import": "./dist/detect/index.mjs" },
+    "./policy": { "bun": "./src/policy/index.ts", "types": "./dist/policy/index.d.mts", "import": "./dist/policy/index.mjs" },
+    "./prompt": { "bun": "./src/prompt/index.ts", "types": "./dist/prompt/index.d.mts", "import": "./dist/prompt/index.mjs" },
+    "./memory": { "bun": "./src/memory/index.ts", "types": "./dist/memory/index.d.mts", "import": "./dist/memory/index.mjs" },
+    "./cache": { "bun": "./src/cache/index.ts", "types": "./dist/cache/index.d.mts", "import": "./dist/cache/index.mjs" },
+    "./freshness": { "bun": "./src/freshness/index.ts", "types": "./dist/freshness/index.d.mts", "import": "./dist/freshness/index.mjs" },
+    "./refs": { "bun": "./src/refs/index.ts", "types": "./dist/refs/index.d.mts", "import": "./dist/refs/index.mjs" },
+    "./state": { "bun": "./src/state/index.ts", "types": "./dist/state/index.d.mts", "import": "./dist/state/index.mjs" },
+    "./statusline": { "bun": "./src/statusline/index.ts", "types": "./dist/statusline/index.d.mts", "import": "./dist/statusline/index.mjs" },
+    "./adapters/claude": { "bun": "./src/adapters/claude/index.ts", "types": "./dist/adapters/claude/index.d.mts", "import": "./dist/adapters/claude/index.mjs" }
   },
-  "files": ["src", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "LICENSE"],
   "license": "MIT",
   "sideEffects": false,
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsdown src/index.ts src/config/index.ts src/util/index.ts src/detect/index.ts src/policy/index.ts src/prompt/index.ts src/memory/index.ts src/cache/index.ts src/freshness/index.ts src/refs/index.ts src/state/index.ts src/statusline/index.ts src/adapters/claude/index.ts --dts --format esm --clean --out-dir dist",
+    "prepublishOnly": "bun test && tsc --noEmit && bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@vercel/detect-agent": "*"
@@ -33,7 +39,8 @@
     "@vercel/detect-agent": { "optional": true }
   },
   "devDependencies": {
-    "typescript": "^6.0.0",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3"
   }
 }

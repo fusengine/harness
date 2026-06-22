@@ -6,6 +6,8 @@
     "lib": ["ESNext"],
     "types": ["bun"],
     "strict": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
