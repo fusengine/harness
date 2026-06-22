@@ -53,8 +53,22 @@ roadmap in [CHANGELOG](../CHANGELOG.md).)*
 
 ## Status
 
-| Adapter | State |
-|---------|-------|
-| Claude Code (hook) | ✅ implemented |
-| Cursor / Cline / Gemini (hook) | ⏳ planned |
-| CLI binary (cli-mode) | ⏳ planned |
+| Adapter | Subpath | State |
+|---------|---------|-------|
+| Claude Code (hook) | `@fusengine/harness/adapters/claude` | ✅ |
+| Cursor (hook) | `@fusengine/harness/adapters/cursor` | ✅ |
+| Cline (hook) | `@fusengine/harness/adapters/cline` | ✅ |
+| Gemini CLI (hook) | `@fusengine/harness/adapters/gemini` | ✅ |
+| CLI (`harness-check`) | `@fusengine/harness/cli` + bin | ✅ |
+
+### cli-mode usage (Aider / Windsurf / OpenHands)
+
+Install the package, then run `harness-check` as a pre-commit step:
+
+```sh
+# .husky/pre-commit  (or .git/hooks/pre-commit)
+npx harness-check
+```
+
+It reads staged files, runs `evaluate()` on each, and exits non-zero (blocking the
+commit) with the formatted prompt when a policy denies.

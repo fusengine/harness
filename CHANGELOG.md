@@ -5,9 +5,20 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- `adapters/cursor`, `adapters/cline`, `adapters/gemini` (hook-mode shims)
-- `bin/` CLI entry for cli-mode harnesses (Aider, Windsurf, OpenHands)
+- Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.1] - 2026-06-22
+
+### Added
+- **adapters/cursor** (`beforeShellExecution` blocks via `permission: deny`;
+  `afterFileEdit` observe-only), **adapters/cline** (`PreToolUse` → `cancel`),
+  **adapters/gemini** (`BeforeTool` → `decision: deny`). Schemas verified against
+  each harness's 2026 hook docs. All map their payload → `evaluate()` → native response.
+- **cli** + **`harness-check`** bin: a cli-mode entry for harnesses without hooks
+  (Aider, Windsurf, OpenHands). Run it as a pre-commit step — checks staged files
+  (`git diff --cached` + `git show :path`) against the policy core, exits non-zero on a violation.
+- Subpath exports for the new adapters + `./cli`; `bin.harness-check`.
 
 ## [0.1.0] - 2026-06-22
 
