@@ -7,7 +7,7 @@
  */
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
-import { dispatchHook } from "./hook";
+import { handleHook } from "../runtime/handle";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
 async function readStdin(): Promise<Record<string, unknown>> {
@@ -27,7 +27,7 @@ const cmd = process.argv[2];
 
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
-  const outcome = dispatchHook(id, await readStdin());
+  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd() });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {
