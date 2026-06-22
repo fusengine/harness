@@ -5,4 +5,5 @@ export * from "./activity";
 export * from "./gate";
 export * from "./normalize";
 export * from "./respond";
+export * from "./mcp";
 export * from "./handle";

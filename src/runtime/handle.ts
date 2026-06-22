@@ -1,8 +1,10 @@
+import { join } from "node:path";
 import { detectFramework } from "../policy/detect-framework";
 import { loadRefs } from "../refs/loader";
 import type { HarnessId } from "../detect/harness";
 import { activityFor } from "./activity";
 import { gate } from "./gate";
+import { MCP_TTL_MS, mcpPostStore, mcpPreIntercept } from "./mcp";
 import { normalizeEvent } from "./normalize";
 import { trackFile } from "./paths";
 import { recordActivity } from "./record";
@@ -31,14 +33,20 @@ export interface HandleOutcome {
  */
 export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
   const event = normalizeEvent(id, payload);
-  const file = trackFile(event.sessionId, harnessTrackDir(id as HarnessId, opts.cwd));
+  const dir = harnessTrackDir(id as HarnessId, opts.cwd);
+  const file = trackFile(event.sessionId, dir);
+  const mcpDir = join(dir, "mcp");
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
   if (event.phase === "post") {
+    mcpPostStore(event.tool, event.input, payload.tool_response ?? payload.tool_output, mcpDir);
     const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now });
     if (activity) await recordActivity(file, activity);
     return { stdout: "", exit: 0 };
   }
+
+  const intercept = mcpPreIntercept(id, event.tool, event.input, mcpDir, MCP_TTL_MS, opts.now);
+  if (intercept !== null) return { stdout: intercept, exit: 0 };
 
   const prompt = await gate({
     sessionId: event.sessionId,

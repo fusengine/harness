@@ -5,8 +5,25 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- MCP path in the dispatcher: verbosity cap (input mutation) + cache-lookup gate
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+- typedoc-generated API reference
+
+## [0.1.12] - 2026-06-22
+
+### Added
+- **MCP interception** — the last two portable guards, wired into `handleHook`:
+  - **verbosity cap** (`policy/verbosity`: `capVerbosity`) — caps exa MCP calls to
+    3 results (Context7 has no verbosity knob); emitted as an input mutation.
+  - **cache lookup/store** (`cache/store`: `mcpCacheKey` / `cacheLookup` / `cacheStore`)
+    — a keyed, mtime-TTL'd file cache. On a pre MCP/WebFetch event a fresh hit is
+    served (deny + cached content); the post event stores the response.
+  - `runtime/mcp` (`mcpPreIntercept` / `mcpPostStore`) routes MCP tool events for
+    Claude/Codex/Gemini (harnesses that support input mutation / cache serving).
+
+### Note
+- This completes all 10 portable enforcement guards from `core-guards`. The
+  remaining plugin pieces (agent prompts, rules/skill content, injection) are
+  Claude-specific content, not portable library logic.
 
 ## [0.1.11] - 2026-06-22
 
