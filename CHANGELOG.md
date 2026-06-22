@@ -5,10 +5,18 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Expand `harness init` to also register the PostToolUse hooks (so harnesses
-  feed the track automatically once wired)
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.8] - 2026-06-22
+
+### Changed
+- **init** now wires BOTH phases: a PRE hook to gate edits AND a POST hook
+  (catch-all → `activityFor` filters) so the track fills automatically. Claude/
+  Codex add `PostToolUse`, Gemini adds `AfterTool` (regex `.*`), Cursor keeps
+  `afterFileEdit`, and Cline gets a second executable `.clinerules/hooks/PostToolUse`.
+- `initFor(id)` now returns `InitFile[]` (was a single file); `harness init`
+  writes all of them. `harness init` is now plug-and-play end-to-end.
 
 ## [0.1.7] - 2026-06-22
 

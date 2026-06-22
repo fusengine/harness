@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { HarnessId } from "../detect/harness";
 import { claudeInit, clineInit, codexInit, cursorInit, geminiInit, type InitFile } from "./templates";
 
-const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile>> = {
+const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile[]>> = {
   "claude-code": claudeInit,
   codex: codexInit,
   cursor: cursorInit,
@@ -12,10 +12,10 @@ const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile>> = {
 };
 
 /**
- * Build the wiring file for a harness, or null when it has no hook integration
- * (cli-mode harnesses use `harness check` in a pre-commit step instead).
+ * Build the wiring file(s) for a harness, or null when it has no hook
+ * integration (cli-mode harnesses use `harness check` in a pre-commit step).
  */
-export function initFor(id: HarnessId, command: string = `npx harness hook ${id}`): InitFile | null {
+export function initFor(id: HarnessId, command: string = `npx harness hook ${id}`): InitFile[] | null {
   const make = RUNNERS[id];
   return make ? make(command) : null;
 }

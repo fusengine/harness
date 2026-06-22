@@ -32,12 +32,13 @@ if (cmd === "hook") {
   process.exit(outcome.exit);
 } else if (cmd === "init") {
   const id = (process.argv[3] as HarnessId | undefined) ?? detectHarness().id;
-  const file = initFor(id);
-  if (!file) {
+  const files = initFor(id);
+  if (!files) {
     process.stderr.write(`harness: no hook integration for "${id}" — use \`harness check\` in a pre-commit step\n`);
     process.exit(1);
   }
-  process.stdout.write(`harness: wired ${id} -> ${writeInitFile(process.cwd(), file)}\n`);
+  const written = files.map((f) => writeInitFile(process.cwd(), f));
+  process.stdout.write(`harness: wired ${id} -> ${written.join(", ")}\n`);
   process.exit(0);
 } else {
   const files = stagedFiles();
