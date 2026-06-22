@@ -19,6 +19,8 @@ export interface ApexContext {
   refs?: RefMeta[];
   /** Absolute paths of SOLID refs already read this session. */
   refsRead?: string[];
+  /** Whether the required prior agents (explore + research) ran within the freshness window. */
+  agentsFresh?: boolean;
 }
 
 /** A single APEX gate: returns a blocking {@link Prompt}, or null to pass. */
@@ -51,8 +53,19 @@ export const solidReadGate: ApexGate = (ctx) => {
   };
 };
 
-/** Default APEX gate chain. */
-export const APEX_GATES: ReadonlyArray<ApexGate> = [docConsultedGate, solidReadGate];
+/** Gate: the required prior agents (explore + research) must have run within the window. */
+export const freshnessGate: ApexGate = (ctx) =>
+  ctx.agentsFresh === false
+    ? {
+        kind: "block",
+        title: "APEX: explore + research required",
+        reason: `Run explore-codebase and research-expert (within the freshness window) before editing ${ctx.framework}.`,
+        actions: ["Launch the explore-codebase agent", "Launch the research-expert agent"],
+      }
+    : null;
+
+/** Default APEX gate chain (freshness, then docs, then SOLID refs). */
+export const APEX_GATES: ReadonlyArray<ApexGate> = [freshnessGate, docConsultedGate, solidReadGate];
 
 /**
  * Run the APEX gates (chain-of-responsibility): the first failing gate's prompt
