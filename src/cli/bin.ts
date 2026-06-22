@@ -1,17 +1,51 @@
 #!/usr/bin/env node
 /**
- * harness-check — cli-mode entry for harnesses without hooks (Aider, Windsurf,
- * OpenHands...). Run it as a pre-commit step: it checks staged files against the
- * policy core and exits non-zero on a violation.
+ * harness — CLI for @fusengine/harness.
+ *   harness check          cli-mode: check staged files (pre-commit), exit non-zero on a violation
+ *   harness init [id]      write the wiring file for a harness (defaults to the detected one)
+ *   harness hook <id>      runtime: read a hook payload on stdin, route to the adapter, print the response
  */
+import { detectHarness, type HarnessId } from "../detect/harness";
+import { initFor, writeInitFile } from "../init/run";
+import { dispatchHook } from "./hook";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
-const files = stagedFiles();
-if (files.length === 0) process.exit(0);
-
-const violations = checkStaged(files, stagedContent);
-if (violations.length > 0) {
-  process.stderr.write(`harness-check: policy violations\n\n${violations.join("\n\n")}\n`);
-  process.exit(1);
+async function readStdin(): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  for await (const c of process.stdin) chunks.push(c as Buffer);
+  const text = Buffer.concat(chunks).toString("utf8").trim();
+  if (!text) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
-process.exit(0);
+
+const cmd = process.argv[2];
+
+if (cmd === "hook") {
+  const id = process.argv[3] ?? detectHarness().id;
+  const outcome = dispatchHook(id, await readStdin());
+  if (outcome.stdout) process.stdout.write(outcome.stdout);
+  process.exit(outcome.exit);
+} else if (cmd === "init") {
+  const id = (process.argv[3] as HarnessId | undefined) ?? detectHarness().id;
+  const file = initFor(id);
+  if (!file) {
+    process.stderr.write(`harness: no hook integration for "${id}" — use \`harness check\` in a pre-commit step\n`);
+    process.exit(1);
+  }
+  process.stdout.write(`harness: wired ${id} -> ${writeInitFile(process.cwd(), file)}\n`);
+  process.exit(0);
+} else {
+  const files = stagedFiles();
+  if (files.length === 0) process.exit(0);
+  const violations = checkStaged(files, stagedContent);
+  if (violations.length > 0) {
+    process.stderr.write(`harness check: policy violations\n\n${violations.join("\n\n")}\n`);
+    process.exit(1);
+  }
+  process.exit(0);
+}

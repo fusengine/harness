@@ -5,8 +5,26 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
+- Compose the full APEX gate (freshness / SOLID-read / trivial-edit) into `evaluate()`
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.2] - 2026-06-22
+
+### Added
+- **adapters/codex**: OpenAI Codex CLI adapter. Codex's `PreToolUse` hook (2026)
+  is Claude-compatible (`tool_name`/`tool_input` → `hookSpecificOutput.permissionDecision`),
+  so it reuses the Claude guard. Codex is now `hook`-mode in `detect` (was `cli`).
+- **init**: `harness init [id]` writes the wiring file for the detected (or named)
+  harness — `.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`,
+  `.gemini/settings.json`, or an executable `.clinerules/hooks/PreToolUse` — each
+  pointing at `npx harness hook <id>`. Formats verified against each harness's docs.
+- **hook dispatcher**: `harness hook <id>` reads a hook payload on stdin, routes it
+  to the matching adapter, and prints the harness's native response.
+
+### Changed
+- The bin is now **`harness`** with subcommands (`check` | `init` | `hook`),
+  replacing the single-purpose `harness-check`.
 
 ## [0.1.1] - 2026-06-22
 

@@ -28,7 +28,7 @@ Shortcut for `detectHarness(env).mode`.
 | Harness | Signal (env) | Mode |
 |---------|--------------|------|
 | Claude Code | `CLAUDECODE` | hook |
-| OpenAI Codex | `CODEX_SANDBOX` | cli |
+| OpenAI Codex | `CODEX_SANDBOX` | hook |
 | Cursor | `CURSOR_AGENT` | hook |
 | Cline | `CLINE` / `CLINE_AGENT` | hook |
 | Gemini CLI | `GEMINI_CLI` | hook |

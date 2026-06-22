@@ -43,7 +43,7 @@ const STD_NAMES: Record<string, HarnessId> = {
 
 /** Harnesses exposing a native hook system (vs CLI-only integration). */
 const HOOK_CAPABLE: ReadonlySet<HarnessId> = new Set([
-  "claude-code", "cursor", "cline", "gemini-cli", "opencode",
+  "claude-code", "codex", "cursor", "cline", "gemini-cli", "opencode",
 ]);
 
 /** Integration mode for a harness id. */

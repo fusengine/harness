@@ -53,9 +53,24 @@ roadmap in [CHANGELOG](../CHANGELOG.md).)*
 
 ## Status
 
+## Wiring it in — `harness init` / `harness hook`
+
+```sh
+npx harness init          # detects the harness, writes its wiring file
+npx harness init codex    # or target one explicitly
+```
+
+`init` writes the right config (`.claude/settings.json`, `.codex/hooks.json`,
+`.cursor/hooks.json`, `.gemini/settings.json`, or `.clinerules/hooks/PreToolUse`)
+pointing at `npx harness hook <id>` — the runtime dispatcher that reads the hook
+payload on stdin, routes it to the adapter, and prints the native response.
+
+## Status
+
 | Adapter | Subpath | State |
 |---------|---------|-------|
 | Claude Code (hook) | `@fusengine/harness/adapters/claude` | ✅ |
+| OpenAI Codex (hook) | `@fusengine/harness/adapters/codex` | ✅ (reuses Claude) |
 | Cursor (hook) | `@fusengine/harness/adapters/cursor` | ✅ |
 | Cline (hook) | `@fusengine/harness/adapters/cline` | ✅ |
 | Gemini CLI (hook) | `@fusengine/harness/adapters/gemini` | ✅ |
