@@ -5,9 +5,21 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Stateful guards: agent-quality threshold, trivial-edit wiring, brainstorm gate,
-  MCP verbosity cap, MCP/WebFetch cache-lookup gate
+- MCP path in the dispatcher: verbosity cap (input mutation) + cache-lookup gate
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+
+## [0.1.11] - 2026-06-22
+
+### Added
+- **agent-quality threshold**: `recordAgent(name, ts, quality?)` + `agentsFresh`
+  now ignores `insufficient`-quality agent calls (matches the plugin's
+  response-length gate).
+- **trivial-edit fast path**: the gate lets up to `TRIVIAL_BUDGET` (4) tiny
+  (< 5 lines), non-`replace_all` edits per window through without the APEX gates
+  (`recordTrivialEdit` / `trivialCount`, sliding window in the track).
+- **brainstorm gate**: `brainstormGate` blocks creating new files when
+  `brainstormRequired` and the brainstorming agent isn't fresh; `detectCreationIntent(prompt)`
+  + `recordBrainstormRequired` provide the signal (harness wires it on UserPromptSubmit).
 
 ## [0.1.10] - 2026-06-22
 

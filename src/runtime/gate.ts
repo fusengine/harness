@@ -1,7 +1,7 @@
 import { evaluate } from "../policy/evaluate";
 import { evaluateApex, type ApexContext } from "../policy/apex";
-import { agentsFresh } from "../tracking/session-state";
-import { loadTrack } from "../tracking/store";
+import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
+import { loadTrack, saveTrack } from "../tracking/store";
 import type { RefMeta } from "../refs/types";
 import type { Prompt } from "../prompt/types";
 
@@ -10,6 +10,9 @@ export const REQUIRED_AGENTS: ReadonlyArray<string> = ["explore-codebase", "rese
 
 /** Default freshness window for {@link REQUIRED_AGENTS} (4 min, the APEX TTL). */
 export const DEFAULT_WINDOW_MS = 240_000;
+
+/** Trivial edits allowed within the window before the full APEX gates apply. */
+export const TRIVIAL_BUDGET = 4;
 
 /** A tool-use to gate, plus the session pointers needed for the stateful gates. */
 export interface GateInput {
@@ -23,19 +26,29 @@ export interface GateInput {
   now: number;
   trackFile: string;
   windowMs?: number;
+  isReplaceAll?: boolean;
 }
 
 /**
- * Full gate: the stateless guards (file-size, git) first, then the stateful
- * APEX gates fed from the session track. Returns the first blocking prompt, or
- * null to allow. APEX gates apply only to code edits (a `filePath`).
+ * Full gate: the stateless guards (file-size, git, security...) first, then a
+ * trivial-edit fast path, then the stateful APEX gates fed from the session
+ * track. Returns the first blocking prompt, or null to allow.
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
   const quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command });
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
 
   if (!input.filePath) return null;
+  const window = input.windowMs ?? DEFAULT_WINDOW_MS;
   const track = await loadTrack(input.trackFile);
+
+  // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
+  const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
+  if (!input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
+    await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
+    return null;
+  }
+
   const ctx: ApexContext = {
     sessionId: input.sessionId,
     framework: input.framework,
@@ -44,7 +57,9 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     authorizations: track.authorizations,
     refs: input.refs,
     refsRead: track.refsRead,
-    agentsFresh: agentsFresh(track, [...REQUIRED_AGENTS], input.windowMs ?? DEFAULT_WINDOW_MS, input.now),
+    agentsFresh: agentsFresh(track, [...REQUIRED_AGENTS], window, input.now),
+    brainstormRequired: track.brainstormRequired,
+    brainstormFresh: agentsFresh(track, ["brainstorming"], window, input.now),
   };
   return evaluateApex(ctx);
 }
