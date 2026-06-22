@@ -5,10 +5,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- A session-tracking layer (record agent/doc/ref activity) to feed `evaluateApex`
-  end-to-end per harness — the remaining piece for full Claude-plugin parity
+- Wire the tracking layer into each adapter's PostToolUse path (record) +
+  PreToolUse path (gate) end-to-end — full Claude-plugin parity
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.4] - 2026-06-22
+
+### Added
+- **tracking** — the session-state layer that feeds `evaluateApex`. Immutable
+  record helpers (`recordDoc`, `recordRefRead`, `recordAgent`) + `agentsFresh()`
+  (all required agents seen within a window), and a `loadTrack`/`saveTrack` store.
+  An adapter records activity on PostToolUse and reads it back to build the
+  `ApexContext` on PreToolUse.
+- **policy/apex**: `freshnessGate` — blocks when the prior agents (explore +
+  research) are not fresh (`agentsFresh: false`); added to the default gate chain
+  ahead of docs + SOLID. New `ApexContext.agentsFresh` field.
 
 ## [0.1.3] - 2026-06-22
 

@@ -25,6 +25,10 @@ test("solidReadGate: block until the required refs are read", () => {
   expect(solidReadGate({ ...ctx, refsRead: gate?.actions })).toBeNull();
 });
 
+test("freshnessGate: blocks when prior agents are not fresh", () => {
+  expect(evaluateApex({ ...base, agentsFresh: false })?.title).toContain("explore");
+});
+
 test("evaluateApex: chain — doc gate first, then solid, else allow", () => {
   const refs = [ref("srp", "principle"), ref("tpl", "template")];
   expect(evaluateApex(base)?.title).toContain("documentation");
