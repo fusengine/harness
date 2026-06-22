@@ -5,9 +5,20 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Compose the full APEX gate (freshness / SOLID-read / trivial-edit) into `evaluate()`
+- A session-tracking layer (record agent/doc/ref activity) to feed `evaluateApex`
+  end-to-end per harness — the remaining piece for full Claude-plugin parity
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.3] - 2026-06-22
+
+### Added
+- **policy/apex** — `evaluateApex(ctx)`: composes the APEX gates as a
+  chain-of-responsibility (first failing gate's `Prompt` wins). Ships
+  `docConsultedGate` (Context7 + Exa via `isDocConsulted`) and `solidReadGate`
+  (the routed required SOLID refs must be read, via `routeReferences`). Pure;
+  the harness adapter supplies the session state (`authorizations`, `refs`,
+  `refsRead`). Gates are individually exported + overridable.
 
 ## [0.1.2] - 2026-06-22
 
