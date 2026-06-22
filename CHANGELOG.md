@@ -5,10 +5,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Wire the tracking layer into each adapter's PostToolUse path (record) +
-  PreToolUse path (gate) end-to-end — full Claude-plugin parity
+- Map each adapter's live PostToolUse tool-name → `recordActivity` so harnesses
+  feed the track automatically (per-harness glue on top of `./runtime`)
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.5] - 2026-06-22
+
+### Added
+- **runtime** — the end-to-end glue between tracking and the gates:
+  - `gate(input)`: runs the stateless guards (file-size, git) first, then loads
+    the session track and runs `evaluateApex` (freshness → docs → SOLID). First
+    block wins; APEX applies only to code edits.
+  - `recordActivity(file, activity)`: a discriminated-union (`agent` | `doc` |
+    `ref`) PostToolUse recorder that persists into the track.
+  - `trackFile(sessionId, baseDir?)` path resolver; `REQUIRED_AGENTS` +
+    `DEFAULT_WINDOW_MS` (4 min). New subpath export `./runtime`.
 
 ## [0.1.4] - 2026-06-22
 
