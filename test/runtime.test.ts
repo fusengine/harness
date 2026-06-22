@@ -29,7 +29,7 @@ test("gate: stateless deny short-circuits (oversized file)", async () => {
 
 test("gate: APEX chain — freshness blocks, then docs once agents recorded", async () => {
   const f = fresh();
-  const input: GateInput = { sessionId: "s1", framework: "react", tool: "Write", filePath: "a.ts", content: "ok", now: 5000, trackFile: f, windowMs: 10000 };
+  const input: GateInput = { sessionId: "s1", framework: "react", tool: "Write", filePath: "a.ts", content: "a\nb\nc\nd\ne\nf", now: 5000, trackFile: f, windowMs: 10000 };
   expect((await gate(input))?.title).toContain("explore");
   await recordActivity(f, { kind: "agent", name: "explore-codebase", ts: 4000 });
   await recordActivity(f, { kind: "agent", name: "research-expert", ts: 4500 });

@@ -5,3 +5,4 @@ export * from "./patterns";
 export * from "./evaluate";
 export * from "./apex";
 export * from "./guards";
+export * from "./creation-intent";

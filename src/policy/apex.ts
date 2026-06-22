@@ -21,6 +21,10 @@ export interface ApexContext {
   refsRead?: string[];
   /** Whether the required prior agents (explore + research) ran within the freshness window. */
   agentsFresh?: boolean;
+  /** Whether brainstorming is required for this edit (creation intent on a new file). */
+  brainstormRequired?: boolean;
+  /** Whether the brainstorming agent ran within the window. */
+  brainstormFresh?: boolean;
 }
 
 /** A single APEX gate: returns a blocking {@link Prompt}, or null to pass. */
@@ -64,8 +68,19 @@ export const freshnessGate: ApexGate = (ctx) =>
       }
     : null;
 
-/** Default APEX gate chain (freshness, then docs, then SOLID refs). */
-export const APEX_GATES: ReadonlyArray<ApexGate> = [freshnessGate, docConsultedGate, solidReadGate];
+/** Gate: brainstorming must precede creating new files when flagged. */
+export const brainstormGate: ApexGate = (ctx) =>
+  ctx.brainstormRequired && ctx.brainstormFresh === false
+    ? {
+        kind: "block",
+        title: "APEX: brainstorm first",
+        reason: `Creation intent detected — brainstorm before creating new ${ctx.framework} files.`,
+        actions: ["Launch the brainstorming agent"],
+      }
+    : null;
+
+/** Default APEX gate chain (brainstorm, freshness, docs, SOLID refs). */
+export const APEX_GATES: ReadonlyArray<ApexGate> = [brainstormGate, freshnessGate, docConsultedGate, solidReadGate];
 
 /**
  * Run the APEX gates (chain-of-responsibility): the first failing gate's prompt

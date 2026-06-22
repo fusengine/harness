@@ -29,7 +29,7 @@ test("respond: native block shape per harness", () => {
 test("handleHook: full pre/post loop drives the gates", async () => {
   const cwd = root();
   const opts: HandleOptions = { now: 5000, cwd };
-  const edit = { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Write", tool_input: { file_path: "a.ts", content: "ok" } };
+  const edit = { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Write", tool_input: { file_path: "a.ts", content: "a\nb\nc\nd\ne\nf" } };
 
   expect((await handleHook("claude-code", edit, opts)).stdout).toContain("explore");
 

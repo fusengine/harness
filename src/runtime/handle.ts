@@ -48,6 +48,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     content: event.content,
     command: event.command,
     refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
+    isReplaceAll: event.input.replace_all === true,
     now: opts.now,
     trackFile: file,
   });
