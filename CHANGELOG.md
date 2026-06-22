@@ -5,10 +5,21 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Map each adapter's live PostToolUse tool-name → `recordActivity` so harnesses
-  feed the track automatically (per-harness glue on top of `./runtime`)
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 - typedoc-generated API reference
+
+## [0.1.6] - 2026-06-22
+
+### Added
+- **runtime/storage**: `harnessTrackDir(id, projectRoot)` — stores each harness's
+  track under its OWN config dir (`.claude/harness`, `.codex/harness`,
+  `.cursor/harness`, `.gemini/harness`, `.clinerules/harness`; `.fuse-harness`
+  fallback), next to its hooks, scoped per project.
+- **runtime/activity**: `activityFor(event)` maps a live tool-use to an
+  `Activity` to record — MCP doc calls (`context7`/`exa`, any separator) → `doc`,
+  `Task` + `subagent_type` → `agent` (bare name), a read of a `.md` → `ref`.
+  Tool names verified against each harness's 2026 hook docs. Closes the
+  auto-fill loop: adapter PostToolUse → `activityFor` → `recordActivity`.
 
 ## [0.1.5] - 2026-06-22
 
