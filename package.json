@@ -1,6 +1,6 @@
 {
   "name": "@fusengine/harness",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Harness-agnostic toolkit for AI coding agents: runtime harness detection (Claude Code, Codex, Cursor, Cline, Gemini, Aider...), pure policy core (env config, project/framework detection, SOLID/file-size limits, APEX freshness, guard patterns, portable prompts), cache, project memory, ref routing, state/locks, statusline, per-harness adapters (Claude/Cursor/Cline/Gemini) and a cli-mode harness-check binary. Bun-native, with a built dist for Node + bundlers.",
   "type": "module",
   "module": "src/index.ts",
@@ -24,6 +24,7 @@
     "./cli": { "bun": "./src/cli/index.ts", "types": "./dist/cli/index.d.mts", "import": "./dist/cli/index.mjs" },
     "./init": { "bun": "./src/init/index.ts", "types": "./dist/init/index.d.mts", "import": "./dist/init/index.mjs" },
     "./tracking": { "bun": "./src/tracking/index.ts", "types": "./dist/tracking/index.d.mts", "import": "./dist/tracking/index.mjs" },
+    "./runtime": { "bun": "./src/runtime/index.ts", "types": "./dist/runtime/index.d.mts", "import": "./dist/runtime/index.mjs" },
     "./adapters/claude": { "bun": "./src/adapters/claude/index.ts", "types": "./dist/adapters/claude/index.d.mts", "import": "./dist/adapters/claude/index.mjs" },
     "./adapters/codex": { "bun": "./src/adapters/codex/index.ts", "types": "./dist/adapters/codex/index.d.mts", "import": "./dist/adapters/codex/index.mjs" },
     "./adapters/cursor": { "bun": "./src/adapters/cursor/index.ts", "types": "./dist/adapters/cursor/index.d.mts", "import": "./dist/adapters/cursor/index.mjs" },
@@ -36,7 +37,7 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "tsdown src/index.ts src/config/index.ts src/util/index.ts src/detect/index.ts src/policy/index.ts src/prompt/index.ts src/memory/index.ts src/cache/index.ts src/freshness/index.ts src/refs/index.ts src/state/index.ts src/statusline/index.ts src/cli/index.ts src/cli/bin.ts src/init/index.ts src/tracking/index.ts src/adapters/claude/index.ts src/adapters/codex/index.ts src/adapters/cursor/index.ts src/adapters/cline/index.ts src/adapters/gemini/index.ts --dts --format esm --clean --out-dir dist",
+    "build": "tsdown src/index.ts src/config/index.ts src/util/index.ts src/detect/index.ts src/policy/index.ts src/prompt/index.ts src/memory/index.ts src/cache/index.ts src/freshness/index.ts src/refs/index.ts src/state/index.ts src/statusline/index.ts src/cli/index.ts src/cli/bin.ts src/init/index.ts src/tracking/index.ts src/runtime/index.ts src/adapters/claude/index.ts src/adapters/codex/index.ts src/adapters/cursor/index.ts src/adapters/cline/index.ts src/adapters/gemini/index.ts --dts --format esm --clean --out-dir dist",
     "prepublishOnly": "bun test && tsc --noEmit && bun run build"
   },
   "publishConfig": {
