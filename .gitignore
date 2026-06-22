@@ -3,6 +3,8 @@ node_modules/
 # build
 dist/
 *.tsbuildinfo
+# generated API docs (run `bun run docs:api`)
+docs/api/
 # os
 .DS_Store
 # fuse-lessons dev memory — internal build notes, not package content.

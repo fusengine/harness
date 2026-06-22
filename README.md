@@ -1,68 +1,133 @@
 # @fusengine/harness
 
-Harness-agnostic toolkit for AI coding agents. One package, modular subpaths,
-**Bun-native** (the `exports` map points at the TypeScript source — no build step).
+A **harness-agnostic enforcement engine** for AI coding agents. It ports the
+guard/gate logic of a Claude Code plugin into one reusable, **Bun-native** npm
+package that runs on **any** harness — Claude Code, OpenAI Codex, Cursor, Cline,
+Gemini CLI — plus a cli-mode fallback for Aider / Windsurf / OpenHands.
 
-It splits cleanly into a **pure policy core** (no harness coupling) and **thin
-adapters** that wire it into a specific harness's hook system.
+It splits cleanly into a **pure policy core** (no harness coupling, fully tested)
+and **thin per-harness adapters** that map a hook payload to the policy and back
+to that harness's native response.
 
-## Why
-
-The same guard logic (file-size limits, APEX freshness, framework detection,
-git guards, project memory) was duplicated across Python + TypeScript hooks and
-bound to one harness. This package is the single, tested source of truth — and
-it knows which harness it's running in.
+```
+detect → init (pre+post hooks) → `harness hook` → guards + APEX gates → native deny/ask
+```
 
 ## Install
 
 ```sh
-bun add @fusengine/harness
+npm i -g @fusengine/harness     # for the CLI (harness init/hook/check)
+# or, as a library:
+bun add @fusengine/harness      # Bun reads the TS source directly — no build step
 ```
 
-## Modules
+## Quickstart
+
+```sh
+cd your-project
+harness init                              # detects the harness, writes its pre+post hooks
+export FUSE_HARNESS_REFS=.claude/skills   # (optional) activate the SOLID-read gate
+```
+
+That's it. `init` writes the wiring file for the detected harness
+(`.claude/settings.json`, `.codex/hooks.json`, `.cursor/hooks.json`,
+`.gemini/settings.json`, or `.clinerules/hooks/PreToolUse`+`PostToolUse`), each
+pointing at `harness hook <id>`. From then on every tool-use is gated, and the
+session activity (agents run, docs consulted, refs read) is recorded
+automatically under `<harness-dir>/harness/`.
+
+### CLI
+
+| Command | What it does |
+|---------|--------------|
+| `harness init [id]` | Write the pre+post hook wiring for the detected (or named) harness. |
+| `harness hook <id>` | Runtime: read a hook payload on stdin, gate (pre) or record (post), print the native response. (Hooks call this — you don't.) |
+| `harness check` | cli-mode: check staged files in a pre-commit step, exit non-zero on a violation. For harnesses without hooks. |
+
+cli-mode (Aider / Windsurf / OpenHands), as a pre-commit step:
+
+```sh
+# .husky/pre-commit
+npx harness check
+```
+
+## What it enforces
+
+Ten portable guards + the APEX gate chain, all evaluated before a tool runs:
+
+| Guard / gate | Fires on |
+|---|---|
+| file-size (SOLID) | a code file over `FUSE_SOLID_MAX_LINES` (default 100) |
+| git | destructive git (`push --force`, `reset --hard`, …) |
+| bash-write | `python3 -c` / `sed -i` / redirects to code files |
+| install | `npm/pip/brew/...` installs (asks) |
+| security | `rm -rf /`, fork bombs, `curl \| sh`; `sudo` (asks) |
+| interface-separation | top-level interface/type/protocol in a component/controller |
+| protected-path | edits to `.claude/plugins\|logs\|cache`, `.git/` |
+| APEX freshness | `explore-codebase` + `research-expert` not run within the window |
+| APEX doc-consulted | Context7 **and** Exa not consulted this session |
+| APEX solid-read | required SOLID refs (from `FUSE_HARNESS_REFS`) not read |
+| brainstorm | creating a new file without brainstorming (when flagged) |
+| MCP verbosity / cache | caps exa `numResults`; serves a fresh cached MCP/WebFetch result |
+
+A trivial-edit fast path lets a few tiny (< 5-line, non-`replace_all`) edits
+through per window without the full APEX gates.
+
+### Environment
+
+| Var | Effect |
+|---|---|
+| `FUSE_SOLID_MAX_LINES` | SOLID file-size limit (default `100`). |
+| `FUSE_HARNESS_REFS` | Directory of `.md` SOLID references → activates `solidReadGate`. |
+| `FUSE_ENFORCE_TTL_SEC` | APEX freshness window in seconds. |
+| `FUSE_LESSONS_THROTTLE_MIN` | Lessons-injection throttle (memory module). |
+
+## Library usage
+
+```ts
+import { detectHarness } from "@fusengine/harness/detect";
+import { evaluate } from "@fusengine/harness/policy";
+import { gate } from "@fusengine/harness/runtime";
+
+const { id, mode } = detectHarness();            // { id: "cursor", mode: "hook" }
+
+// stateless guards (file-size, git, security, …)
+const verdict = evaluate({ tool: "Write", filePath: "src/big.ts", content });
+if (verdict.decision !== "allow") console.error(verdict.prompt?.reason);
+
+// full gate (stateless + stateful APEX, fed from the session track)
+const prompt = await gate({ sessionId, framework: "react", tool: "Write",
+  filePath: "src/Button.tsx", content, now: Date.now(), trackFile });
+```
+
+The `Prompt` it returns (`{ kind: "block" | "ask" | "inform", title, reason, actions? }`)
+is portable; each adapter maps it to the harness's native shape.
+
+## Subpath exports
 
 | Subpath | What |
 |---------|------|
-| `@fusengine/harness/detect` | `detectHarness()` / `detectMode()` — Claude Code, Codex, Cursor, Cline, Gemini, opencode, Windsurf, Copilot, Aider, Kiro, Goose, Amp (env signals + `AGENT`/`AI_AGENT` standards). `mode` is `hook` or `cli`. |
-| `@fusengine/harness/policy` | `evaluate(ctx)` → `{ decision, message }`; `evaluateFileSize`, `detectProjectType`, `detectFramework`, git/install guard patterns. |
-| `@fusengine/harness/config` | `resolveTtlSec` / `resolveMaxLines` (env-driven, robust parse), `ttlLabel`, `splitTarget`. |
-| `@fusengine/harness/memory` | Per-project "never reproduce" lessons: throttle state, multi-project registry by git root. |
-| `@fusengine/harness/cache` | `compactMarkdown`, `queryHash`, `jaccardSimilar`, atomic JSON I/O, MCP response extraction. |
-| `@fusengine/harness/freshness` | `isDocConsulted` (Context7 + Exa), trivial-edit counter. |
-| `@fusengine/harness/refs` | Frontmatter parsing, glob→regex, SOLID reference scoring/routing. |
-| `@fusengine/harness/state` | Directory locks, daily APEX state, task.json helpers. |
-| `@fusengine/harness/statusline` | Formatters, ANSI colors, progress/gradient bars. |
-| `@fusengine/harness/adapters/claude` | Claude Code adapter: read stdin → policy → `hookSpecificOutput`. |
+| `./detect` | `detectHarness()` / `detectMode()` — 13 harnesses, `hook` vs `cli`. |
+| `./policy` | `evaluate(ctx)`, the 10 guards, `evaluateApex`, framework detection. |
+| `./runtime` | `handleHook`, `gate`, `recordActivity`, `activityFor`, per-harness storage + MCP intercept. |
+| `./tracking` | Session track: `recordAgent/Doc/RefRead`, `agentsFresh`, trivial-edit counter. |
+| `./refs` | Frontmatter parse, `loadRefs(dir)`, SOLID ref scoring/routing. |
+| `./prompt` | The portable `Prompt` type + `formatPrompt`. |
+| `./cache` | MCP/WebFetch cache: key, lookup/store, compaction, response extraction. |
+| `./memory` | Per-project "never reproduce" lessons. |
+| `./config` `./util` `./state` `./statusline` `./freshness` `./init` `./cli` | env config, project-root, locks, statusline, doc-freshness, wiring templates, staged checks. |
+| `./adapters/{claude,codex,cursor,cline,gemini}` | Thin per-harness adapters. |
 
-## Usage
-
-```ts
-import { detectHarness, detectMode } from "@fusengine/harness/detect";
-import { evaluate } from "@fusengine/harness/policy";
-
-const { id, mode } = detectHarness();        // e.g. { id: "cursor", mode: "hook" }
-
-const verdict = evaluate({ tool: "Write", filePath: "src/big.ts", content });
-if (verdict.decision === "deny") console.error(verdict.message);
-```
-
-Claude Code hook (thin adapter):
-
-```ts
-import { readClaudeInput, fileSizeGuard } from "@fusengine/harness/adapters/claude";
-
-const deny = fileSizeGuard(await readClaudeInput());
-if (deny) { console.log(deny); process.exit(2); }
-```
-
-Harness without hooks (Aider/Windsurf/OpenHands) → `cli` mode: run the same
-`evaluate()` from a pre-commit step instead.
+See [`docs/`](./docs) for per-module guides, and run `bun run docs:api` for the
+generated typedoc API reference.
 
 ## Develop
 
 ```sh
-bun test          # test suite
-bunx tsc --noEmit # typecheck
+bun test            # 105 tests
+bunx tsc --noEmit   # typecheck (isolatedDeclarations)
+bun run build       # dist + .d.mts via tsdown (for Node/bundler consumers)
+bun run docs:api    # generate the typedoc API reference
 ```
 
-CI runs both on every PR. MIT licensed.
+CI runs test + typecheck on every PR. MIT licensed.

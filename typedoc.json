@@ -1,0 +1,12 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "exclude": ["**/*.test.ts", "**/cli/bin.ts"],
+  "out": "docs/api",
+  "readme": "none",
+  "skipErrorChecking": true,
+  "excludeInternal": true,
+  "githubPages": false,
+  "name": "@fusengine/harness"
+}
