@@ -14,7 +14,7 @@ export const GIT_BLOCKED: ReadonlyArray<RegExp> = [
 export const GIT_ASK: ReadonlyArray<RegExp> = [
   /git push/, /git checkout/, /git reset/, /git rebase/, /git merge/,
   /git stash/, /git clean/, /git rm/, /git mv/, /git restore/,
-  /git revert/, /git cherry-pick/,
+  /git revert/, /git cherry-pick/, /git commit/, /git add/, /git branch -d/,
 ];
 
 /** System-level package installs (need confirmation). */

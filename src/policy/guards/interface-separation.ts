@@ -9,6 +9,10 @@ export const PY_MODEL_RE: RegExp = /^\s*class\s+\w+\((BaseModel|TypedDict|Protoc
 export const PHP_DECL_RE: RegExp = /^\s*(interface|abstract class)\b/m;
 /** Swift views: top-level `protocol Foo`. */
 export const SWIFT_PROTO_RE: RegExp = /^\s*protocol\s+[A-Z]/m;
+/** Go handlers/controllers: top-level `type Foo interface`. */
+export const GO_DECL_RE: RegExp = /^\s*type\s+[A-Z]\w*\s+interface\b/m;
+/** Java/Kotlin controllers/handlers: top-level `interface`/`record`. */
+export const JAVA_DECL_RE: RegExp = /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)?(?:interface|record)\s+[A-Z]/m;
 
 /**
  * Blocks top-level interface/type/protocol declarations in component, view or
@@ -28,9 +32,12 @@ export function interfaceSeparationGuard(ctx: GuardContext): Prompt | null {
     actions: ["Move the interface/type to its own file (Interface Segregation)"],
   };
 
+  const inAny = (...frags: string[]): boolean => frags.some((f) => path.includes(f));
   if (/\.(tsx|jsx|vue|svelte)$/.test(path) && TS_DECL_RE.test(content)) return block;
-  if (path.includes("views/") && /\.py$/.test(path) && PY_MODEL_RE.test(content)) return block;
-  if (path.includes("Controllers/") && /\.php$/.test(path) && PHP_DECL_RE.test(content)) return block;
-  if (path.includes("Views/") && /\.swift$/.test(path) && SWIFT_PROTO_RE.test(content)) return block;
+  if (/\.py$/.test(path) && inAny("views/", "controllers/", "routes/") && PY_MODEL_RE.test(content)) return block;
+  if (/\.go$/.test(path) && inAny("handlers/", "controllers/") && GO_DECL_RE.test(content)) return block;
+  if (/\.(java|kt)$/.test(path) && inAny("controllers/", "handlers/") && JAVA_DECL_RE.test(content)) return block;
+  if (/\.php$/.test(path) && inAny("Controllers/", "Handlers/") && PHP_DECL_RE.test(content)) return block;
+  if (/\.swift$/.test(path) && inAny("Views/", "Components/") && SWIFT_PROTO_RE.test(content)) return block;
   return null;
 }

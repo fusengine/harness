@@ -7,7 +7,21 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - read_paths: let a served MCP cache-hit count as doc-consulted (needs the cache
   files to carry a provider prefix) — the last inert gap from the parity audit
+- file-size: check the on-disk file (not just incoming content) + agent-type exemption
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+
+## [0.1.17] - 2026-06-24
+
+### Added (parity audit — pattern coverage)
+- **git**: `GIT_ASK` += `git commit` / `git add` / `git branch -d` (ask). NOTE:
+  with Ralph mode gone, these now prompt on every use — drop the 3 patterns if too noisy.
+- **security**: critical += `shred` / `fdisk` / `diskutil erase` / redirect to
+  `/dev/{sda,hda,nvme}` / `rm -rf /{etc,usr,var,bin,sbin,…}`; ask += `su` / `doas` /
+  `passwd` / `rm` / `unlink`.
+- **interface-separation**: now covers **Go** (`type Foo interface`) and
+  **Java/Kotlin** (`interface`/`record`), plus widened paths (Python `controllers/`/
+  `routes/`, PHP `Handlers/`, Swift `Components/`).
+- **verbosity**: caps exa `tokensNum` ≤ 2000 and Context7 `tokens` ≤ 2000 (was numResults only).
 
 ## [0.1.16] - 2026-06-24
 
