@@ -39,7 +39,7 @@ file-I/O only — no harness coupling.
 ## memory — `@fusengine/harness/memory`
 | Export | Description |
 |--------|-------------|
-| `stateFileFor(root)` / `readState` / `setStateField` | per-project throttle state at `<root>/MEMORY/state.json` |
+| `stateFileFor(root)` / `lessonsFileFor(root)` / `readState` / `setStateField` | per-project state at `<root>/.harness/memory/` |
 | `throttleMs(env?)` | reminder window (`FUSE_LESSONS_THROTTLE_MIN`, default 5 min) |
 | `nowStamp()` | `YYYY-MM-DD HH:MM` |
 | `readRoots(home?)` / `addRoot(root, home?)` | multi-project registry |

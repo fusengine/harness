@@ -7,6 +7,21 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 
+## [0.1.14] - 2026-06-23
+
+### Changed
+- **Unified, neutral project state dir.** All per-project state now lives under
+  one `<root>/.harness/` (was scattered: `.claude/harness/`, `MEMORY/`), so it no
+  longer hides inside one harness's config dir:
+  - `.harness/track/` (session tracks), `.harness/cache/` (MCP/WebFetch),
+    `.harness/memory/` (`LESSON.md` committable + `state.json` machine-local).
+  - `harness init` now also writes a selective `.harness/.gitignore`
+    (ignores track/cache/state.json, keeps `LESSON.md`).
+- **New `config/layout` — single source of truth.** `projectLayout(root)` derives
+  every path; `runtime/storage`, `memory`, and `init` all consume it (nothing
+  hardcodes a dir name). `harnessTrackDir(id, root)` → `harnessStateDir(root)`;
+  `memory` gains `lessonsFileFor(root)`. The HOME roots registry is unchanged.
+
 ## [0.1.13] - 2026-06-23
 
 ### Documentation

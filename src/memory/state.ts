@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { projectLayout } from "../config/layout";
 import { ensureMemoryGitignore } from "./gitignore";
 
 /** Per-project reminder throttle state, stored at `<root>/MEMORY/state.json`. */
@@ -10,7 +11,12 @@ export interface ReminderState {
 
 /** Absolute path of the per-project throttle state file. */
 export function stateFileFor(root: string): string {
-  return `${root}/MEMORY/state.json`;
+  return projectLayout(root).memoryStateFile;
+}
+
+/** Absolute path of the per-project curated lessons file (committable). */
+export function lessonsFileFor(root: string): string {
+  return projectLayout(root).lessonsFile;
 }
 
 function num(v: unknown): number {

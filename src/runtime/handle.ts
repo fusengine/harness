@@ -1,7 +1,6 @@
-import { join } from "node:path";
+import { projectLayout } from "../config/layout";
 import { detectFramework } from "../policy/detect-framework";
 import { loadRefs } from "../refs/loader";
-import type { HarnessId } from "../detect/harness";
 import { activityFor } from "./activity";
 import { gate } from "./gate";
 import { MCP_TTL_MS, mcpPostStore, mcpPreIntercept } from "./mcp";
@@ -9,7 +8,6 @@ import { normalizeEvent } from "./normalize";
 import { trackFile } from "./paths";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
-import { harnessTrackDir } from "./storage";
 
 /** Options for {@link handleHook} (caller supplies the clock + project root). */
 export interface HandleOptions {
@@ -33,9 +31,9 @@ export interface HandleOutcome {
  */
 export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
   const event = normalizeEvent(id, payload);
-  const dir = harnessTrackDir(id as HarnessId, opts.cwd);
-  const file = trackFile(event.sessionId, dir);
-  const mcpDir = join(dir, "mcp");
+  const layout = projectLayout(opts.cwd);
+  const file = trackFile(event.sessionId, layout.trackDir);
+  const mcpDir = layout.cacheDir;
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
   if (event.phase === "post") {

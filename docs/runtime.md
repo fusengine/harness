@@ -56,7 +56,8 @@ and the gate reads it on PRE:
 
 ## Storage & MCP
 
-- `harnessTrackDir(id, root)` → the track lives under the harness's own config
-  dir (`.claude/harness`, `.codex/harness`, …).
+- `projectLayout(root)` (`./config`) → the single source of truth: all state
+  lives under one neutral `<root>/.harness/` (`track/`, `cache/`, `memory/`).
+  `harnessStateDir(root)` returns `<root>/.harness`.
 - `mcpPreIntercept` serves a fresh cached MCP/WebFetch result (deny + content) or
   caps exa `numResults`; `mcpPostStore` caches the response. See `./cache`.
