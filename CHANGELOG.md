@@ -7,8 +7,21 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - read_paths: let a served MCP cache-hit count as doc-consulted (needs the cache
   files to carry a provider prefix) — the last inert gap from the parity audit
-- file-size: check the on-disk file (not just incoming content) + agent-type exemption
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+
+## [0.1.18] - 2026-06-24
+
+### Added (parity audit — file-size on-disk + agent exemption)
+- **file-size now checks the existing on-disk file**, not just the incoming
+  payload: an **Edit** on an already-oversized file blocks (judges `existingLines`
+  read by the runtime gate), while a **Write** judges its full new content (so it
+  can legitimately shrink a large file). `Explore`/`Plan` agents are exempt.
+- `PolicyContext` gains `agentType` + `existingLines`; `GateInput` gains
+  `agentType`; `normalizeEvent` extracts `agent_type` / `subagent_type`.
+
+### Documentation
+- Refreshed `docs/guards.md` to the current coverage (security commands, Go/Java
+  interfaces, git ask set, file-size on-disk, verbosity caps).
 
 ## [0.1.17] - 2026-06-24
 

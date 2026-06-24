@@ -70,6 +70,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     command: event.command,
     refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
     isReplaceAll: event.input.replace_all === true,
+    agentType: event.agentType,
     windowMs: opts.windowMs,
     now: opts.now,
     trackFile: file,

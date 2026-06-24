@@ -14,6 +14,10 @@ export interface PolicyContext {
   command?: string;
   /** Optional override for the SOLID max-lines limit. */
   maxLines?: number;
+  /** Subagent type — `Explore`/`Plan` are exempt from the file-size gate. */
+  agentType?: string;
+  /** Line count of the existing on-disk file (so an Edit on an oversized file blocks). */
+  existingLines?: number;
 }
 
 /** Harness-agnostic policy decision (+ a portable prompt for adapters to render). */
@@ -57,9 +61,12 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
       },
     };
   }
-  if (ctx.filePath && isCodeFile(ctx.filePath) && ctx.content !== undefined) {
-    const verdict = evaluateFileSize(countLines(ctx.content), ctx.maxLines);
-    if (!verdict.ok) {
+  if (ctx.filePath && isCodeFile(ctx.filePath) && ctx.agentType !== "Explore" && ctx.agentType !== "Plan") {
+    const incoming = ctx.content !== undefined ? countLines(ctx.content) : 0;
+    // Write provides the full new content → judge it. Edit is partial → judge the on-disk file.
+    const lines = ctx.tool === "Edit" ? Math.max(incoming, ctx.existingLines ?? 0) : incoming || (ctx.existingLines ?? 0);
+    const verdict = evaluateFileSize(lines, ctx.maxLines);
+    if (lines > 0 && !verdict.ok) {
       return {
         decision: "deny",
         message: verdict.message,
@@ -69,7 +76,7 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
           reason: verdict.message ?? "",
           actions: [`Split into modules under ${verdict.max} lines (Single Responsibility)`, "Then re-run the write"],
         },
-        meta: { framework: detectFramework(ctx.filePath, ctx.content), lines: verdict.lines, max: verdict.max },
+        meta: { framework: detectFramework(ctx.filePath, ctx.content ?? ""), lines: verdict.lines, max: verdict.max },
       };
     }
   }
