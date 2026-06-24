@@ -20,6 +20,7 @@ export const GIT_ASK: ReadonlyArray<RegExp> = [
 /** System-level package installs (need confirmation). */
 export const SYSTEM_INSTALL: ReadonlyArray<RegExp> = [
   /brew install/, /brew upgrade/, /brew cask/, /apt install/, /apt-get install/,
+  /dnf install/, /pacman -S/,
 ];
 
 /** Project-level package installs. */

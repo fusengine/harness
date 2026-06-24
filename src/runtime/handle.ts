@@ -15,6 +15,8 @@ export interface HandleOptions {
   cwd: string;
   /** Directory of SOLID reference `.md` files for `solidReadGate` (else inert). */
   refsDir?: string;
+  /** APEX freshness window in ms (from `FUSE_ENFORCE_TTL_SEC`). */
+  windowMs?: number;
 }
 
 /** What the hook bin should print + exit with. */
@@ -55,6 +57,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     command: event.command,
     refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
     isReplaceAll: event.input.replace_all === true,
+    windowMs: opts.windowMs,
     now: opts.now,
     trackFile: file,
   });

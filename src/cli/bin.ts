@@ -8,6 +8,7 @@
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
 import { handleHook } from "../runtime/handle";
+import { resolveTtlSec } from "../config/ttl";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
 async function readStdin(): Promise<Record<string, unknown>> {
@@ -27,7 +28,7 @@ const cmd = process.argv[2];
 
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
-  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS });
+  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS, windowMs: resolveTtlSec(process.env) * 1000 });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {
