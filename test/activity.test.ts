@@ -1,14 +1,11 @@
 import { test, expect } from "bun:test";
 import { activityFor, type ToolEvent } from "../src/runtime/activity";
-import { harnessTrackDir } from "../src/runtime/storage";
+import { harnessStateDir } from "../src/runtime/storage";
 
 const ev = (tool: string, input?: Record<string, unknown>): ToolEvent => ({ tool, input, sessionId: "s1", framework: "react", now: 1000 });
 
-test("harnessTrackDir: per-harness config dir + fallback", () => {
-  expect(harnessTrackDir("claude-code", "/p")).toBe("/p/.claude/harness");
-  expect(harnessTrackDir("codex", "/p")).toBe("/p/.codex/harness");
-  expect(harnessTrackDir("gemini-cli", "/p")).toBe("/p/.gemini/harness");
-  expect(harnessTrackDir("aider", "/p")).toBe("/p/.fuse-harness/harness");
+test("harnessStateDir: neutral .harness dir", () => {
+  expect(harnessStateDir("/p")).toBe("/p/.harness");
 });
 
 test("activityFor: MCP doc (any separator)", () => {

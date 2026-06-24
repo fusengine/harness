@@ -21,7 +21,8 @@ test("templates: pre + post wiring per harness", () => {
 test("initFor: hook harness -> files, cli-only -> null", () => {
   expect(initFor("claude-code")?.[0]?.path).toBe(".claude/settings.json");
   expect(initFor("codex")?.[0]?.path).toBe(".codex/hooks.json");
-  expect(initFor("cline")?.length).toBe(2);
+  expect(initFor("cline")?.length).toBe(3);
+  expect(initFor("cline")?.at(-1)?.path).toBe(".harness/.gitignore");
   expect(initFor("aider")).toBeNull();
 });
 

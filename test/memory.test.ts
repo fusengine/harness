@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { stateFileFor, readState, setStateField, throttleMs, nowStamp } from "../src/memory/state";
+import { stateFileFor, lessonsFileFor, readState, setStateField, throttleMs, nowStamp } from "../src/memory/state";
 import { registryFile, readRoots, addRoot } from "../src/memory/registry";
 
 test("readState: missing file -> zeros", () => {
@@ -16,8 +16,9 @@ test("setStateField: round-trip without clobbering sibling", () => {
   expect(readState(file)).toEqual({ lastCodeEditAt: 111, lastRemindedAt: 222 });
 });
 
-test("stateFileFor", () => {
-  expect(stateFileFor("/a/b")).toBe("/a/b/MEMORY/state.json");
+test("stateFileFor + lessonsFileFor under .harness/memory", () => {
+  expect(stateFileFor("/a/b")).toBe("/a/b/.harness/memory/state.json");
+  expect(lessonsFileFor("/a/b")).toBe("/a/b/.harness/memory/LESSON.md");
 });
 
 test("throttleMs: default / override / bad -> default", () => {

@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { HarnessId } from "../detect/harness";
 import { claudeInit, clineInit, codexInit, cursorInit, geminiInit, type InitFile } from "./templates";
+import { STATE_GITIGNORE, STATE_ROOT } from "../config/layout";
 
 const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile[]>> = {
   "claude-code": claudeInit,
@@ -17,7 +18,8 @@ const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile[]>> = {
  */
 export function initFor(id: HarnessId, command: string = `npx harness hook ${id}`): InitFile[] | null {
   const make = RUNNERS[id];
-  return make ? make(command) : null;
+  if (!make) return null;
+  return [...make(command), { path: `${STATE_ROOT}/.gitignore`, content: STATE_GITIGNORE }];
 }
 
 /** Write an {@link InitFile} under `root` (creates dirs; `chmod +x` when executable). */

@@ -34,7 +34,7 @@ That's it. `init` writes the wiring file for the detected harness
 `.gemini/settings.json`, or `.clinerules/hooks/PreToolUse`+`PostToolUse`), each
 pointing at `harness hook <id>`. From then on every tool-use is gated, and the
 session activity (agents run, docs consulted, refs read) is recorded
-automatically under `<harness-dir>/harness/`.
+automatically under `<project>/.harness/` (track, cache, memory).
 
 ### CLI
 
