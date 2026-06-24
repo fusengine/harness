@@ -103,6 +103,21 @@ const prompt = await gate({ sessionId, framework: "react", tool: "Write",
 The `Prompt` it returns (`{ kind: "block" | "ask" | "inform", title, reason, actions? }`)
 is portable; each adapter maps it to the harness's native shape.
 
+### Extend it
+
+Add your own project rules without forking — they run **after** the privileged
+core chain (two-tier), and the chain is **fail-closed** (a guard that throws blocks,
+never silently passes):
+
+```ts
+import { registerGuard } from "@fusengine/harness/policy";
+
+registerGuard(({ tool, command }) =>
+  tool === "Bash" && command?.includes("kubectl delete")
+    ? { kind: "ask", title: "Confirm cluster change", reason: command }
+    : null);
+```
+
 ## Subpath exports
 
 | Subpath | What |
