@@ -34,7 +34,7 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
       - name: Publish
-        # --provenance requires a PUBLIC repo; re-add it if/when this repo goes public.
-        run: npm publish --access public
+        # Repo is public → emit a signed provenance attestation (sigstore).
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

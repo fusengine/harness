@@ -5,7 +5,13 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Go public → re-enable `--provenance` + Trusted Publishing (OIDC), drop `NPM_TOKEN`
+- Trusted Publishing (OIDC) on npmjs → drop the `NPM_TOKEN` secret
+
+## [0.1.23] - 2026-06-24
+
+### Changed
+- Repo is now **public** → the publish workflow emits a signed **provenance**
+  attestation (`npm publish --provenance`, sigstore). First release with provenance.
 
 ## [0.1.22] - 2026-06-24
 
