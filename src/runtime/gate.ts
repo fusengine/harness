@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { evaluate } from "../policy/evaluate";
 import { evaluateApex, type ApexContext } from "../policy/apex";
 import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
@@ -27,6 +28,17 @@ export interface GateInput {
   trackFile: string;
   windowMs?: number;
   isReplaceAll?: boolean;
+  agentType?: string;
+}
+
+/** Line count of the existing on-disk file (undefined if absent/unreadable). */
+function existingLineCount(path: string | undefined): number | undefined {
+  if (!path) return undefined;
+  try {
+    return existsSync(path) ? readFileSync(path, "utf8").split("\n").length : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -35,7 +47,7 @@ export interface GateInput {
  * track. Returns the first blocking prompt, or null to allow.
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
-  const quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command });
+  const quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines: existingLineCount(input.filePath) });
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
 
   if (!input.filePath) return null;

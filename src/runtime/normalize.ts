@@ -7,6 +7,8 @@ export interface NormalizedEvent {
   filePath?: string;
   content?: string;
   command?: string;
+  /** Subagent type, if the tool-use came from one (Explore/Plan are file-size-exempt). */
+  agentType?: string;
 }
 
 function str(v: unknown): string | undefined {
@@ -43,5 +45,6 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     filePath: str(input.file_path) ?? str(input.path) ?? str(payload.file_path),
     content: str(input.content) ?? str(input.new_string),
     command: str(input.command) ?? str(payload.command),
+    agentType: str(payload.agent_type) ?? str(input.subagent_type),
   };
 }

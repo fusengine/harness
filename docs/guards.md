@@ -18,16 +18,21 @@ portable `Prompt` (`kind: "block" | "ask" | "inform"`) or `null` to continue.
 
 | Guard | Fires when | kind |
 |-------|-----------|------|
-| `securityGuard` | `rm -rf /`, fork bomb, `curl \| sh`, `mkfs`, disk overwrite | block |
-| | `sudo`, `chmod 777`, recursive `chown`, `eval`, write to `/etc` | ask |
+| `securityGuard` | `rm -rf /\|/etc\|/usr…`, fork bomb, `curl \| sh`, `mkfs`/`shred`/`fdisk`/`diskutil erase`, `> /dev/{sda,hda,nvme}` | block |
+| | `sudo`/`su`/`doas`/`passwd`, `chmod 777`, recursive `chown`, `eval`, `rm`/`unlink`, write to `/etc` | ask |
 | `protectedPathGuard` | Write/Edit under `.claude/plugins\|logs\|cache`, `.git/` | block |
 | `bashWriteGuard` | `python3 -c`, `sed -i`, heredoc/redirect to a code file | block |
 | | redirect to a non-code file, `tee`, `dd of=`, `node -e` writes | ask |
-| `interfaceSeparationGuard` | top-level `interface`/`type`/`protocol` in a component/view/controller | block |
-| `installGuard` | `npm/yarn/pnpm/bun/pip/cargo/go/gem/composer` + `brew/apt/...` installs | ask |
+| `interfaceSeparationGuard` | top-level `interface`/`type`/`protocol`/`record` in a TS/JS/Vue/Svelte, Python, **Go**, **Java/Kotlin**, PHP, or Swift component/view/controller/handler | block |
+| `installGuard` | `npm/yarn/pnpm/bun/pip/cargo/go/gem/composer` + `brew/apt/dnf/pacman` installs | ask |
 
-Plus, inside `evaluate()` after the chain: **git** (destructive git commands)
-and **file-size** (a code file over `FUSE_SOLID_MAX_LINES`).
+Plus, inside `evaluate()` after the chain:
+- **git** — destructive ops (`push --force`, `reset --hard`, `branch -D`…) → **block**;
+  routine ops (`push`, `checkout`, `commit`, `add`, `branch -d`, `merge`…) → **ask**.
+- **file-size** — over `FUSE_SOLID_MAX_LINES` (default 100). A **Write** judges its
+  new content; an **Edit** judges the existing on-disk file. `Explore`/`Plan` agents are exempt.
+- **verbosity** (`capVerbosity`) — caps exa `numResults`≤3 + `tokensNum`≤2000 and
+  Context7 `tokens`≤2000 (applied as an input mutation, not a block).
 
 ## APEX gates (stateful)
 
