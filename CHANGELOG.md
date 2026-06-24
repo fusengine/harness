@@ -5,7 +5,24 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
+- read_paths: let a served MCP cache-hit count as doc-consulted (needs the cache
+  files to carry a provider prefix) — the last inert gap from the parity audit
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+
+## [0.1.16] - 2026-06-24
+
+### Fixed (parity audit — inert gates now actually fire)
+- **agent-quality**: `activityFor` derives agent `quality` from the POST response
+  length (≥500 → `sufficient`); `recordActivity` persists it, so `agentsFresh`
+  finally rejects empty/insufficient agent runs (was structurally inert).
+- **brainstorm**: `handleHook` now handles a `UserPromptSubmit` payload —
+  `detectCreationIntent(prompt)` → `recordBrainstormRequired`, so `brainstormGate`
+  can actually fire (the flag was never set before).
+
+### Removed
+- **`dispatchHook`** (`cli/hook.ts`) + its test — dead, stateless, APEX-bypassing
+  entry point superseded by `handleHook`. Removed to kill the footgun. Documented
+  the thin-adapter (stateless) vs `handleHook` (full) distinction in `docs/adapters.md`.
 
 ## [0.1.15] - 2026-06-23
 

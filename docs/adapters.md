@@ -5,6 +5,15 @@ shim that (1) parses a harness's event payload, (2) calls the core, (3)
 serializes that harness's native response. Adapters are the *only*
 harness-specific code.
 
+> **Thin (stateless) vs full (stateful).** An adapter's `guard()` runs only the
+> **stateless** policy (`evaluate`: file-size, git, security, bash-write,
+> install, interface, protected-path) — it judges the *command*, not the
+> *session*. The **full** enforcement (stateless **+** the stateful APEX gates:
+> freshness, doc-consulted, SOLID-read, brainstorm + activity recording) only
+> runs through **`handleHook`** (i.e. `harness hook <id>`), which reads/writes
+> the session track. Use `handleHook` for real enforcement; the thin adapter
+> exports are a fast stateless building block, not the complete gate.
+
 ## Claude Code — `@fusengine/harness/adapters/claude`
 
 | Export | Description |
