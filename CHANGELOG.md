@@ -4,6 +4,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-06-24
+
+### Fixed (security)
+- **macOS raw-disk bypass**: the `dd` block missed `/dev/rdisk` (the raw, faster,
+  more destructive macOS path), so `dd of=/dev/rdisk2` slipped through — widened to
+  `r?disk` (+ `xvd`).
+- **ReDoS in `stripHeredoc`**: the lazy dot-all + backreference could backtrack
+  catastrophically (O(n³)); rewrote as a linear two-phase scan (backreference-free
+  opener + per-heredoc closer search), preserving `<<-` indented-closer semantics.
+
 ## [0.1.27] - 2026-06-24
 
 ### Fixed (port parity — gaps found by a Python↔TS content diff)

@@ -8,7 +8,7 @@ export const CRITICAL_PATTERNS: RegExp[] = [
   /\b(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/,
   /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\s+\//,
   /\bmkfs(?:\.[a-z0-9]+)?\b/,
-  /\bdd\b[^\n]*\bof=\/dev\/(?:disk|sd|hd|nvme|mmcblk|vd)/i,
+  /\bdd\b[^\n]*\bof=\/dev\/(?:r?disk|sd|hd|nvme|mmcblk|vd|xvd)/i,
   /\bshred\b/,
   /\bfdisk\b/,
   /\bdiskutil\s+(?:erase|partitionDisk)/i,
@@ -27,9 +27,27 @@ export const ASK_PATTERNS: RegExp[] = [
   /\brm\s/, /\bunlink\s/, /\bdel\s/,
 ];
 
-/** Strip heredoc bodies so their content isn't matched as a command (false positives). */
+/**
+ * Strip heredoc bodies so their content isn't matched as a command (false positives).
+ * Two-phase scan: a backreference-free opener regex finds `<<[-]DELIM`, then the body
+ * is cut up to the closing delimiter via `indexOf` — O(n), no catastrophic backtracking.
+ */
 function stripHeredoc(cmd: string): string {
-  return cmd.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, " ");
+  const opener = /<<-?\s*['"]?(\w+)['"]?/g;
+  let out = cmd;
+  let m: RegExpExecArray | null;
+  while ((m = opener.exec(out)) !== null) {
+    const delim: string = m[1] ?? "";
+    // Closer may be indented (the `<<-` form strips leading tabs); `\b` ends the word.
+    const closer = new RegExp(`\\n[ \\t]*${delim}\\b`);
+    const rest: string = out.slice(m.index + m[0].length);
+    const hit: RegExpMatchArray | null = closer.exec(rest);
+    if (!hit || hit.index === undefined) break;
+    const end: number = m.index + m[0].length + hit.index + hit[0].length;
+    out = `${out.slice(0, m.index)} ${out.slice(end)}`;
+    opener.lastIndex = m.index;
+  }
+  return out;
 }
 
 /** Guards against dangerous Bash commands (critical → block, sensitive → ask). */
