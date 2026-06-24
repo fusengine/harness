@@ -30,12 +30,13 @@ jobs:
         run: bunx tsc --noEmit
       - name: Build
         run: bun run build
+      # No registry-url: it writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc, and the
+      # mere presence of that line disables npm's OIDC path → empty token → 404 on PUT.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: "https://registry.npmjs.org"
       - name: Upgrade npm (OIDC trusted publishing needs npm >= 11.5)
-        run: npm install -g npm@latest
+        run: npm install -g npm@latest --force
       - name: Publish
         # Repo public → signed provenance (sigstore) + Trusted Publishing (OIDC, no token).
         run: npm publish --access public --provenance
