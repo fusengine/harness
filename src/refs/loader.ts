@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, delimiter } from "node:path";
 import { parseFrontmatter } from "./frontmatter";
 import type { RefMeta } from "./types";
 
@@ -31,18 +31,20 @@ export function toRefMeta(fm: Record<string, string>, filePath: string): RefMeta
  * {@link RefMeta}. The content is entirely the consumer's — point this at any
  * refs dir (`FUSE_HARNESS_REFS`). Returns an empty list when the dir is absent.
  */
-export async function loadRefs(dir: string): Promise<RefMeta[]> {
-  let entries: string[];
-  try {
-    entries = (await readdir(dir, { recursive: true })) as string[];
-  } catch {
-    return [];
-  }
+export async function loadRefs(dirs: string): Promise<RefMeta[]> {
   const refs: RefMeta[] = [];
-  for (const rel of entries) {
-    if (!rel.endsWith(".md")) continue;
-    const filePath = join(dir, rel);
-    refs.push(toRefMeta(parseFrontmatter(await readFile(filePath, "utf8")), filePath));
+  for (const dir of dirs.split(delimiter).filter(Boolean)) {
+    let entries: string[];
+    try {
+      entries = (await readdir(dir, { recursive: true })) as string[];
+    } catch {
+      continue;
+    }
+    for (const rel of entries) {
+      if (!rel.endsWith(".md")) continue;
+      const filePath = join(dir, rel);
+      refs.push(toRefMeta(parseFrontmatter(await readFile(filePath, "utf8")), filePath));
+    }
   }
   return refs;
 }
