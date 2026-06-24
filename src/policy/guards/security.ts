@@ -9,6 +9,11 @@ export const CRITICAL_PATTERNS: RegExp[] = [
   /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\s+\//,
   /\bmkfs(?:\.[a-z0-9]+)?\b/,
   /\bdd\b[^\n]*\bif=\/dev\/zero\b[^\n]*\bof=\/dev\//,
+  /\bshred\b/,
+  /\bfdisk\b/,
+  /\bdiskutil\s+(?:erase|partitionDisk)/i,
+  /(?:>|>>)\s*\/dev\/(?:sda|hda|nvme)/,
+  /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*\/(?:etc|usr|var|bin|sbin|boot|lib)\b/,
 ];
 
 /** Patterns that warrant explicit confirmation before running. */
@@ -18,6 +23,8 @@ export const ASK_PATTERNS: RegExp[] = [
   /\bchown\s+-R\b/,
   /\beval\s/,
   /(?:>|>>|\btee\b)\s*\/etc\//,
+  /\bsu\s/, /\bdoas\s/, /\bpasswd\b/,
+  /\brm\s/, /\bunlink\s/,
 ];
 
 /** Guards against dangerous Bash commands (critical → block, sensitive → ask). */
