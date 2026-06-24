@@ -4,8 +4,13 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
-### Planned
-- Trusted Publishing (OIDC) on npmjs → drop the `NPM_TOKEN` secret
+## [0.1.24] - 2026-06-24
+
+### Changed
+- **Publish via npm Trusted Publishing (OIDC)** — dropped `NODE_AUTH_TOKEN` /
+  `NPM_TOKEN` from the workflow; auth is now the short-lived GitHub OIDC token
+  (no long-lived secret). npm upgraded to ≥11.5 in CI for OIDC support. Provenance
+  still emitted. The `NPM_TOKEN` repo secret can now be deleted.
 
 ## [0.1.23] - 2026-06-24
 
