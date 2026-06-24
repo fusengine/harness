@@ -2,8 +2,7 @@ name: Publish
 
 # Auto-publish to npm when a version tag is pushed:
 #   git tag v0.1.0 && git push origin v0.1.0
-# Auth: npm Trusted Publishing (OIDC) — configure the trusted publisher on npmjs.
-# No NPM_TOKEN secret needed (the `id-token: write` permission grants the OIDC token).
+# Auth: NPM_TOKEN secret (npmjs -> Access Tokens -> Automation). Provenance via id-token.
 
 on:
   push:
@@ -30,15 +29,13 @@ jobs:
         run: bunx tsc --noEmit
       - name: Build
         run: bun run build
-      # No registry-url: it writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc, and the
-      # mere presence of that line disables npm's OIDC path → empty token → 404 on PUT.
       - uses: actions/setup-node@v4
         with:
-          node-version: 24 # ships npm 11.x natively (OIDC trusted publishing needs npm >= 11.5)
-      - name: Upgrade npm (belt-and-suspenders for OIDC)
-        run: npm install -g npm@latest --force
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
       - name: Publish
-        # Repo public → signed provenance (sigstore) + Trusted Publishing (OIDC, no token).
-        run: |
-          node --version && npm --version
-          npm publish --access public --provenance --loglevel verbose
+        # Provenance (sigstore) + token auth. OIDC trusted publishing deferred until the
+        # npmjs trusted-publisher entry matches (registry returns "package not found" otherwise).
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
