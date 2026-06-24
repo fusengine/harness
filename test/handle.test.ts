@@ -8,7 +8,7 @@ import { respond } from "../src/runtime/respond";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-h-"));
 const post = (sid: string, tool: string, input?: Record<string, unknown>) =>
-  ({ hook_event_name: "PostToolUse", session_id: sid, tool_name: tool, tool_input: input });
+  ({ hook_event_name: "PostToolUse", session_id: sid, tool_name: tool, tool_input: input, tool_response: "x".repeat(600) });
 
 test("normalizeEvent: claude pre/post + cline nesting", () => {
   expect(normalizeEvent("claude-code", { hook_event_name: "PostToolUse", tool_name: "Read", tool_input: { file_path: "a.md" }, session_id: "s" }).phase).toBe("post");

@@ -1,6 +1,10 @@
 import { projectLayout } from "../config/layout";
 import { detectFramework } from "../policy/detect-framework";
+import { detectCreationIntent } from "../policy/creation-intent";
 import { loadRefs } from "../refs/loader";
+import { extractText } from "../cache/mcp-response";
+import { recordBrainstormRequired } from "../tracking/session-state";
+import { loadTrack, saveTrack } from "../tracking/store";
 import { activityFor } from "./activity";
 import { gate } from "./gate";
 import { MCP_TTL_MS, mcpPostStore, mcpPreIntercept } from "./mcp";
@@ -38,9 +42,18 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const mcpDir = layout.cacheDir;
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
+  // UserPromptSubmit: flag whether the prompt expresses creation intent (brainstorm gate).
+  const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
+  if (userPrompt !== undefined) {
+    const track = await loadTrack(file);
+    await saveTrack(file, recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
+    return { stdout: "", exit: 0 };
+  }
+
   if (event.phase === "post") {
-    mcpPostStore(event.tool, event.input, payload.tool_response ?? payload.tool_output, mcpDir);
-    const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now });
+    const response = payload.tool_response ?? payload.tool_output;
+    mcpPostStore(event.tool, event.input, response, mcpDir);
+    const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
     if (activity) await recordActivity(file, activity);
     return { stdout: "", exit: 0 };
   }
