@@ -7,6 +7,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 
+## [0.1.15] - 2026-06-23
+
+### Added
+- **git-ask parity**: `evaluate` now wires `GIT_ASK` (push/checkout/reset/merge/
+  rebase/stash/clean/rm/mv/restore/revert/cherry-pick) → a `Prompt{kind:"ask"}`
+  confirmation (destructive ops stay a hard `deny`). Previously `GIT_ASK` was
+  defined but never consumed.
+
+### Changed
+- **TTL honored**: `harness hook` now reads `FUSE_ENFORCE_TTL_SEC` (`resolveTtlSec`)
+  and feeds it as the gate window; `DEFAULT_WINDOW_MS` is now **2 min** (was a
+  fixed 4 min), matching the plugin + installer default.
+- **De-duplicated install patterns**: `installGuard` consumes `PROJECT_INSTALL` /
+  `SYSTEM_INSTALL` from `policy/patterns` (added `dnf` / `pacman`); removed the
+  guard's duplicate regexes.
+
 ## [0.1.14] - 2026-06-23
 
 ### Changed

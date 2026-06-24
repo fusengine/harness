@@ -1,7 +1,7 @@
 import { isCodeFile } from "../util/project-root";
 import { countLines, evaluateFileSize } from "./file-size";
 import { detectFramework } from "./detect-framework";
-import { matchPatterns, GIT_BLOCKED } from "./patterns";
+import { matchPatterns, GIT_BLOCKED, GIT_ASK } from "./patterns";
 import { runGuards } from "./guards";
 import type { Prompt } from "../prompt/types";
 
@@ -42,6 +42,18 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
         title: "Destructive git command",
         reason,
         actions: ["Use a non-destructive alternative (e.g. --force-with-lease; avoid --hard / -D)"],
+      },
+    };
+  }
+  if (ctx.command && matchPatterns(ctx.command, GIT_ASK)) {
+    return {
+      decision: "deny",
+      message: `Git operation requires confirmation: ${ctx.command}`,
+      prompt: {
+        kind: "ask",
+        title: "Confirm git operation",
+        reason: `Authorize: ${ctx.command.trim()}`,
+        actions: ["Approve if this git operation is intended"],
       },
     };
   }

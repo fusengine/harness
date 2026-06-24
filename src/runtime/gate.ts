@@ -8,8 +8,8 @@ import type { Prompt } from "../prompt/types";
 /** Prior agents the freshness gate requires before a code edit. */
 export const REQUIRED_AGENTS: ReadonlyArray<string> = ["explore-codebase", "research-expert"];
 
-/** Default freshness window for {@link REQUIRED_AGENTS} (4 min, the APEX TTL). */
-export const DEFAULT_WINDOW_MS = 240_000;
+/** Default freshness window for {@link REQUIRED_AGENTS} (2 min — matches the plugin's `FUSE_ENFORCE_TTL_SEC` default). */
+export const DEFAULT_WINDOW_MS = 120_000;
 
 /** Trivial edits allowed within the window before the full APEX gates apply. */
 export const TRIVIAL_BUDGET = 4;
