@@ -5,6 +5,9 @@ dist/
 *.tsbuildinfo
 # generated API docs (run `bun run docs:api`)
 docs/api/
+# harness/plugin session state (APEX task files, etc.) — generated, not package content
+.claude/
+.harness/
 # os
 .DS_Store
 # fuse-lessons dev memory — internal build notes, not package content.
