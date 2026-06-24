@@ -7,6 +7,13 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 
+## [0.1.21] - 2026-06-24
+
+### Documentation
+- README: added an **"Extend it"** section with a `registerGuard` example +
+  the two-tier / fail-closed note, so the shipped npm landing page documents the
+  0.1.20 extensibility API.
+
 ## [0.1.20] - 2026-06-24
 
 ### Added (ideas mined from OpenClaw + hermes-agent)
