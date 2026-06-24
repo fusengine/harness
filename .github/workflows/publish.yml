@@ -34,9 +34,11 @@ jobs:
       # mere presence of that line disables npm's OIDC path → empty token → 404 on PUT.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - name: Upgrade npm (OIDC trusted publishing needs npm >= 11.5)
+          node-version: 24 # ships npm 11.x natively (OIDC trusted publishing needs npm >= 11.5)
+      - name: Upgrade npm (belt-and-suspenders for OIDC)
         run: npm install -g npm@latest --force
       - name: Publish
         # Repo public → signed provenance (sigstore) + Trusted Publishing (OIDC, no token).
-        run: npm publish --access public --provenance
+        run: |
+          node --version && npm --version
+          npm publish --access public --provenance
