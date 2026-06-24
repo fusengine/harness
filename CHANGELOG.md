@@ -5,7 +5,15 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+- Go public → re-enable `--provenance` + Trusted Publishing (OIDC), drop `NPM_TOKEN`
+
+## [0.1.22] - 2026-06-24
+
+### Documentation / packaging
+- `package.json`: added `repository` / `homepage` / `bugs` — so npmjs links back to
+  the repo and resolves the README's relative links.
+- README: replaced the single vague `docs/` link with a **Documentation** table
+  (absolute GitHub links to each guide + CHANGELOG, so they work on npmjs too).
 
 ## [0.1.21] - 2026-06-24
 
