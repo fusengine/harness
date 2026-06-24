@@ -41,4 +41,4 @@ jobs:
         # Repo public → signed provenance (sigstore) + Trusted Publishing (OIDC, no token).
         run: |
           node --version && npm --version
-          npm publish --access public --provenance
+          npm publish --access public --provenance --loglevel verbose
