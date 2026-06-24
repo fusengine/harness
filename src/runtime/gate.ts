@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
-import { evaluate } from "../policy/evaluate";
+import { evaluate, type PolicyResult } from "../policy/evaluate";
 import { evaluateApex, type ApexContext } from "../policy/apex";
+import { FAIL_CLOSED } from "../policy/guards";
 import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
 import { loadTrack, saveTrack } from "../tracking/store";
 import type { RefMeta } from "../refs/types";
@@ -47,7 +48,12 @@ function existingLineCount(path: string | undefined): number | undefined {
  * track. Returns the first blocking prompt, or null to allow.
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
-  const quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines: existingLineCount(input.filePath) });
+  let quick: PolicyResult;
+  try {
+    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines: existingLineCount(input.filePath) });
+  } catch {
+    return FAIL_CLOSED;
+  }
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
 
   if (!input.filePath) return null;
@@ -73,5 +79,9 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     brainstormRequired: track.brainstormRequired,
     brainstormFresh: agentsFresh(track, ["brainstorming"], window, input.now),
   };
-  return evaluateApex(ctx);
+  try {
+    return evaluateApex(ctx);
+  } catch {
+    return FAIL_CLOSED;
+  }
 }

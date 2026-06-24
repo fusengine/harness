@@ -7,6 +7,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ### Planned
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
 
+## [0.1.20] - 2026-06-24
+
+### Added (ideas mined from OpenClaw + hermes-agent)
+- **Fail-closed enforcement**: `runGuards` and the runtime `gate` (`evaluate` +
+  `evaluateApex`) now wrap execution — a guard/gate that **throws** returns a block
+  (`FAIL_CLOSED`) instead of crashing the hook and letting the tool run ungated.
+  Closes a fail-**open** hole (a bug degrades to "too strict", never "no protection").
+- **Extensible guard chain** (two-tier, OpenClaw-style): `registerGuard(fn)` adds a
+  user guard that runs **after** the privileged core chain (the core can't be
+  bypassed); `clearUserGuards()` resets. Turns the fixed 5-guard chain into an
+  extensible policy engine — users add project rules without forking.
+
+### Note
+- Adopted only the in-scope, non-babysitting ideas from the OpenClaw/hermes audit;
+  secret-redaction, gateway, agent-loop, and memory features were deliberately skipped.
+
 ## [0.1.19] - 2026-06-24
 
 ### Fixed (parity audit — last inert gap closed)
