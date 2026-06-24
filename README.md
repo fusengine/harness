@@ -133,13 +133,26 @@ registerGuard(({ tool, command }) =>
 | `./config` `./util` `./state` `./statusline` `./freshness` `./init` `./cli` | env config, project-root, locks, statusline, doc-freshness, wiring templates, staged checks. |
 | `./adapters/{claude,codex,cursor,cline,gemini}` | Thin per-harness adapters. |
 
-See [`docs/`](./docs) for per-module guides, and run `bun run docs:api` for the
-generated typedoc API reference.
+## Documentation
+
+| Guide | What |
+|-------|------|
+| [docs/index.md](https://github.com/fusengine/harness/blob/main/docs/index.md) | architecture overview + map |
+| [docs/detect.md](https://github.com/fusengine/harness/blob/main/docs/detect.md) | harness detection (`hook` vs `cli`) |
+| [docs/policy.md](https://github.com/fusengine/harness/blob/main/docs/policy.md) | `evaluate`, file-size, framework, APEX gates |
+| [docs/guards.md](https://github.com/fusengine/harness/blob/main/docs/guards.md) | the guard chain, `registerGuard`, fail-closed |
+| [docs/runtime.md](https://github.com/fusengine/harness/blob/main/docs/runtime.md) | `handleHook`, `gate`, tracking, MCP intercept |
+| [docs/config.md](https://github.com/fusengine/harness/blob/main/docs/config.md) | env config (TTL, max-lines, refs dir) |
+| [docs/modules.md](https://github.com/fusengine/harness/blob/main/docs/modules.md) | cache · refs · state · memory · statusline · util |
+| [docs/adapters.md](https://github.com/fusengine/harness/blob/main/docs/adapters.md) | adapters + `harness init`/`hook` wiring |
+| [CHANGELOG.md](https://github.com/fusengine/harness/blob/main/CHANGELOG.md) | release history |
+
+Run `bun run docs:api` for the generated typedoc API reference.
 
 ## Develop
 
 ```sh
-bun test            # 105 tests
+bun test            # 117 tests
 bunx tsc --noEmit   # typecheck (isolatedDeclarations)
 bun run build       # dist + .d.mts via tsdown (for Node/bundler consumers)
 bun run docs:api    # generate the typedoc API reference
