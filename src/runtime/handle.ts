@@ -59,7 +59,10 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   }
 
   const intercept = mcpPreIntercept(id, event.tool, event.input, mcpDir, MCP_TTL_MS, opts.now);
-  if (intercept !== null) return { stdout: intercept, exit: 0 };
+  if (intercept !== null) {
+    if (intercept.docSource) await recordActivity(file, { kind: "doc", framework, sessionId: event.sessionId, source: intercept.docSource });
+    return { stdout: intercept.stdout, exit: 0 };
+  }
 
   const prompt = await gate({
     sessionId: event.sessionId,

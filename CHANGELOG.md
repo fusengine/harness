@@ -5,9 +5,23 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 ## [Unreleased]
 
 ### Planned
-- read_paths: let a served MCP cache-hit count as doc-consulted (needs the cache
-  files to carry a provider prefix) — the last inert gap from the parity audit
 - Trusted Publishing (OIDC) once the repo is public, to drop `NPM_TOKEN`
+
+## [0.1.19] - 2026-06-24
+
+### Fixed (parity audit — last inert gap closed)
+- **cache-served docs now count as consulted**: when `mcpPreIntercept` serves a
+  fresh context7/exa result from cache, `handleHook` records the doc consultation
+  (`recordActivity` `doc`), so `docConsultedGate` is satisfied on cross-session
+  cache hits — previously only a live MCP call recorded it (the cached branch was
+  inert). Cleaner than the plugin's `read_paths`: recorded at serve-time, no
+  provider-prefixed cache filenames needed. `mcpPreIntercept` now returns
+  `{ stdout, docSource? }` (was a bare string).
+
+### Parity
+- This closes the last portable enforcement gap from the 8-agent audit. Remaining
+  differences are by design (project-local `.harness/` state, fail-closed
+  bash-write whitelist, no Ralph mode, pre-commit-lint out of scope).
 
 ## [0.1.18] - 2026-06-24
 
