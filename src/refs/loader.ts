@@ -11,6 +11,15 @@ function pick(fm: Record<string, string>, ...keys: string[]): string {
   return "";
 }
 
+const SOLID_SLUGS = new Set(["single-responsibility", "open-closed", "liskov-substitution", "interface-segregation", "dependency-inversion", "solid-principles"]);
+
+/** Infer a ref's level from its path when the frontmatter omits it (templates/→template, SOLID slug→principle). */
+function inferLevel(filePath: string): string {
+  if (filePath.includes("/templates/")) return "template";
+  const stem = (filePath.split("/").pop() ?? "").replace(/\.md$/, "");
+  return SOLID_SLUGS.has(stem) ? "principle" : "architecture";
+}
+
 /** Build a {@link RefMeta} from parsed frontmatter, tolerant of kebab/camel keys. */
 export function toRefMeta(fm: Record<string, string>, filePath: string): RefMeta {
   return {
@@ -21,7 +30,7 @@ export function toRefMeta(fm: Record<string, string>, filePath: string): RefMeta
     related: pick(fm, "related"),
     appliesTo: pick(fm, "appliesTo", "applies-to", "applies_to"),
     triggerOnEdit: pick(fm, "triggerOnEdit", "trigger-on-edit", "trigger_on_edit"),
-    level: pick(fm, "level"),
+    level: pick(fm, "level") || inferLevel(filePath),
     filePath,
   };
 }

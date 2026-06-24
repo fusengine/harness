@@ -8,7 +8,7 @@ export const CRITICAL_PATTERNS: RegExp[] = [
   /\b(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/,
   /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\s+\//,
   /\bmkfs(?:\.[a-z0-9]+)?\b/,
-  /\bdd\b[^\n]*\bif=\/dev\/zero\b[^\n]*\bof=\/dev\//,
+  /\bdd\b[^\n]*\bof=\/dev\/(?:disk|sd|hd|nvme|mmcblk|vd)/i,
   /\bshred\b/,
   /\bfdisk\b/,
   /\bdiskutil\s+(?:erase|partitionDisk)/i,
@@ -24,13 +24,18 @@ export const ASK_PATTERNS: RegExp[] = [
   /\beval\s/,
   /(?:>|>>|\btee\b)\s*\/etc\//,
   /\bsu\s/, /\bdoas\s/, /\bpasswd\b/,
-  /\brm\s/, /\bunlink\s/,
+  /\brm\s/, /\bunlink\s/, /\bdel\s/,
 ];
+
+/** Strip heredoc bodies so their content isn't matched as a command (false positives). */
+function stripHeredoc(cmd: string): string {
+  return cmd.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, " ");
+}
 
 /** Guards against dangerous Bash commands (critical → block, sensitive → ask). */
 export function securityGuard(ctx: GuardContext): Prompt | null {
   if (ctx.tool !== "Bash" || !ctx.command) return null;
-  const cmd: string = ctx.command;
+  const cmd: string = stripHeredoc(ctx.command);
 
   for (const re of CRITICAL_PATTERNS) {
     if (re.test(cmd)) {

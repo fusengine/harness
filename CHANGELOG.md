@@ -4,6 +4,18 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.27] - 2026-06-24
+
+### Fixed (port parity — gaps found by a Python↔TS content diff)
+- **security**: the `dd` block matched only `if=/dev/zero of=/dev/`; widened to any
+  `dd … of=/dev/<disk>`. Added `del` to the ask list, and a `stripHeredoc()` pass so
+  a heredoc body no longer triggers false positives.
+- **refs routing**: keyword scoring is now case-insensitive (lowercased haystack),
+  matching the original.
+- **refs loading**: `level` is now inferred from the path when the frontmatter omits
+  it (`templates/`→template, SOLID slug→principle, else architecture) — restores the
+  principle/template hoisting for refs without an explicit `level:`.
+
 ## [0.1.26] - 2026-06-24
 
 ### Changed
