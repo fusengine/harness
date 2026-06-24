@@ -14,6 +14,12 @@ const hit = runGuards({ tool: "Bash", command: "rm -rf /" });
 `GuardContext` is `{ tool, filePath?, content?, command? }`. A guard returns a
 portable `Prompt` (`kind: "block" | "ask" | "inform"`) or `null` to continue.
 
+**Extensible + fail-closed.** `registerGuard(fn)` adds a user guard that runs
+**after** the privileged core chain (two-tier — the core can't be bypassed; use
+`clearUserGuards()` to reset). `runGuards` is **fail-closed**: a guard that throws
+returns a block (`FAIL_CLOSED`), never a silent pass — and the runtime `gate`
+wraps `evaluate`/`evaluateApex` the same way, so a bug can never disable enforcement.
+
 ## The chain (evaluation order)
 
 | Guard | Fires when | kind |

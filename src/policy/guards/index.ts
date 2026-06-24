@@ -22,10 +22,39 @@ export const GUARDS: ReadonlyArray<Guard> = [
   installGuard,
 ];
 
-/** Run the guard chain; the first firing guard's Prompt wins, else null. */
+/** Block prompt returned when a guard or gate throws (fail-closed). */
+export const FAIL_CLOSED: Prompt = {
+  kind: "block",
+  title: "Policy error",
+  reason: "A policy check errored — blocked for safety (fail-closed).",
+  actions: ["Fix the failing guard/gate, then retry"],
+};
+
+const USER_GUARDS: Guard[] = [];
+
+/** Register a user guard — runs AFTER the privileged core chain (two-tier). */
+export function registerGuard(guard: Guard): void {
+  USER_GUARDS.push(guard);
+}
+
+/** Remove all registered user guards (mainly for tests). */
+export function clearUserGuards(): void {
+  USER_GUARDS.length = 0;
+}
+
+/**
+ * Run the guard chain — privileged core guards first, then user guards — and
+ * return the first firing Prompt, else null. Fail-closed: a guard that throws
+ * blocks (never silently passes).
+ */
 export function runGuards(ctx: GuardContext): Prompt | null {
-  for (const guard of GUARDS) {
-    const hit = guard(ctx);
+  for (const guard of [...GUARDS, ...USER_GUARDS]) {
+    let hit: Prompt | null;
+    try {
+      hit = guard(ctx);
+    } catch {
+      return FAIL_CLOSED;
+    }
     if (hit) return hit;
   }
   return null;
