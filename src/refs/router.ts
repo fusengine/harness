@@ -23,9 +23,10 @@ export function scoreReferences(refs: RefMeta[], filePath: string, content: stri
       for (const frag of meta.triggerOnEdit.split(", ")) if (filePath.includes(frag.trim())) score += 5;
     }
     if (meta.keywords) {
+      const hay = `${filePath} ${content}`.toLowerCase();
       for (const kw of meta.keywords.split(", ")) {
-        const k = kw.trim();
-        if (k && (filePath.includes(k) || content.includes(k))) score += 1;
+        const k = kw.trim().toLowerCase();
+        if (k && hay.includes(k)) score += 1;
       }
     }
     if (score > 0) scored.push({ meta, score });
