@@ -1,16 +1,23 @@
 import { globToRe } from "./frontmatter";
 import type { RefMeta, ScoredRef, RouteResult } from "./types";
 
+/** Literal (non-wildcard) path segments in a glob — more = more specific. */
+function specificity(glob: string): number {
+  return glob.split("/").filter((s) => s && s !== "**" && !s.includes("*")).length;
+}
+
 /**
  * Score references against a file edit (pure):
- * +10 per `applies-to` glob match, +5 per `trigger-on-edit` fragment, +1 per keyword.
+ * +10 per `applies-to` glob match, weighted by glob SPECIFICITY (+5 per literal path
+ * segment) so a more specific skill wins (an app-router glob beats a bare extension
+ * glob beats a plain TS glob). +5 per `trigger-on-edit` fragment, +1 per keyword.
  */
 export function scoreReferences(refs: RefMeta[], filePath: string, content: string): ScoredRef[] {
   const scored: ScoredRef[] = [];
   for (const meta of refs) {
     let score = 0;
     if (meta.appliesTo) {
-      for (const g of meta.appliesTo.split(", ")) if (globToRe(g).test(filePath)) score += 10;
+      for (const g of meta.appliesTo.split(", ")) if (globToRe(g).test(filePath)) score += 10 + specificity(g) * 5;
     }
     if (meta.triggerOnEdit) {
       for (const frag of meta.triggerOnEdit.split(", ")) if (filePath.includes(frag.trim())) score += 5;

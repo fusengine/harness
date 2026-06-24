@@ -4,6 +4,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-06-24
+
+### Changed (framework-aware SOLID routing)
+- `scoreReferences` now weights each `applies-to` glob match by **specificity**
+  (`+10` base + `+5` per literal path segment), so the most specific skill wins:
+  `**/app/**/*.tsx` (nextjs) > `**/*.tsx` (react) > `**/*.ts` (generic). The
+  solid-read gate routes to the right language/framework skill purely from the
+  skills' declared globs — no hardcoded framework list. Add a `solid-vue` skill
+  with `applies-to: **/*.vue` and it routes automatically.
+
 ### Planned
 - OIDC Trusted Publishing once the npmjs trusted-publisher entry matches the
   workflow (currently the registry returns "package not found" at token exchange).
