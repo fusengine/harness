@@ -4,6 +4,14 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-06-24
+
+### Changed
+- `loadRefs` now accepts a **path-delimiter list of directories** (`dir1:dir2`,
+  cross-platform via `path.delimiter`) and scans each, so `FUSE_HARNESS_REFS` can
+  point straight at the spread `solid-*/references` dirs — no copy/aggregation step,
+  no content duplication, and only the SOLID ref dirs are scanned (fast).
+
 ## [0.1.25] - 2026-06-24
 
 ### Changed (framework-aware SOLID routing)
