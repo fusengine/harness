@@ -36,9 +36,11 @@ test("mcpPreIntercept: cache hit denies with content; cap mutates", () => {
   const now = 1000;
   cacheStore(d, "mcp__exa__web_search_exa", "hit", "CACHED");
   const served = mcpPreIntercept("claude-code", "mcp__exa__web_search_exa", { query: "hit" }, d, 10_000, now);
-  expect(served && JSON.parse(served).hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(served && JSON.parse(served.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(served?.docSource).toBe("exa");
   const mutated = mcpPreIntercept("gemini-cli", "mcp__exa__web_search_exa", { query: "miss", numResults: 9 }, d, 10_000, now);
-  expect(mutated && JSON.parse(mutated).hookSpecificOutput.tool_input.numResults).toBe(3);
+  expect(mutated && JSON.parse(mutated.stdout).hookSpecificOutput.tool_input.numResults).toBe(3);
+  expect(mutated?.docSource).toBeUndefined();
   expect(mcpPreIntercept("claude-code", "Write", {}, d, 10_000, now)).toBeNull();
 });
 

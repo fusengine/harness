@@ -32,22 +32,35 @@ function mutateWith(id: string, input: Record<string, unknown>): string {
   return "";
 }
 
+/** The doc provider a served cache-hit satisfies (`exa`/`context7`), else undefined. */
+function docSourceOf(tool: string): string | undefined {
+  if (/exa/i.test(tool)) return "exa";
+  if (/context7/i.test(tool)) return "context7";
+  return undefined;
+}
+
+/** A pre-event MCP interception: the native response + any doc source it satisfied. */
+export interface McpIntercept {
+  stdout: string;
+  docSource?: string;
+}
+
 /**
  * Pre-event MCP interception: serve a fresh cache hit (deny + cached content),
  * else cap exa verbosity (allow + mutated input), else null to allow normally.
  * Harnesses without input-mutation/cache support fall through to null.
  */
-export function mcpPreIntercept(id: string, tool: string, input: Record<string, unknown>, dir: string, ttlMs: number, now: number): string | null {
+export function mcpPreIntercept(id: string, tool: string, input: Record<string, unknown>, dir: string, ttlMs: number, now: number): McpIntercept | null {
   if (!isMcpTool(tool)) return null;
   const cached = cacheLookup(dir, tool, queryOf(input), ttlMs, now);
   if (cached) {
     const served = denyWith(id, cached);
-    if (served) return served;
+    if (served) return { stdout: served, docSource: docSourceOf(tool) };
   }
   const capped = capVerbosity(tool, input);
   if (capped) {
     const mutated = mutateWith(id, capped);
-    if (mutated) return mutated;
+    if (mutated) return { stdout: mutated };
   }
   return null;
 }
