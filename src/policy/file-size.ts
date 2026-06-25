@@ -8,9 +8,21 @@ export interface FileSizeVerdict {
   message: string | null;
 }
 
-/** Count lines in file content (empty string = 0). */
+/**
+ * Count substantive (code-only) lines — blank lines and comment-only lines
+ * (`//`, `*`, `/*` block-comment bodies) don't count toward the SOLID limit, so a
+ * well-documented file isn't penalized for its JSDoc. (`#` is intentionally NOT
+ * skipped: it is code in Rust `#[derive]` and C `#include`, not a comment.)
+ */
 export function countLines(content: string): number {
-  return content === "" ? 0 : content.split("\n").length;
+  if (content === "") return 0;
+  let n = 0;
+  for (const line of content.split("\n")) {
+    const s = line.trim();
+    if (!s || s.startsWith("//") || s.startsWith("*") || s.startsWith("/*")) continue;
+    n++;
+  }
+  return n;
 }
 
 /**

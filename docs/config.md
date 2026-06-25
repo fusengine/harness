@@ -23,6 +23,7 @@ float / `<= 0` all fall back to the default.
 | `FUSE_ENFORCE_TTL_SEC` | `120` | freshness windows |
 | `FUSE_SOLID_MAX_LINES` | `100` | file-size policy |
 | `FUSE_LESSONS_THROTTLE_MIN` | `5` | project-memory reminders |
+| `FUSE_DESIGN_GEMINI` | _(off)_ | opt-in design Gemini gates — set `1`/`true` to enable |
 
 ```ts
 const max = resolveMaxLines();                       // process.env
