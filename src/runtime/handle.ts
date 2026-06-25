@@ -1,19 +1,22 @@
 import { projectLayout } from "../config/layout";
 import { detectFramework } from "../policy/detect-framework";
 import { detectCreationIntent } from "../policy/creation-intent";
-import { loadRefs } from "../refs/loader";
 import { extractText } from "../cache/mcp-response";
 import { recordBrainstormRequired } from "../tracking/session-state";
 import { loadTrack, saveTrack } from "../tracking/store";
 import { activityFor } from "./activity";
-import { gate } from "./gate";
-import { MCP_TTL_MS, mcpPostStore, mcpPreIntercept } from "./mcp";
+import { mcpPostStore } from "./mcp";
 import { normalizeEvent } from "./normalize";
 import { trackFile } from "./paths";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
 import { designGate } from "./design";
 import { designLifecycle } from "./design-lifecycle";
+import { promptSubmitContext } from "./inject-context";
+import { lifecycleStdout, postEditContext } from "./lifecycle-bridge";
+import { postTrackingSideEffects } from "./lifecycle/post-tracking";
+import { handlePre } from "./handle-pre";
+import type { PluginScope } from "./lifecycle";
 
 /** Options for {@link handleHook} (caller supplies the clock + project root). */
 export interface HandleOptions {
@@ -23,6 +26,8 @@ export interface HandleOptions {
   refsDir?: string;
   /** APEX freshness window in ms (from `FUSE_ENFORCE_TTL_SEC`). */
   windowMs?: number;
+  /** Which plugin's hooks.json invoked the harness (selects lifecycle behavior). */
+  scope?: PluginScope;
 }
 
 /** What the hook bin should print + exit with. */
@@ -47,12 +52,16 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
   if (designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) return { stdout: "", exit: 0 };
 
-  // UserPromptSubmit: flag whether the prompt expresses creation intent (brainstorm gate).
+  // Ported lifecycle/session/context hooks (SessionStart, SubagentStart/Stop, etc.).
+  const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now);
+  if (life !== null) return { stdout: life, exit: 0 };
+
+  // UserPromptSubmit (core scope): brainstorm flag + CLAUDE.md injection.
   const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
   if (userPrompt !== undefined) {
     const track = await loadTrack(file);
     await saveTrack(file, recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
-    return { stdout: "", exit: 0 };
+    return { stdout: promptSubmitContext(userPrompt, opts.cwd), exit: 0 };
   }
 
   if (event.phase === "post") {
@@ -61,32 +70,10 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     const designWarn = designGate(payload, event, mcpDir, opts.cwd);
     const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
     if (activity) await recordActivity(file, activity);
-    return { stdout: designWarn ? respond(id, designWarn) : "", exit: 0 };
+    postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now);
+    const extra = postEditContext(opts.scope ?? "core", event, opts.now);
+    return { stdout: designWarn ? respond(id, designWarn) : extra, exit: 0 };
   }
 
-  const intercept = mcpPreIntercept(id, event.tool, event.input, mcpDir, MCP_TTL_MS, opts.now);
-  if (intercept !== null) {
-    if (intercept.docSource) await recordActivity(file, { kind: "doc", framework, sessionId: event.sessionId, source: intercept.docSource });
-    return { stdout: intercept.stdout, exit: 0 };
-  }
-
-  const designBlock = designGate(payload, event, mcpDir, opts.cwd);
-  if (designBlock) return { stdout: respond(id, designBlock), exit: 0 };
-
-  const prompt = await gate({
-    sessionId: event.sessionId,
-    framework,
-    tool: event.tool,
-    filePath: event.filePath,
-    content: event.content,
-    command: event.command,
-    cwd: opts.cwd,
-    refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
-    isReplaceAll: event.input.replace_all === true,
-    agentType: event.agentType,
-    windowMs: opts.windowMs,
-    now: opts.now,
-    trackFile: file,
-  });
-  return prompt ? { stdout: respond(id, prompt), exit: 0 } : { stdout: "", exit: 0 };
+  return handlePre({ id, payload, event, framework, mcpDir, file, opts });
 }
