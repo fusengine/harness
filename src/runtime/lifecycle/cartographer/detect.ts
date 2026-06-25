@@ -1,0 +1,51 @@
+/**
+ * Plugin discovery (fs). Ports `detect_plugins.py`: marketplace `plugins` dir
+ * resolution + `plugin.json` meta reading.
+ */
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/** Sorted entry names of `dir` (alpha, byte-order), or `[]` on error. */
+function sortedNames(dir: string): string[] {
+  try {
+    return readdirSync(dir).sort((a, b) => a.localeCompare(b, "en"));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read `[version, name]` from `<pluginPath>/.claude-plugin/plugin.json`.
+ * @param pluginPath - Absolute plugin directory.
+ * @returns The `[version, name]` pair (both "" when absent/unreadable).
+ */
+export function readPluginMeta(pluginPath: string): [string, string] {
+  const pj = join(pluginPath, ".claude-plugin", "plugin.json");
+  if (!existsSync(pj)) return ["", ""];
+  try {
+    const meta = JSON.parse(readFileSync(pj, "utf-8")) as { version?: string; name?: string };
+    return [meta.version ?? "", meta.name ?? ""];
+  } catch {
+    return ["", ""];
+  }
+}
+
+/**
+ * Auto-detect the marketplace `plugins` dir that contains `cartographer`,
+ * falling back to the first marketplace with a `plugins` dir, else `cwd`.
+ * Ports `find_marketplace_plugins`.
+ * @param home - Home directory (defaults to `~`).
+ * @returns The resolved plugins directory.
+ */
+export function findMarketplacePlugins(home: string = homedir()): string {
+  const mp = join(home, ".claude", "plugins", "marketplaces");
+  const markets = sortedNames(mp);
+  for (const m of markets) {
+    if (existsSync(join(mp, m, "plugins", "cartographer"))) return join(mp, m, "plugins");
+  }
+  for (const m of markets) {
+    if (existsSync(join(mp, m, "plugins"))) return join(mp, m, "plugins");
+  }
+  return process.cwd();
+}

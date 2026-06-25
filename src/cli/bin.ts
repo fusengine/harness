@@ -8,6 +8,7 @@
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
 import { handleHook } from "../runtime/handle";
+import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
@@ -28,7 +29,10 @@ const cmd = process.argv[2];
 
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
-  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS, windowMs: resolveTtlSec(process.env) * 1000 });
+  const scopeArg = process.argv[4];
+  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog"]);
+  const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
+  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS, windowMs: resolveTtlSec(process.env) * 1000, scope });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {

@@ -1,6 +1,6 @@
 {
   "name": "@fusengine/harness",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "Harness-agnostic toolkit for AI coding agents: runtime harness detection (Claude Code, Codex, Cursor, Cline, Gemini, Aider...), pure policy core (env config, project/framework detection, SOLID/file-size limits, APEX freshness, guard patterns, portable prompts), cache, project memory, ref routing, state/locks, statusline, per-harness adapters (Claude/Cursor/Cline/Gemini) and a cli-mode harness-check binary. Bun-native, with a built dist for Node + bundlers.",
   "type": "module",
   "module": "src/index.ts",
@@ -115,9 +115,16 @@
       "import": "./dist/adapters/gemini/index.mjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/fusengine/harness.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fusengine/harness.git"
+  },
   "homepage": "https://github.com/fusengine/harness#readme",
   "bugs": "https://github.com/fusengine/harness/issues",
   "sideEffects": false,

@@ -2,7 +2,73 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.1.30] - 2026-06-25
+
+### Added (lifecycle/session/context port: cartographer + security-expert + changelog-watcher hooks → harness)
+- **New plugin scopes** `carto` | `security` | `changelog` on `PluginScope`, resolved from the
+  `hook <id> <scope>` CLI arg (`cli/bin.ts`), routing three more plugins' Python hooks into the harness:
+  - **cartographer** — pure policy `policy/cartographer/*` (`indicators.ts` project-detection +
+    exclude sets, `frontmatter.ts` YAML field/body parse, `entry.ts` index-line regex parse,
+    `describe.ts` heading/comment/desc extraction) and runtime effects
+    `runtime/lifecycle/cartographer/*` (`fs-util.ts` tree walk + file desc, `merge.ts` enriched-
+    sidecar-aware index merge, `write-tree.ts` recursive `index.md` generation, `project-map.ts`
+    project-tree map, `track-enrichment.ts` `.enriched.json` sidecar, `session-start.ts`).
+    **SessionStart (carto)** generates the project map (ports `generate_project_map.py`);
+    **PostToolUse (carto, Edit/Write)** tracks enriched descriptions (ports `track-enrichment.py`).
+    *(The plugin ecosystem map `generate_map.py` and its libs are NOT ported and stay in Python.)*
+  - **security-expert** — `runtime/lifecycle/security/*` (`skill-state.ts` shared
+    `~/.claude/logs/00-security` state + UTC date/iso helpers, `check-skill.ts` **non-blocking**
+    advisory `permissionDecision: allow` + `additionalContext` when the security skill is unread,
+    `track-skill-read.ts`, `track-mcp.ts`). **PreToolUse (security)** is advisory-only — it never
+    runs the core APEX/SOLID/file-size gate chain. Ports `check-security-skill.py`,
+    `track-skill-read.py`, `track-mcp-research.py`.
+  - **changelog-watcher** — `runtime/lifecycle/changelog-research.ts`: **PostToolUse (changelog)**
+    logs Exa/WebFetch/WebSearch research to `~/.claude/logs/00-changelog`. Ports
+    `track-watch-research.py`.
+- **Post-tracking side-effects** `runtime/lifecycle/post-tracking.ts` (`postTrackingSideEffects`):
+  routes PostToolUse to the carto/security/changelog trackers by scope (side-effects only, no stdout),
+  wired into `handle.ts`; security PreToolUse advisory wired into `handle-pre.ts`.
+
+### Added (lifecycle/session/context port: core-guards + solid + claude-rules hooks → harness)
+- **Lifecycle hook dispatch** (`runtime/lifecycle/*` + `runtime/lifecycle-bridge.ts`): ports
+  the remaining Python hooks of the core-guards, solid, and claude-rules plugins into the
+  harness, routed by event in `handleHook` via a new `scope` (`core` | `solid` | `rules`)
+  resolved from the `hook <id> <scope>` CLI arg:
+  - **SessionStart (core)** `lifecycle/session-start.ts`: inject `~/.claude/CLAUDE.md` + dev
+    context (git branch/status + project type) and run the cache/state cleanups — ports
+    `inject-claude-md.py`, `load-dev-context.py`, `cleanup-session-states.py`,
+    `cleanup-old-caches.py` into one call.
+  - **SessionStart (solid)** `lifecycle/solid-detect.ts`: detect the SOLID profile and append
+    `SOLID_*` exports to `CLAUDE_ENV_FILE` — ports `solid/detect-project.py`.
+  - **SessionStart + UserPromptSubmit (rules)** `lifecycle/inject-rules.ts`: concatenate
+    `${CLAUDE_PLUGIN_ROOT}/rules/*.md` as `additionalContext` — ports `claude-rules/inject-rules.py`.
+  - **PostToolUse (core, Write/Edit)** `lifecycle/track-changes.ts` + `lifecycle/post-edit-ts.ts`:
+    cumulative session-change tracking → sniper reminder, and eslint/prettier report — ports
+    `track-session-changes.py` + `post-edit-typescript.py`.
+  - **SubagentStart** `lifecycle/subagent-cache.ts` (MCP cache table, ports `inject-context-cache.py`),
+    **SubagentStop** `lifecycle/agent-memory.ts` (ports `track-agent-memory.py`),
+    **TeammateIdle** `lifecycle/teammate-idle.ts`, **PostToolUseFailure** `lifecycle/tool-failure.ts`,
+    **PreCompact** `lifecycle/pre-compact.ts`, **SessionEnd** `lifecycle/session-end.ts`,
+    **InstructionsLoaded** `lifecycle/instructions-loaded.ts`.
+- **Shared state/cleanup helpers**: `runtime/home-state.ts` (the `_shared/state_manager` +
+  `cache_io` equivalent: `~/.claude/fusengine-cache` paths, session-state load/save, session-id
+  sanitize), `runtime/fs-cleanup.ts` (mtime/TTL file removal, log trim, whitelisted-subtree purge,
+  empty-dir prune), `runtime/dev-context.ts` (git + project-type context). `handleHook`'s
+  PreToolUse pipeline extracted to `runtime/handle-pre.ts` to keep each module < 100 lines.
+
+### Added (finishes the plugin→harness port: the last two context-injection hooks)
+- **CLAUDE.md + APEX UserPromptSubmit injection** (`policy/claude-md-context.ts`):
+  reads `~/.claude/CLAUDE.md` and, when the prompt matches the FR/EN dev-verb regex,
+  prepends the APEX instruction (project type detected from the cwd; max-lines from
+  the single-source `resolveMaxLines()`). Emitted as `additionalContext` from
+  `handleHook` on UserPromptSubmit (alongside the existing brainstorm flag). Ports
+  the plugin's `core-guards/scripts/user-prompt/read-claude-md.py`.
+- **APEX Task PreToolUse injection** (`policy/apex-task-context.ts`): when the
+  project's `.claude/apex/` exists, reads `task.json` and injects the APEX sub-agent
+  context (`additionalContext`) for `tool === "Task"`. Ports the plugin's
+  `ai-pilot/scripts/inject-apex-context.py`.
+- **`runtime/inject-context.ts`**: thin renderers wiring both behaviors into the
+  Claude `additionalContext` response shape; consumed by `handleHook`.
 
 ## [0.1.29] - 2026-06-25
 
