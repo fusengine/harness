@@ -40,23 +40,22 @@ test("detectClaudeMdProjectType: package.json next/react then generic", () => {
 test("buildApexInstruction: exact APEX preamble text", () => {
   const out = buildApexInstruction("nextjs", 100);
   expect(out.startsWith("INSTRUCTION: This is a development task. Use APEX methodology:")).toBe(true);
-  expect(out).toContain("**TRACKING FILE**: [project]/.claude/apex/task.json");
-  expect(out).toContain("Project type: nextjs");
-  expect(out).toContain("2. **PLAN**: TaskCreate (<100 lines per file)");
-  expect(out).toContain("3. **EXECUTE**: nextjs-expert, SOLID principles");
-  expect(out.endsWith("4. **EXAMINE**: Run sniper agent after ANY modification")).toBe(true);
+  for (const frag of [
+    "**TRACKING FILE**: [project]/.claude/apex/task.json",
+    "Project type detected: nextjs",
+    "explore-codebase + research-expert + nextjs-expert",
+    "2. **PLAN**: Use TaskCreate to break down tasks (<100 lines per file)",
+    "3. **EXECUTE**: nextjs-expert, follow SOLID principles, split at 90 lines",
+    "4. **EXAMINE**: Run sniper agent after ANY modification",
+  ]) expect(out).toContain(frag);
+  expect(out.endsWith("**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.")).toBe(true);
 });
 
 test("loadApexTaskState: parses + defaults on missing", () => {
   const dir = root();
   const f = join(dir, "task.json");
-  writeFileSync(
-    f,
-    JSON.stringify({
-      current_task: "3",
-      tasks: { "3": { subject: "wire", phase: "execute", doc_consulted: { ctx7: { consulted: true }, exa: { consulted: false } } } },
-    }),
-  );
+  const tasks = { "3": { subject: "wire", phase: "execute", doc_consulted: { ctx7: { consulted: true }, exa: { consulted: false } } } };
+  writeFileSync(f, JSON.stringify({ current_task: "3", tasks }));
   expect(loadApexTaskState(f)).toEqual({ id: "3", subject: "wire", phase: "execute", docs: "ctx7" });
   expect(loadApexTaskState(join(dir, "nope.json"))).toEqual({ id: "1", subject: "", phase: "analyze", docs: "none" });
 });
