@@ -1,11 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { evaluate, type PolicyResult } from "../policy/evaluate";
+import { countLines } from "../policy/file-size";
 import { evaluateApex, type ApexContext } from "../policy/apex";
 import { FAIL_CLOSED } from "../policy/guards";
 import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
 import { loadTrack, saveTrack } from "../tracking/store";
-import type { RefMeta } from "../refs/types";
+import { dryGate } from "./dry";
+import { preCommitGate } from "./precommit";
+import { modularGate } from "./modular";
+import { frameworkSkillGate } from "./framework-skill-gate";
+import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
+
+export type { GateInput } from "./gate-input";
 
 /** Prior agents the freshness gate requires before a code edit. */
 export const REQUIRED_AGENTS: ReadonlyArray<string> = ["explore-codebase", "research-expert"];
@@ -16,27 +23,18 @@ export const DEFAULT_WINDOW_MS = 120_000;
 /** Trivial edits allowed within the window before the full APEX gates apply. */
 export const TRIVIAL_BUDGET = 4;
 
-/** A tool-use to gate, plus the session pointers needed for the stateful gates. */
-export interface GateInput {
-  sessionId: string;
-  framework: string;
-  tool: string;
-  filePath?: string;
-  content?: string;
-  command?: string;
-  refs?: RefMeta[];
-  now: number;
-  trackFile: string;
-  windowMs?: number;
-  isReplaceAll?: boolean;
-  agentType?: string;
-}
-
-/** Line count of the existing on-disk file (undefined if absent/unreadable). */
+/**
+ * Code-only line count of the existing on-disk file (undefined if
+ * absent/unreadable). Uses {@link countLines} (skips blank/comment lines) to
+ * mirror the Python `count_code_lines(get_full_file_content(...))`, so a partial
+ * Edit judges the full file by the SAME metric as the incoming snippet — a raw
+ * `split("\n").length` would over-count JSDoc/blank lines (and add a
+ * trailing-newline off-by-one), falsely blocking well-documented files.
+ */
 function existingLineCount(path: string | undefined): number | undefined {
   if (!path) return undefined;
   try {
-    return existsSync(path) ? readFileSync(path, "utf8").split("\n").length : undefined;
+    return existsSync(path) ? countLines(readFileSync(path, "utf8")) : undefined;
   } catch {
     return undefined;
   }
@@ -48,17 +46,25 @@ function existingLineCount(path: string | undefined): number | undefined {
  * track. Returns the first blocking prompt, or null to allow.
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
+  const existingLines = existingLineCount(input.filePath);
   let quick: PolicyResult;
   try {
-    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines: existingLineCount(input.filePath) });
+    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines });
   } catch {
     return FAIL_CLOSED;
   }
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
 
+  const precommit = preCommitGate(input.tool, input.command, input.cwd);
+  if (precommit) return precommit;
+  const modular = modularGate(input.tool, input.filePath, input.content, input.cwd);
+  if (modular) return modular;
   if (!input.filePath) return null;
   const window = input.windowMs ?? DEFAULT_WINDOW_MS;
   const track = await loadTrack(input.trackFile);
+
+  const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingLines);
+  if (solidOrSkill) return solidOrSkill;
 
   // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
   const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
@@ -80,8 +86,12 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     brainstormFresh: agentsFresh(track, ["brainstorming"], window, input.now),
   };
   try {
-    return evaluateApex(ctx);
+    const apex = evaluateApex(ctx);
+    if (apex) return apex;
   } catch {
     return FAIL_CLOSED;
   }
+
+  // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.
+  return dryGate(input.tool, input.filePath, input.content, input.cwd);
 }

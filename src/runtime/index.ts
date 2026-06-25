@@ -3,6 +3,8 @@ export * from "./storage";
 export * from "./record";
 export * from "./activity";
 export * from "./gate";
+export * from "./dry";
+export * from "./precommit";
 export * from "./normalize";
 export * from "./respond";
 export * from "./mcp";

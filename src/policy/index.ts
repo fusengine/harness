@@ -7,3 +7,5 @@ export * from "./apex";
 export * from "./guards";
 export * from "./creation-intent";
 export * from "./verbosity";
+export * from "./framework-solid";
+export * from "./skill-triggers";

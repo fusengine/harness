@@ -16,6 +16,45 @@ export function isApexCommand(prompt: string): boolean {
   return /(?:^|\s)\/apex|\/fuse-ai-pilot:apex/i.test(prompt);
 }
 
+/** Modular architecture variants layered on top of the framework. */
+export type ModularArchitecture = "fusecore" | "nextjs-modular" | null;
+
+/**
+ * Detect a project-internal modular architecture (a sub-architecture the
+ * framework-level {@link detectProjectType} doesn't capture): Fusengine's
+ * FuseCore (Laravel) or a `modules/`-based Next.js layout.
+ */
+export function detectModularArchitecture(dir: string): ModularArchitecture {
+  const has = (f: string): boolean => existsSync(join(dir, f));
+  if (has("FuseCore") && has("artisan")) return "fusecore";
+  if (has("modules") && (has("next.config.js") || has("next.config.ts") || has("next.config.mjs"))) {
+    return "nextjs-modular";
+  }
+  return null;
+}
+
+/**
+ * Resolve the skill a detected modular architecture forces.
+ *
+ * Ports the Python `check-nextjs-skill.py` / `check-laravel-skill.py` gates:
+ * when the project is detected on disk as a modular architecture, a specific
+ * skill is required ('solid-nextjs' for nextjs-modular, 'fusecore' for
+ * fusecore). Returns `null` when no modular architecture is detected.
+ *
+ * @param cwd - Project root directory to scan.
+ * @returns The forced skill name, or `null` when none applies.
+ */
+export function requiredArchSkill(cwd: string): string | null {
+  switch (detectModularArchitecture(cwd)) {
+    case "nextjs-modular":
+      return "solid-nextjs";
+    case "fusecore":
+      return "fusecore";
+    default:
+      return null;
+  }
+}
+
 /** Detect the project type by scanning config files in `dir`. */
 export function detectProjectType(dir: string): ProjectType {
   const has = (f: string): boolean => existsSync(join(dir, f));

@@ -4,6 +4,43 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.29] - 2026-06-25
+
+### Added (completes the plugin→harness port; nothing left in the plugins' `_shared`)
+- **DRY duplication gate** (`runtime/dry.ts`): extracts declared symbols from a
+  Write/Edit, greps the codebase (module-boundary aware, fail-open on grep
+  error/timeout), and blocks when 2+ existing declarations clash. Wired into
+  `gate()` after the APEX gates.
+- **`detectModularArchitecture`** (`policy/detect-project.ts`): FuseCore (Laravel)
+  and `modules/`-based Next.js sub-architecture detection.
+- **pre-commit gate** (`runtime/precommit.ts`): runs eslint/tsc/prettier/ruff on a
+  `git commit` and blocks on errors (effectful, fail-open, never auto-fixes).
+- **design pipeline** (`policy/design/*` + `runtime/design.ts`): the full design-agent
+  state machine ported from the plugin — phase ordering, HTML/CSS-only writes, screenshot
+  quota + scroll-before-screenshot, inspiration/identity gating, Gemini create_frontend
+  validation (OKLCH/forbidden-fonts/reference-URL), and post-write content checks
+  (accessibility/AI-slop/hardcoded-colors) as non-blocking warnings. Activated by the
+  design-agent flag; inert for every other agent. Gemini gates are opt-in via
+  `FUSE_DESIGN_GEMINI` (off by default).
+- **modular architecture gate** (`runtime/modular.ts`): enforces Next.js `modules/`
+  (app/ conventions + cross-module imports) and Laravel FuseCore (app/ domain ban,
+  `module.json`, cross-module use) — only when the architecture is detected on disk.
+- **framework SOLID rules** (`policy/framework-solid*`): per-framework rules beyond the
+  generic file-size/interface guards — React (custom hooks under `hooks/`), Next.js
+  (`'use client'` directive, adaptive 150-line limit for route files), Laravel
+  (interfaces under `Contracts/`, fat-controller 80-line), Swift (`@MainActor`/`Sendable`,
+  protocols under `Protocols/`, adaptive 150 for View/Screen). Counts the full on-disk
+  file on Edit; skips vendor/build dirs.
+- **skill triggers** (`policy/skill-triggers.ts` + `skill-patterns/*`): detects a library
+  API in written code (e.g. `useActionState`→react-19, Prisma→prisma-7, shadcn markup→
+  shadcn skill) and blocks until the matching sub-skill ref was read in-session;
+  `*-shadcn` required only in shadcn projects. `requiredArchSkill` forces the
+  modular-architecture skill (`solid-nextjs`/`fusecore`).
+
+### Fixed
+- **file-size**: `countLines` counts CODE-ONLY lines (skips blank + `//`/`*`/`/*`
+  comment lines), matching the original; `#` stays code (Rust/C).
+
 ## [0.1.28] - 2026-06-24
 
 ### Fixed (security)

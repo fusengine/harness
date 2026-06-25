@@ -35,6 +35,7 @@ for Bun; a built `dist` (`.mjs` + `.d.mts`) serves Node/bundler consumers.
 | [config.md](./config.md) | env-driven config (TTL, max-lines, refs dir) |
 | [modules.md](./modules.md) | cache · freshness · refs · state · memory · statusline · util |
 | [adapters.md](./adapters.md) | adapters + `harness init`/`hook` wiring |
+| [design.md](./design.md) | design-agent pipeline — state machine, gates, opt-in Gemini |
 
 Generated API reference: `bun run docs:api` → `docs/api/`.
 See also: [CHANGELOG](../CHANGELOG.md) · [CONTRIBUTING](../CONTRIBUTING.md) · [README](../README.md).
@@ -43,7 +44,7 @@ See also: [CHANGELOG](../CHANGELOG.md) · [CONTRIBUTING](../CONTRIBUTING.md) · 
 
 ```sh
 bun add @fusengine/harness
-bun test            # 105 tests
+bun test            # 117 tests
 bunx tsc --noEmit   # typecheck (isolatedDeclarations)
 bun run build       # dist + .d.mts
 ```

@@ -47,6 +47,13 @@ through without the APEX gates. The gate reads the existing **on-disk** line cou
 so an `Edit` on an already-oversized file blocks; pass `agentType` to exempt
 `Explore`/`Plan` agents.
 
+After the stateless guards, the gate runs **effectful** checks (each fail-open):
+`preCommitGate` (runs eslint/tsc/prettier/ruff on a `git commit`), `modularGate`
+(Next.js `modules/` and Laravel FuseCore structure + cross-module imports), and
+`dryGate` (greps the codebase for duplicate declarations). The design-agent
+pipeline is dispatched separately and is inert unless a design agent is active —
+see [design.md](./design.md).
+
 ## Tracking (`./tracking`)
 
 The session track feeds the stateful gates. An adapter records activity on POST

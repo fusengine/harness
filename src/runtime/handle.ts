@@ -12,6 +12,8 @@ import { normalizeEvent } from "./normalize";
 import { trackFile } from "./paths";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
+import { designGate } from "./design";
+import { designLifecycle } from "./design-lifecycle";
 
 /** Options for {@link handleHook} (caller supplies the clock + project root). */
 export interface HandleOptions {
@@ -42,6 +44,9 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const mcpDir = layout.cacheDir;
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
+  // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
+  if (designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) return { stdout: "", exit: 0 };
+
   // UserPromptSubmit: flag whether the prompt expresses creation intent (brainstorm gate).
   const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
   if (userPrompt !== undefined) {
@@ -53,9 +58,10 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   if (event.phase === "post") {
     const response = payload.tool_response ?? payload.tool_output;
     mcpPostStore(event.tool, event.input, response, mcpDir);
+    const designWarn = designGate(payload, event, mcpDir, opts.cwd);
     const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
     if (activity) await recordActivity(file, activity);
-    return { stdout: "", exit: 0 };
+    return { stdout: designWarn ? respond(id, designWarn) : "", exit: 0 };
   }
 
   const intercept = mcpPreIntercept(id, event.tool, event.input, mcpDir, MCP_TTL_MS, opts.now);
@@ -64,6 +70,9 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     return { stdout: intercept.stdout, exit: 0 };
   }
 
+  const designBlock = designGate(payload, event, mcpDir, opts.cwd);
+  if (designBlock) return { stdout: respond(id, designBlock), exit: 0 };
+
   const prompt = await gate({
     sessionId: event.sessionId,
     framework,
@@ -71,6 +80,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     filePath: event.filePath,
     content: event.content,
     command: event.command,
+    cwd: opts.cwd,
     refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
     isReplaceAll: event.input.replace_all === true,
     agentType: event.agentType,
