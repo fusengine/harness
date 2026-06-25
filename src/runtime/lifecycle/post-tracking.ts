@@ -8,17 +8,21 @@ import { trackEnrichment } from "./cartographer/track-enrichment";
 import { trackSkillRead } from "./security/track-skill-read";
 import { trackMcpResearch } from "./security/track-mcp";
 import { trackWatchResearch } from "./changelog-research";
+import { dispatchLessons } from "./lessons/dispatch";
 
 /**
  * Dispatch the appropriate PostToolUse tracker for the invoking scope. Carto
  * persists manual enrichments; security records skill reads + MCP research;
- * changelog records watch research. Side-effect only.
+ * changelog records watch research; lessons arms the per-project throttle.
+ * Side-effect only.
  * @param scope - The invoking plugin scope.
  * @param event - The normalized event.
  * @param input - The raw tool input.
  * @param now - Clock.
+ * @param payload - The raw hook payload (for the lessons mark).
+ * @param cwd - The project root (for the lessons mark).
  */
-export function postTrackingSideEffects(scope: PluginScope, event: NormalizedEvent, input: Record<string, unknown>, now: number): void {
+export function postTrackingSideEffects(scope: PluginScope, event: NormalizedEvent, input: Record<string, unknown>, now: number, payload: Record<string, unknown> = {}, cwd: string = process.cwd()): void {
   if (scope === "carto" && (event.tool === "Edit" || event.tool === "Write") && event.filePath) {
     trackEnrichment(event.filePath);
     return;
@@ -30,5 +34,7 @@ export function postTrackingSideEffects(scope: PluginScope, event: NormalizedEve
   }
   if (scope === "changelog") {
     trackWatchResearch(event.tool, input, now);
+    return;
   }
+  if (scope === "lessons") dispatchLessons("PostToolUse", payload, cwd, now);
 }

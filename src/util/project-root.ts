@@ -12,7 +12,13 @@ export function isCodeFile(p: string): boolean {
   return CODE_EXT.test(p) && !SKIP_DIRS.test(p);
 }
 
-function walkUpFor(dir: string, marker: string): string | null {
+/**
+ * Walk up from `dir` to the nearest ancestor directory containing `marker`.
+ * @param dir - Starting directory.
+ * @param marker - Sibling file/dir name to look for at each level.
+ * @returns The ancestor holding `marker`, or `null` at filesystem root.
+ */
+export function walkUpFor(dir: string, marker: string): string | null {
   let current = resolve(dir);
   while (current !== "/") {
     if (existsSync(`${current}/${marker}`)) return current;

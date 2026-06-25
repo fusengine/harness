@@ -9,9 +9,10 @@ import { saveApexState } from "./pre-compact";
 import { cleanupSession } from "./session-end";
 import { validateRulesLoaded } from "./instructions-loaded";
 import { cartoSessionStart } from "./cartographer/session-start";
+import { dispatchLessons } from "./lessons/dispatch";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
-export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot";
+export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo";
 
 /** Inputs the lifecycle dispatcher needs (clock + roots injected). */
 export interface LifecycleInput {
@@ -26,7 +27,8 @@ export interface LifecycleInput {
 function sessionStart(input: LifecycleInput): string {
   if (input.scope === "solid") return solidDetectStart();
   if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd);
-  if (input.scope === "carto") return cartoSessionStart(input.cwd);
+  if (input.scope === "carto") return cartoSessionStart(input.cwd, input.now);
+  if (input.scope === "lessons") return dispatchLessons("SessionStart", input.payload, input.cwd, input.now);
   return sessionStartCore(input.cwd, undefined, input.now);
 }
 
@@ -44,7 +46,11 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "UserPromptSubmit":
       return input.scope === "rules" ? injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd) : null;
     case "SubagentStart":
-      return input.scope === "aipilot" ? "" : subagentCacheContext(input.payload.session_id);
+      if (input.scope === "aipilot") return "";
+      if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now);
+      return subagentCacheContext(input.payload.session_id);
+    case "Stop":
+      return input.scope === "lessons" ? dispatchLessons("Stop", input.payload, input.cwd, input.now) : null;
     case "SubagentStop":
       return input.scope === "aipilot" ? "" : trackAgentMemory(input.payload, undefined, input.now);
     case "TeammateIdle":

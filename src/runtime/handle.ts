@@ -18,6 +18,7 @@ import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { handlePre } from "./handle-pre";
 import { dispatchAipilot, aipilotPostToolUse } from "./lifecycle";
 import type { PluginScope } from "./lifecycle";
+import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 
 /** Raw Claude hook event name from a payload (empty when absent). */
 function rawEventName(payload: Record<string, unknown>): string {
@@ -82,7 +83,9 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     const designWarn = designGate(payload, event, mcpDir, opts.cwd);
     const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
     if (activity) await recordActivity(file, activity);
-    postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now);
+    postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
+    const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
+    if (seoDeny) return { stdout: seoDeny, exit: 0 };
     if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate")) {
       const out = await aipilotPostToolUse(payload, opts.cwd);
       if (out) return { stdout: out, exit: 0 };

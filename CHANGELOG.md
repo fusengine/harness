@@ -2,6 +2,24 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.32] - 2026-06-25
+
+### Added (fuse-lessons + fuse-seo ports → harness, ecosystem map → `carto`)
+- **New `lessons` scope** (`PluginScope`, `cli/bin.ts` `validScopes`): ports fuse-lessons' 4 events to
+  `runtime/lifecycle/lessons/`. `dispatchLessons` routes SessionStart/SubagentStart (inject
+  `<root>/MEMORY/LESSON.md` as additionalContext), Stop (cross-project reminder for roots with unsaved
+  code edits, throttled via the existing `memory/registry` + `memory/state`), and PostToolUse (arm the
+  per-project throttle, wired through `postTrackingSideEffects`). `lessons/state.ts` overrides only the
+  two `<root>/MEMORY/` paths, reusing all state/throttle logic from `src/memory`.
+- **New `seo` scope**: ports fuse-seo's validate hook. `policy/seo/validate.ts` (`isHtmlLike`,
+  `missingSeoElements`) is a zero-dependency regex presence-gate (no cheerio); `lifecycle/seo/post-tool-use.ts`
+  denies an HTML-like edit under a `.fuse-seo` marker that is missing any of the 7 SEO elements, via a
+  `permissionDecision: deny` PostToolUse response (`seoPostToolUseResponse`).
+- **Cartographer ecosystem map** folded into the `carto` scope: `cartoSessionStart` now regenerates BOTH
+  the project map AND the plugin ecosystem map (`cartographer/ecosystem-map.ts` ports `generate_map.py`,
+  reusing `findMarketplacePlugins`/`readPluginMeta`/`scanPlugin`/`mergeLines`/`writePluginMap`) and emits
+  the navigation context as additionalContext.
+
 ## [0.1.31] - 2026-06-25
 
 ### Added (ai-pilot cache/injection port → harness, new `aipilot` scope)
