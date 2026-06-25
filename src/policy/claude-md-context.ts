@@ -45,13 +45,14 @@ export function detectClaudeMdProjectType(cwd: string): string {
 export function buildApexInstruction(projectType: string, maxLines: number): string {
   return (
     `INSTRUCTION: This is a development task. Use APEX methodology:\n\n` +
-    `**TRACKING FILE**: [project]/.claude/apex/task.json\n\n` +
-    `1. **ANALYZE** (3 AGENTS IN PARALLEL):\n` +
-    `   - explore-codebase + research-expert + general-purpose\n` +
-    `   - Project type: ${projectType}\n\n` +
-    `2. **PLAN**: TaskCreate (<${maxLines} lines per file)\n\n` +
-    `3. **EXECUTE**: ${projectType}-expert, SOLID principles\n\n` +
-    `4. **EXAMINE**: Run sniper agent after ANY modification`
+    `**TRACKING FILE**: [project]/.claude/apex/task.json (auto-created on first Write/Edit)\n\n` +
+    `1. **ANALYZE** (MANDATORY - 3 AGENTS IN PARALLEL):\n` +
+    `   - explore-codebase + research-expert + ${projectType}-expert (framework expertise)\n` +
+    `   - Project type detected: ${projectType}\n\n` +
+    `2. **PLAN**: Use TaskCreate to break down tasks (<${maxLines} lines per file)\n\n` +
+    `3. **EXECUTE**: ${projectType}-expert, follow SOLID principles, split at ${maxLines - 10} lines\n\n` +
+    `4. **EXAMINE**: Run sniper agent after ANY modification\n\n` +
+    `**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.`
   );
 }
 

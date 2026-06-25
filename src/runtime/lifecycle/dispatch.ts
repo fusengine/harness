@@ -11,7 +11,7 @@ import { validateRulesLoaded } from "./instructions-loaded";
 import { cartoSessionStart } from "./cartographer/session-start";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
-export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog";
+export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot";
 
 /** Inputs the lifecycle dispatcher needs (clock + roots injected). */
 export interface LifecycleInput {
@@ -44,9 +44,9 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "UserPromptSubmit":
       return input.scope === "rules" ? injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd) : null;
     case "SubagentStart":
-      return subagentCacheContext(input.payload.session_id);
+      return input.scope === "aipilot" ? "" : subagentCacheContext(input.payload.session_id);
     case "SubagentStop":
-      return trackAgentMemory(input.payload, undefined, input.now);
+      return input.scope === "aipilot" ? "" : trackAgentMemory(input.payload, undefined, input.now);
     case "TeammateIdle":
       return validateTeammateOutput(input.payload);
     case "PostToolUseFailure":
@@ -55,7 +55,7 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "PreCompact":
       return saveApexState(input.cwd, input.now);
     case "SessionEnd":
-      cleanupSession(undefined, input.now);
+      if (input.scope !== "aipilot") cleanupSession(undefined, input.now);
       return "";
     case "InstructionsLoaded":
       validateRulesLoaded(input.payload);
@@ -64,3 +64,5 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       return null;
   }
 }
+
+export { dispatchAipilot, aipilotPostToolUse } from "./aipilot/dispatch-aipilot";

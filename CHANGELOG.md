@@ -2,6 +2,48 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.31] - 2026-06-25
+
+### Added (ai-pilot cache/injection port → harness, new `aipilot` scope)
+- **New plugin scope** `aipilot` on `PluginScope`, resolved from the `hook <id> aipilot` CLI arg
+  (`cli/bin.ts` `validScopes`). Unlike the other scopes (routed by event), the ai-pilot scope also
+  routes by **agent matcher** (the payload's `agent_type`), reproducing the ai-pilot plugin's
+  per-agent `hooks.json` entries now that the 11 TypeScript scripts live in the harness.
+- **`runtime/lifecycle/aipilot/*`** — the ported cache + injection handlers (each < 100 lines):
+  - `dispatch-aipilot.ts` — the (event, agent_type) router (`dispatchAipilot` + `aipilotPostToolUse`).
+  - `cache-base.ts` — shared project-hash/age/checksum helpers, reusing `home-state.fusengineCache`
+    so ai-pilot caches share the existing `~/.claude/fusengine-cache` tree (no second cache layer).
+  - **SubagentStart injectors**: `inject-apex.ts` (matcher "": APEX AGENTS.md + task context +
+    cartographer paths, ports `inject-subagent-context.ts`), `inject-explore.ts` (explore-codebase:
+    cached architecture or save block, ports `explore-cache-check.ts`), `inject-doc.ts`
+    (research-expert: cached docs, ports `doc-cache-inject.ts`), `inject-lessons.ts` (matcher "":
+    known-issues, ports `lessons-cache-inject.ts`), `inject-test.ts` (sniper: changed-file list,
+    ports `test-cache-inject.ts`).
+  - **SubagentStop writers**: `cache-doc.ts` (research-expert synthesis → doc cache, ports
+    `cache-doc-from-transcript.ts`), `cache-lessons.ts` (sniper edits → lessons, ports
+    `cache-sniper-lessons.ts` — the dead `promote-global-lessons.ts` spawn is dropped),
+    `cache-test.ts` (sniper linter output → per-file checksums, ports `cache-test-results.ts`).
+  - **SessionEnd**: `analytics.ts` (`logCacheEvent` + `cacheAnalyticsSave`, ports
+    `cache-analytics-save.ts`).
+  - **PostToolUse (TaskCreate|TaskUpdate)**: `sync-task.ts` + `apex-task-store.ts` (lock + task.json
+    create/start/complete + commit reminder, ports `sync-task-tracking.ts`).
+  - Support modules: `transcript.ts` (JSONL parse), `source-scan.ts` (monorepo glob + stack detect),
+    `lessons.ts` (dedup/merge/categorize), `types.ts` (cache + APEX interfaces).
+
+### Changed (deduplication — fused, not duplicated)
+- **`policy/claude-md-context.ts` `buildApexInstruction`** absorbs the richer ai-pilot
+  UserPromptSubmit APEX preamble (tracking-file note, 3-agents-in-parallel mandate,
+  `${projectType}-expert`, split target, doc-status reminder). The **single** core-scope
+  UserPromptSubmit injection now carries it — ai-pilot's `detect-and-inject-apex.ts` is **not**
+  re-emitted (its `hooks.json` UserPromptSubmit entry is removed), avoiding a double APEX injection.
+- **`runtime/lifecycle/dispatch.ts`** guards the core `SubagentStart`/`SubagentStop`/`SessionEnd`
+  cases so the core handlers (`subagentCacheContext` MCP-cache table, `trackAgentMemory`,
+  `cleanupSession`) do **not** fire for the `aipilot` scope — the ai-pilot SubagentStart cache
+  injectors are emitted via separate `hooks.json` entries, so there is no double emission, and the
+  MCP cache continues to be served by the core scope.
+- **`runtime/handle.ts`** runs the async `dispatchAipilot` before the sync lifecycle dispatch and
+  routes `aipilot` PostToolUse TaskCreate/TaskUpdate to `aipilotPostToolUse`.
+
 ## [0.1.30] - 2026-06-25
 
 ### Added (lifecycle/session/context port: cartographer + security-expert + changelog-watcher hooks → harness)

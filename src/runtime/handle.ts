@@ -16,7 +16,13 @@ import { promptSubmitContext } from "./inject-context";
 import { lifecycleStdout, postEditContext } from "./lifecycle-bridge";
 import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { handlePre } from "./handle-pre";
+import { dispatchAipilot, aipilotPostToolUse } from "./lifecycle";
 import type { PluginScope } from "./lifecycle";
+
+/** Raw Claude hook event name from a payload (empty when absent). */
+function rawEventName(payload: Record<string, unknown>): string {
+  return typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
+}
 
 /** Options for {@link handleHook} (caller supplies the clock + project root). */
 export interface HandleOptions {
@@ -52,6 +58,12 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
   if (designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) return { stdout: "", exit: 0 };
 
+  // ai-pilot scope async lifecycle (SubagentStart/Stop, SessionEnd cache handlers).
+  if (opts.scope === "aipilot") {
+    const ai = await dispatchAipilot(rawEventName(payload), payload, opts.cwd, opts.now);
+    if (ai !== null) return { stdout: ai, exit: 0 };
+  }
+
   // Ported lifecycle/session/context hooks (SessionStart, SubagentStart/Stop, etc.).
   const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now);
   if (life !== null) return { stdout: life, exit: 0 };
@@ -71,6 +83,10 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
     if (activity) await recordActivity(file, activity);
     postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now);
+    if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate")) {
+      const out = await aipilotPostToolUse(payload, opts.cwd);
+      if (out) return { stdout: out, exit: 0 };
+    }
     const extra = postEditContext(opts.scope ?? "core", event, opts.now);
     return { stdout: designWarn ? respond(id, designWarn) : extra, exit: 0 };
   }
