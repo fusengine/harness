@@ -2,6 +2,21 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.35] - 2026-06-27
+
+### Added
+
+- **`harness changelog` CLI verb**: ports the changelog-watcher plugin fetch into the engine —
+  fetches the Claude Code changelog, parses recent versions, diffs against the saved per-day
+  state (~/.claude/logs/00-changelog), and prints JSON {latest, new_since_last_check,
+  recent_versions}. Dual-runtime (global fetch). The changelog-scan skill now calls the harness
+  instead of a per-plugin script.
+
+### Fixed
+
+- Changelog parser updated to the current docs MDX format (Update label blocks) with the legacy
+  header form kept as fallback — the old regex matched nothing on the live page.
+
 ## [0.1.34] - 2026-06-27
 
 ### Security (#8 — tamper-resistant enforcement state)
