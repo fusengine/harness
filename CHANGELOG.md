@@ -2,6 +2,20 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.33] - 2026-06-27
+
+### Fixed
+
+- **Dual-runtime**: the published CLI now runs under Node (npx/npm/global) as well as Bun.
+  Replaced all Bun-only APIs (Bun.file/write/spawn/sleep/stdin) and the bun Glob import with
+  node:fs / node:child_process / process.stdin via a new src/util/runtime-io compat module —
+  fixes the "Cannot find package bun" crash on Node installs (the bin ships a node shebang).
+
+### Changed
+
+- init: generated hook command "npx harness" -> "npx -y @fusengine/harness"; the Claude
+  PreToolUse matcher is widened to Write|Edit|Bash so git/install/bash are guarded.
+
 ## [0.1.32] - 2026-06-25
 
 ### Added (fuse-lessons + fuse-seo ports → harness, ecosystem map → `carto`)
