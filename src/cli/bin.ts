@@ -4,9 +4,11 @@
  *   harness check          cli-mode: check staged files (pre-commit), exit non-zero on a violation
  *   harness init [id]      write the wiring file for a harness (defaults to the detected one)
  *   harness hook <id>      runtime: read a hook payload on stdin, route to the adapter, print the response
+ *   harness changelog      fetch + diff the Claude Code changelog, print a JSON summary (changelog-watcher)
  */
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
+import { scanChangelog } from "../changelog/fetch";
 import { handleHook } from "../runtime/handle";
 import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
@@ -45,6 +47,14 @@ if (cmd === "hook") {
   const written = files.map((f) => writeInitFile(process.cwd(), f));
   process.stdout.write(`harness: wired ${id} -> ${written.join(", ")}\n`);
   process.exit(0);
+} else if (cmd === "changelog") {
+  try {
+    process.stdout.write(JSON.stringify(await scanChangelog()) + "\n");
+    process.exit(0);
+  } catch (e) {
+    process.stdout.write(JSON.stringify({ status: "error", message: e instanceof Error ? e.message : "changelog fetch failed" }) + "\n");
+    process.exit(1);
+  }
 } else {
   const files = stagedFiles();
   if (files.length === 0) process.exit(0);
