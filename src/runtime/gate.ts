@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
 import { evaluate, type PolicyResult } from "../policy/evaluate";
-import { countLines } from "../policy/file-size";
+import { existingLineCount } from "./gate-helpers";
 import { evaluateApex, type ApexContext } from "../policy/apex";
 import { FAIL_CLOSED } from "../policy/guards";
 import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
+import { agentsRanFromTranscript } from "../freshness/agent-evidence";
 import { loadTrack, saveTrack } from "../tracking/store";
 import { dryGate } from "./dry";
 import { preCommitGate } from "./precommit";
@@ -22,23 +22,6 @@ export const DEFAULT_WINDOW_MS = 120_000;
 
 /** Trivial edits allowed within the window before the full APEX gates apply. */
 export const TRIVIAL_BUDGET = 4;
-
-/**
- * Code-only line count of the existing on-disk file (undefined if
- * absent/unreadable). Uses {@link countLines} (skips blank/comment lines) to
- * mirror the Python `count_code_lines(get_full_file_content(...))`, so a partial
- * Edit judges the full file by the SAME metric as the incoming snippet — a raw
- * `split("\n").length` would over-count JSDoc/blank lines (and add a
- * trailing-newline off-by-one), falsely blocking well-documented files.
- */
-function existingLineCount(path: string | undefined): number | undefined {
-  if (!path) return undefined;
-  try {
-    return existsSync(path) ? countLines(readFileSync(path, "utf8")) : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Full gate: the stateless guards (file-size, git, security...) first, then a
@@ -73,6 +56,15 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     return null;
   }
 
+  // Freshness: prefer platform-authored transcript evidence (the agent cannot
+  // forge a Task tool_use in the runtime-owned transcript). The self-recorded
+  // track is only a fallback when no transcript path is available (tests / other
+  // harnesses) — so a forged track can no longer satisfy the gate.
+  const freshnessFor = (names: string[]): boolean =>
+    input.transcriptPath
+      ? agentsRanFromTranscript(input.transcriptPath, names, window, input.now)
+      : agentsFresh(track, names, window, input.now);
+
   const ctx: ApexContext = {
     sessionId: input.sessionId,
     framework: input.framework,
@@ -81,9 +73,9 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     authorizations: track.authorizations,
     refs: input.refs,
     refsRead: track.refsRead,
-    agentsFresh: agentsFresh(track, [...REQUIRED_AGENTS], window, input.now),
+    agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
     brainstormRequired: track.brainstormRequired,
-    brainstormFresh: agentsFresh(track, ["brainstorming"], window, input.now),
+    brainstormFresh: freshnessFor(["brainstorming"]),
   };
   try {
     const apex = evaluateApex(ctx);

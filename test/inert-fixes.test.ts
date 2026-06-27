@@ -4,8 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { activityFor } from "../src/runtime/activity";
 import { handleHook } from "../src/runtime/handle";
-import { projectLayout } from "../src/config/layout";
-import { trackFile } from "../src/runtime/paths";
+import { trackFile, defaultStateDir } from "../src/runtime/paths";
 import { loadTrack } from "../src/tracking/store";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-inert-"));
@@ -22,7 +21,7 @@ test("activityFor: agent quality derived from responseLength", () => {
 
 test("handleHook: UserPromptSubmit sets brainstormRequired from creation intent", async () => {
   const cwd = root();
-  const file = trackFile("s1", projectLayout(cwd).trackDir);
+  const file = trackFile("s1", defaultStateDir(cwd));
   await handleHook("claude-code", { session_id: "s1", prompt: "create a new dashboard component" }, { now: 1, cwd });
   expect((await loadTrack(file)).brainstormRequired).toBe(true);
   await handleHook("claude-code", { session_id: "s1", prompt: "fix the login bug" }, { now: 2, cwd });

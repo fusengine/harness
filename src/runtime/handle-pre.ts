@@ -65,6 +65,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     windowMs: opts.windowMs,
     now: opts.now,
     trackFile: file,
+    transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
   });
   return prompt ? { stdout: respond(id, prompt), exit: 0 } : { stdout: "", exit: 0 };
 }

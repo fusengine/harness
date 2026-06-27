@@ -15,4 +15,6 @@ export interface GateInput {
   windowMs?: number;
   isReplaceAll?: boolean;
   agentType?: string;
+  /** Absolute path to the session transcript (Claude `transcript_path`) for evidence-based freshness. */
+  transcriptPath?: string;
 }
