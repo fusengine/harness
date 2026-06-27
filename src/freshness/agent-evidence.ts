@@ -1,0 +1,93 @@
+/**
+ * Platform-authored transcript evidence for APEX agent freshness.
+ * Parses the Claude Code session JSONL transcript to find genuine Task
+ * tool_use entries — forging this requires writing into the transcript file
+ * which the Claude Code platform controls, unlike the self-recorded track.
+ */
+import { readText } from "../util/runtime-io";
+
+/** Raw shape of one JSONL line in a Claude Code transcript. */
+interface TranscriptLine {
+  /** ISO-8601 or epoch-ms timestamp written by the platform. */
+  timestamp?: string | number;
+  message?: { content?: unknown[] };
+}
+
+/** A tool_use content block inside a transcript message. */
+interface ToolUseBlock {
+  type: string;
+  /** Tool name, e.g. "Task", "Read", "Edit". */
+  name?: string;
+  input?: {
+    /** Primary agent-identity field in Task invocations. */
+    subagent_type?: string;
+    /** Alternate field name seen in some Claude transcript variants. */
+    name?: string;
+  };
+}
+
+/** Parse a raw `timestamp` field to epoch ms; `undefined` when absent or invalid. */
+function parseTs(raw: string | number | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw === "number") return raw;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : undefined;
+}
+
+/**
+ * Return `true` ONLY when, for EVERY name in `names`, the Claude Code
+ * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task`
+ * tool whose `subagent_type` (or `name`) input field matches, with the entry
+ * timestamp within `windowMs` of `now`.
+ *
+ * **Timestamp note:** when a transcript entry carries no `timestamp` field it
+ * is counted as within-window (we cannot prove staleness). This is
+ * intentionally lenient to stay robust across transcript-format evolution; the
+ * tamper-resistance guarantee derives from the platform authoring the file —
+ * not from the timestamp alone.
+ *
+ * @param transcriptPath - Absolute path to the session `.jsonl` transcript
+ *   (hook payload field: `transcript_path`). Returns `false` when `undefined`.
+ * @param names - Required agent `subagent_type` values — ALL must appear.
+ * @param windowMs - Freshness window in milliseconds.
+ * @param now - Current epoch ms (pass `Date.now()` at the call-site).
+ * @returns `true` when ALL agents have real, within-window transcript evidence.
+ */
+export function agentsRanFromTranscript(
+  transcriptPath: string | undefined,
+  names: readonly string[],
+  windowMs: number,
+  now: number,
+): boolean {
+  if (!transcriptPath || names.length === 0) return false;
+  let text: string;
+  try {
+    text = readText(transcriptPath);
+  } catch {
+    return false;
+  }
+  const cutoff = now - windowMs;
+  const found = new Set<string>();
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let entry: TranscriptLine;
+    try {
+      entry = JSON.parse(line) as TranscriptLine;
+    } catch {
+      continue; // tolerate malformed lines
+    }
+    const ts = parseTs(entry.timestamp);
+    if (ts !== undefined && ts <= cutoff) continue;
+    const content = entry.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content as ToolUseBlock[]) {
+      if (block?.type !== "tool_use" || block.name !== "Task") continue;
+      const agent = block.input?.subagent_type ?? block.input?.name;
+      if (typeof agent === "string" && (names as string[]).includes(agent)) {
+        found.add(agent);
+      }
+    }
+    if (found.size === names.length) return true;
+  }
+  return names.every((n) => found.has(n));
+}

@@ -2,6 +2,21 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.34] - 2026-06-27
+
+### Security (#8 — tamper-resistant enforcement state)
+
+- **Freshness from the transcript**: the APEX explore+research gate now verifies prior
+  agents from the runtime-authored session transcript (transcript_path), not the
+  self-recorded track — so an agent can no longer forge its own state file to pass the
+  gate (new src/freshness/agent-evidence).
+- **State out-of-tree**: the session track moves from <repo>/.harness/track to
+  ~/.claude/fuse-harness/state/<projectHash>/ (src/runtime/paths); the protected-path
+  guard now also blocks Bash redirections into state dirs.
+- **Integrity**: the track is persisted as an HMAC-signed envelope; load fails closed on
+  MAC mismatch (src/tracking/integrity). The key is agent-readable, so the transcript
+  evidence is the real guarantee; relocation + guard + HMAC are defense-in-depth.
+
 ## [0.1.33] - 2026-06-27
 
 ### Fixed

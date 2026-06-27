@@ -7,7 +7,7 @@ import { loadTrack, saveTrack } from "../tracking/store";
 import { activityFor } from "./activity";
 import { mcpPostStore } from "./mcp";
 import { normalizeEvent } from "./normalize";
-import { trackFile } from "./paths";
+import { defaultStateDir, trackFile } from "./paths";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
 import { designGate } from "./design";
@@ -52,7 +52,7 @@ export interface HandleOutcome {
 export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
   const event = normalizeEvent(id, payload);
   const layout = projectLayout(opts.cwd);
-  const file = trackFile(event.sessionId, layout.trackDir);
+  const file = trackFile(event.sessionId, defaultStateDir(opts.cwd));
   const mcpDir = layout.cacheDir;
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
