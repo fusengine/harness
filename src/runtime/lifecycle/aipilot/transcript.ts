@@ -5,6 +5,7 @@
  * plugin's `cache/project-detect.ts` + `cache/lesson-helpers.ts` (now removed).
  */
 import { readdirSync } from "node:fs";
+import { readText } from "../../../util/runtime-io";
 import type { EditEntry } from "./types";
 
 const ROOT_MARKERS = [".git", ".hg", "turbo.json", "nx.json", "lerna.json", "pnpm-workspace.yaml"];
@@ -33,7 +34,7 @@ export function projectRootFromPaths(filePaths: string[]): string | null {
 
 /** Extract all absolute file paths from tool_use entries in a JSONL transcript. */
 export async function transcriptFilePaths(transcriptPath: string): Promise<string[]> {
-  const text = await Bun.file(transcriptPath).text();
+  const text = readText(transcriptPath);
   const paths = new Set<string>();
   for (const line of text.split("\n").filter(Boolean)) {
     try {
@@ -51,7 +52,7 @@ export async function transcriptFilePaths(transcriptPath: string): Promise<strin
 
 /** Extract deduplicated Edit tool_use entries (keyed by basename) from a transcript. */
 export async function transcriptEdits(transcriptPath: string): Promise<EditEntry[]> {
-  const text = await Bun.file(transcriptPath).text();
+  const text = readText(transcriptPath);
   const edits: EditEntry[] = [];
   for (const line of text.split("\n").filter(Boolean)) {
     try {
@@ -71,7 +72,7 @@ export async function transcriptEdits(transcriptPath: string): Promise<EditEntry
 
 /** Extract the last assistant text report (first 500 lines) from a transcript. */
 export async function transcriptReport(transcriptPath: string): Promise<string> {
-  const text = await Bun.file(transcriptPath).text();
+  const text = readText(transcriptPath);
   let lastReport = "";
   for (const line of text.split("\n").filter(Boolean)) {
     try {

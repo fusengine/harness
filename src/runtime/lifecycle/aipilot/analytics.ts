@@ -7,6 +7,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
+import { readText, writeText, pathExists } from "../../../util/runtime-io";
 import { cacheBaseDir } from "./cache-base";
 
 const TOKEN_WEIGHTS: Record<string, number> = { explore: 15000, doc: 10000, lessons: 3000, tests: 5000 };
@@ -63,9 +64,8 @@ function parseEntries(raw: string): SessionEntry[] {
 export async function cacheAnalyticsSave(home: string = homedir(), now: number = Date.now()): Promise<void> {
   const dir = join(cacheBaseDir(home), "analytics");
   const sessionsFile = join(dir, "sessions.jsonl");
-  const file = Bun.file(sessionsFile);
-  if (!(await file.exists())) return;
-  const raw = await file.text();
+  if (!pathExists(sessionsFile)) return;
+  const raw = readText(sessionsFile);
   if (!raw.trim()) return;
   const entries = parseEntries(raw);
   if (entries.length === 0) return;
@@ -95,5 +95,5 @@ export async function cacheAnalyticsSave(home: string = homedir(), now: number =
 
   const cutoff = new Date(now - 30 * 86_400_000).toISOString();
   const kept = entries.filter((e) => e.ts >= cutoff);
-  await Bun.write(sessionsFile, kept.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  writeText(sessionsFile, kept.map((e) => JSON.stringify(e)).join("\n") + "\n");
 }

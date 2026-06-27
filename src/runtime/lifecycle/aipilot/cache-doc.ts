@@ -7,6 +7,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
+import { readText, writeText, pathExists, sleep } from "../../../util/runtime-io";
 import { hashText16, cacheDirFor } from "./cache-base";
 import { transcriptFilePaths, projectRootFromPaths } from "./transcript";
 import type { CacheEntry, CacheIndex } from "./types";
@@ -19,7 +20,7 @@ const RETRY_DELAYS = [500, 1000, 2000];
 
 /** Extract the longest assistant synthesis + queried library ids from a transcript. */
 async function extractSynthesis(path: string): Promise<{ text: string; libraries: string[] }> {
-  const lines = (await Bun.file(path).text()).split("\n").filter(Boolean);
+  const lines = readText(path).split("\n").filter(Boolean);
   const libraries: string[] = [];
   let synthesis = "";
   for (const line of lines) {
@@ -49,7 +50,7 @@ async function extractSynthesis(path: string): Promise<{ text: string; libraries
  * @param home - Home dir (defaults to `~`).
  */
 export async function cacheDocFromTranscript(transcript: string | undefined, cwd: string, home: string = homedir()): Promise<void> {
-  if (!transcript || !(await Bun.file(transcript).exists())) return;
+  if (!transcript || !pathExists(transcript)) return;
   const allPaths = await transcriptFilePaths(transcript);
   const projPath = projectRootFromPaths(allPaths) ?? process.env.CLAUDE_PROJECT_DIR ?? cwd;
   const cacheDir = cacheDirFor("doc", projPath, home);
@@ -58,7 +59,7 @@ export async function cacheDocFromTranscript(transcript: string | undefined, cwd
   let result = await extractSynthesis(transcript);
   for (const delay of RETRY_DELAYS) {
     if (result.text.length >= MIN_TEXT_SIZE && result.libraries.length > 0) break;
-    await Bun.sleep(delay);
+    await sleep(delay);
     result = await extractSynthesis(transcript);
   }
   const { text, libraries } = result;
@@ -70,7 +71,7 @@ export async function cacheDocFromTranscript(transcript: string | undefined, cwd
   const content = text.slice(0, MAX_DOC_SIZE);
   const topic = libraries.join(", ");
   const docHash = hashText16(topic);
-  await Bun.write(join(docsDir, `${docHash}.md`), content);
+  writeText(join(docsDir, `${docHash}.md`), content);
 
   const sizeKb = Math.floor(content.length / 1024);
   for (const lib of libraries) {

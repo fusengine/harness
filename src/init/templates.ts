@@ -20,7 +20,7 @@ export function claudeInit(command: string): InitFile[] {
   return [{
     path: ".claude/settings.json",
     content: json({ hooks: {
-      PreToolUse: [{ matcher: "Write|Edit", hooks: [{ type: "command", command }] }],
+      PreToolUse: [{ matcher: "Write|Edit|Bash", hooks: [{ type: "command", command }] }],
       PostToolUse: [{ matcher: "", hooks: [{ type: "command", command }] }],
     } }),
   }];

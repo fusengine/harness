@@ -7,7 +7,7 @@ import { initFor, writeInitFile } from "../src/init/run";
 
 test("templates: pre + post wiring per harness", () => {
   const claude = JSON.parse(claudeInit("c")[0]!.content) as { hooks: { PreToolUse: { matcher: string }[]; PostToolUse: unknown[] } };
-  expect(claude.hooks.PreToolUse[0]?.matcher).toBe("Write|Edit");
+  expect(claude.hooks.PreToolUse[0]?.matcher).toBe("Write|Edit|Bash");
   expect(claude.hooks.PostToolUse.length).toBe(1);
   expect((JSON.parse(cursorInit("x")[0]!.content) as { version: number }).version).toBe(1);
   const gemini = JSON.parse(geminiInit("x")[0]!.content) as { hooks: { AfterTool: unknown[] } };

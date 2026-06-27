@@ -9,6 +9,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { readJsonFile } from "../../../util/json-io";
+import { readText } from "../../../util/runtime-io";
 import { resolveMaxLines } from "../../../config/limits";
 import { contextResponse } from "../../../adapters/claude";
 import type { ApexTaskFile } from "./types";
@@ -55,8 +56,8 @@ export async function injectApexSubagentContext(cwd: string, home: string = home
   const apexDir = join(projectRoot, ".claude", "apex");
   if (!existsSync(apexDir)) return "";
 
-  const agentsFile = Bun.file(join(apexDir, "AGENTS.md"));
-  const agents = (await agentsFile.exists()) ? (await agentsFile.text()).slice(0, 4000) : "";
+  const agentsPath = join(apexDir, "AGENTS.md");
+  const agents = existsSync(agentsPath) ? readText(agentsPath).slice(0, 4000) : "";
   const taskData = await readJsonFile<ApexTaskFile>(join(apexDir, "task.json"));
   const completed = taskData ? completedTasks(taskData.tasks) : "none";
   const pending = taskData ? pendingTasks(taskData.tasks) : "none";

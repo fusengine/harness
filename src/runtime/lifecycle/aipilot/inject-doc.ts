@@ -6,6 +6,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJsonFile } from "../../../util/json-io";
+import { readText, pathExists } from "../../../util/runtime-io";
 import { contextResponse } from "../../../adapters/claude";
 import { cacheDirFor, cacheAge, projectHash } from "./cache-base";
 import { logCacheEvent } from "./analytics";
@@ -27,9 +28,9 @@ async function buildDocsContext(entries: CacheEntry[], docsDir: string, now: num
     if (age > maxAge) maxAge = age;
     if (!entry.hash || seen.has(entry.hash)) continue;
     seen.add(entry.hash);
-    const file = Bun.file(join(docsDir, `${entry.hash}.md`));
-    if (!(await file.exists())) continue;
-    const content = await file.text();
+    const docPath = join(docsDir, `${entry.hash}.md`);
+    if (!pathExists(docPath)) continue;
+    const content = readText(docPath);
     if (!content) continue;
     ctx += `\n${content}\n`;
     count++;

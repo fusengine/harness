@@ -5,6 +5,7 @@
  */
 import { mkdir, rmdir } from "node:fs/promises";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
+import { sleep } from "../../../util/runtime-io";
 import type { ApexTaskFile } from "./types";
 
 /**
@@ -19,7 +20,7 @@ export async function acquireLock(lockDir: string, timeoutMs = 5000): Promise<((
     try {
       await mkdir(lockDir, { recursive: false });
       return async () => { try { await rmdir(lockDir); } catch { /* noop */ } };
-    } catch { await Bun.sleep(100); }
+    } catch { await sleep(100); }
   }
   return null;
 }

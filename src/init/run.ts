@@ -16,7 +16,7 @@ const RUNNERS: Partial<Record<HarnessId, (command: string) => InitFile[]>> = {
  * Build the wiring file(s) for a harness, or null when it has no hook
  * integration (cli-mode harnesses use `harness check` in a pre-commit step).
  */
-export function initFor(id: HarnessId, command: string = `npx harness hook ${id}`): InitFile[] | null {
+export function initFor(id: HarnessId, command: string = `npx -y @fusengine/harness hook ${id}`): InitFile[] | null {
   const make = RUNNERS[id];
   if (!make) return null;
   return [...make(command), { path: `${STATE_ROOT}/.gitignore`, content: STATE_GITIGNORE }];

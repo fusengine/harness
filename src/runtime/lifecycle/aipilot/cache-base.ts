@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { fusengineCache } from "../../home-state";
+import { readText } from "../../../util/runtime-io";
 
 /** 16-char hex SHA-256 of `text` (project hash / doc topic key). */
 export function hashText16(text: string): string {
@@ -37,7 +38,7 @@ export function cacheAge(ts: string, now: number = Date.now()): number {
 /** Full SHA-256 hex checksum of a file's text; "" when unreadable. */
 export async function fileChecksum(path: string): Promise<string> {
   try {
-    return createHash("sha256").update(await Bun.file(path).text()).digest("hex");
+    return createHash("sha256").update(readText(path)).digest("hex");
   } catch {
     return "";
   }
