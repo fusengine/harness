@@ -3,33 +3,41 @@
  * Ported from the ai-pilot plugin's `cache/source-collector.ts` +
  * the stack detection in `cache/lesson-helpers.ts` (now removed).
  */
-import { Glob } from "bun";
 import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { collectFiles } from "../../../util/runtime-io";
 
-/** Source file glob patterns (monorepo-aware; separate to avoid brace-wildcards). */
-const SRC_PATTERNS = [
-  "src/**/*.{ts,tsx,js,jsx}",
-  "app/**/*.{ts,tsx,js,jsx}",
-  "apps/*/src/**/*.{ts,tsx,js,jsx}",
-  "packages/*/src/**/*.{ts,tsx,js,jsx}",
-] as const;
+/** Source extensions to collect (monorepo-aware, dot-prefixed for matching). */
+const SRC_EXTS = new Set([".ts", ".tsx", ".js", ".jsx"]);
+/** Roots walked: `src`, `app`, plus each child `src` under `apps/` and `packages/`. */
+const TOP_DIRS = ["src", "app"] as const;
+const NESTED_PARENTS = ["apps", "packages"] as const;
+
+/** Collect the existing monorepo `src` roots nested under `apps/` and `packages/`. */
+function nestedRoots(projectPath: string): string[] {
+  const roots: string[] = [];
+  for (const parent of NESTED_PARENTS) {
+    try {
+      for (const e of readdirSync(join(projectPath, parent), { withFileTypes: true })) {
+        if (e.isDirectory()) roots.push(join(projectPath, parent, e.name, "src"));
+      }
+    } catch { /* parent dir may not exist */ }
+  }
+  return roots;
+}
 
 /**
  * Scan source files in `projectPath` (monorepo-aware), capped at `maxFiles`.
+ * Node+Bun portable: walks `node:fs` recursively (replaces the Bun `Glob`).
  * @param projectPath - Absolute project root.
  * @param maxFiles - Max files to collect (default 200).
- * @returns Absolute paths matching the source patterns.
+ * @returns Absolute paths matching the source extensions.
  */
 export async function scanSourceFiles(projectPath: string, maxFiles = 200): Promise<string[]> {
   const files: string[] = [];
-  for (const pattern of SRC_PATTERNS) {
-    try {
-      for await (const p of new Glob(pattern).scan({ cwd: projectPath, absolute: true })) {
-        if (p.includes("node_modules")) continue;
-        files.push(p);
-        if (files.length >= maxFiles) break;
-      }
-    } catch { /* dir may not exist */ }
+  const roots = [...TOP_DIRS.map((d) => join(projectPath, d)), ...nestedRoots(projectPath)];
+  for (const root of roots) {
+    collectFiles(root, SRC_EXTS, files, maxFiles);
     if (files.length >= maxFiles) break;
   }
   return files;

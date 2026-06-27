@@ -8,6 +8,7 @@ import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { writeJsonFile } from "../../../util/json-io";
+import { pathExists } from "../../../util/runtime-io";
 import { cacheDirFor, projectHash } from "./cache-base";
 import { logCacheEvent } from "./analytics";
 import { transcriptEdits, transcriptReport, projectRootFromPaths } from "./transcript";
@@ -21,7 +22,7 @@ import type { LessonEntry } from "./types";
  * @param home - Home dir (defaults to `~`).
  */
 export async function cacheSniperLessons(transcript: string | undefined, cwd: string, home: string = homedir()): Promise<void> {
-  if (!transcript || !(await Bun.file(transcript).exists())) return;
+  if (!transcript || !pathExists(transcript)) return;
   const edits = await transcriptEdits(transcript);
   if (edits.length === 0) return;
 

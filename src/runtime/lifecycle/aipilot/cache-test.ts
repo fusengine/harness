@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
+import { readText, pathExists } from "../../../util/runtime-io";
 import { cacheDirFor, projectHash, fileChecksum } from "./cache-base";
 import { logCacheEvent } from "./analytics";
 import { transcriptFilePaths, projectRootFromPaths } from "./transcript";
@@ -15,7 +16,7 @@ import type { TestCache, TestResult } from "./types";
 
 /** Extract linter-related command/output text from a JSONL transcript. */
 async function extractLinterOutput(path: string): Promise<string> {
-  const text = await Bun.file(path).text();
+  const text = readText(path);
   const outputs: string[] = [];
   for (const line of text.split("\n").filter(Boolean)) {
     try {
@@ -40,7 +41,7 @@ async function extractLinterOutput(path: string): Promise<string> {
  * @param home - Home dir (defaults to `~`).
  */
 export async function cacheTestResults(transcript: string | undefined, cwd: string, home: string = homedir()): Promise<void> {
-  if (!transcript || !(await Bun.file(transcript).exists())) return;
+  if (!transcript || !pathExists(transcript)) return;
   const allPaths = await transcriptFilePaths(transcript);
   const projectPath = projectRootFromPaths(allPaths) ?? process.env.CLAUDE_PROJECT_DIR ?? cwd;
   const pHash = projectHash(projectPath);

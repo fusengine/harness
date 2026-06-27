@@ -6,6 +6,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJsonFile } from "../../../util/json-io";
+import { readText, pathExists, spawnCapture } from "../../../util/runtime-io";
 import { contextResponse } from "../../../adapters/claude";
 import { hashText16, cacheDirFor, cacheAge, projectHash } from "./cache-base";
 import { logCacheEvent } from "./analytics";
@@ -16,8 +17,7 @@ const CONFIG_FILES = ["package.json", "tsconfig.json", "composer.json", "go.mod"
 /** Compute a config hash from git-tracked config files; "noconfig" on failure. */
 async function configHash(cwd: string): Promise<string> {
   try {
-    const proc = Bun.spawn(["git", "ls-tree", "HEAD", ...CONFIG_FILES], { cwd, stdout: "pipe", stderr: "ignore" });
-    const output = await new Response(proc.stdout).text();
+    const output = spawnCapture("git", ["ls-tree", "HEAD", ...CONFIG_FILES], cwd);
     return output.trim() ? hashText16(output) : "noconfig";
   } catch {
     return "noconfig";
@@ -46,8 +46,7 @@ export async function injectExploreCache(cwd: string, home: string = homedir(), 
 
   let context = "";
   const meta = await readJsonFile<{ timestamp: string; config_hash: string }>(metaFile);
-  const snapBunFile = Bun.file(snapFile);
-  const snapshot = (await snapBunFile.exists()) ? await snapBunFile.text() : "";
+  const snapshot = pathExists(snapFile) ? readText(snapFile) : "";
 
   if (meta?.timestamp && snapshot) {
     const age = cacheAge(meta.timestamp, now);

@@ -4,6 +4,7 @@
  */
 import { evaluate } from "../../policy/evaluate";
 import { formatPrompt, type Prompt } from "../../prompt/types";
+import { readStdin } from "../../util/runtime-io";
 
 /** Subset of the Claude Code hook stdin payload we consume. */
 export interface ClaudeHookInput {
@@ -15,7 +16,7 @@ export interface ClaudeHookInput {
 
 /** Read & parse the Claude hook payload from stdin (empty object on bad input). */
 export async function readClaudeInput(): Promise<ClaudeHookInput> {
-  const text = await Bun.stdin.text();
+  const text = await readStdin();
   if (!text.trim()) return {};
   try {
     const parsed: unknown = JSON.parse(text);

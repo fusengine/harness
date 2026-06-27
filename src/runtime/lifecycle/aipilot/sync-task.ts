@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { readJsonFile } from "../../../util/json-io";
+import { spawnCapture } from "../../../util/runtime-io";
 import { contextResponse } from "../../../adapters/claude";
 import { acquireLock, taskCreate, taskStart, taskComplete } from "./apex-task-store";
 import type { ApexTaskFile } from "./types";
@@ -14,8 +15,7 @@ import type { ApexTaskFile } from "./types";
 /** True when the project has uncommitted git changes. */
 async function hasGitChanges(cwd: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn(["git", "status", "--porcelain"], { cwd, stdout: "pipe", stderr: "ignore" });
-    return (await new Response(proc.stdout).text()).trim().length > 0;
+    return spawnCapture("git", ["status", "--porcelain"], cwd).trim().length > 0;
   } catch { return false; }
 }
 
