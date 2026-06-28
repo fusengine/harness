@@ -2,6 +2,26 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.36] - 2026-06-28
+
+### Added (fuse-memory-neural port → `memory` scope)
+
+- **New `memory` scope** (`PluginScope`, `cli/bin.ts` `validScopes`): ports the four memory-neural
+  hook scripts into the engine, all best-effort against a Graphiti server
+  (`NEURAL_MEMORY_HOST`/`GRAPHITI_PORT`, 5s `AbortSignal.timeout`, network/IO errors swallowed):
+  - `auto-capture-error.py` → `memory/capture-error.ts`: a failed Bash command is stored as a
+    Graphiti episode and a `qdrant-find`/`qdrant-store` hint is surfaced as additionalContext.
+  - `track-memory-ops.py` → `memory/track-ops.ts`: graphiti/qdrant tool calls are logged to
+    `~/.claude/logs/00-memory/operations.log` (rotate 1000→500).
+  - `recall-on-session.py` → `memory/recall.ts`: SessionStart detects the project type and recalls
+    relevant past lessons from Graphiti, injected as additionalContext.
+  - `capture-agent-lesson.py` → `memory/agent-lesson.ts`: SubagentStop stores a finished agent's
+    conclusion as an episode (skips explore-codebase/websearch + errored exits).
+- The async scopes (`aipilot` + `memory`) are now dispatched through a shared
+  `runtime/handle-scope-async.ts` helper, keeping `handle.ts` under the SOLID file-size limit.
+- 9 new tests (`test/memory-scope.test.ts`): severity/salience scoring, project detection, log
+  rotation, env-overridable base URL, best-effort no-op paths, dispatch routing. 167 tests total.
+
 ## [0.1.35] - 2026-06-27
 
 ### Added

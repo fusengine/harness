@@ -25,6 +25,7 @@ export * from "./security/track-mcp";
 export * from "./security/skill-state";
 export * from "./lessons/dispatch";
 export * from "./lessons/state";
+export * from "./memory/dispatch";
 export * from "./seo/post-tool-use";
 export * from "./cartographer/ecosystem-map";
 export * from "./cartographer/write-plugin-map";

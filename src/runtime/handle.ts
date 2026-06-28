@@ -16,7 +16,8 @@ import { promptSubmitContext } from "./inject-context";
 import { lifecycleStdout, postEditContext } from "./lifecycle-bridge";
 import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { handlePre } from "./handle-pre";
-import { dispatchAipilot, aipilotPostToolUse } from "./lifecycle";
+import { aipilotPostToolUse } from "./lifecycle";
+import { asyncScopeStdout } from "./handle-scope-async";
 import type { PluginScope } from "./lifecycle";
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 
@@ -59,11 +60,9 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
   if (designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) return { stdout: "", exit: 0 };
 
-  // ai-pilot scope async lifecycle (SubagentStart/Stop, SessionEnd cache handlers).
-  if (opts.scope === "aipilot") {
-    const ai = await dispatchAipilot(rawEventName(payload), payload, opts.cwd, opts.now);
-    if (ai !== null) return { stdout: ai, exit: 0 };
-  }
+  // Async per-scope lifecycle (aipilot cache handlers + memory-neural Graphiti).
+  const asyncOut = await asyncScopeStdout(opts.scope, rawEventName(payload), payload, opts.cwd, opts.now);
+  if (asyncOut !== null) return { stdout: asyncOut, exit: 0 };
 
   // Ported lifecycle/session/context hooks (SessionStart, SubagentStart/Stop, etc.).
   const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now);
