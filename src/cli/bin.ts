@@ -32,7 +32,7 @@ const cmd = process.argv[2];
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
   const scopeArg = process.argv[4];
-  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo"]);
+  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory"]);
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
   const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS, windowMs: resolveTtlSec(process.env) * 1000, scope });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
