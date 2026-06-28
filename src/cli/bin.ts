@@ -12,6 +12,7 @@ import { scanChangelog } from "../changelog/fetch";
 import { handleHook } from "../runtime/handle";
 import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
+import { loadDotenv } from "../config/dotenv";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
 async function readStdin(): Promise<Record<string, unknown>> {
@@ -31,6 +32,7 @@ const cmd = process.argv[2];
 
 if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
+  loadDotenv(id as HarnessId);
   const scopeArg = process.argv[4];
   const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory"]);
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";

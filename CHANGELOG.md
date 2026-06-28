@@ -2,6 +2,19 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.37] - 2026-06-28
+
+### Added (native `.env` loading)
+
+- **`config/dotenv.ts`**: the engine now loads `.env` itself at the start of `harness hook`, instead of
+  relying on Bun auto-dotenv or `BASH_ENV`. Ports the claude-plugins `services/env-file.ts` reader
+  (`export KEY="value"` / `KEY=value`, quotes + `#` comments, CRLF-safe) and merges into `process.env`
+  **without overwriting** an already-set var (the real environment always wins). Per-harness home file
+  (`~/.claude/.env`, `~/.codex/.env`, `~/.cursor/.env`, `~/.gemini/.env`, …) selected from the detected
+  harness, plus the project `<cwd>/.env`. `loadDotenv` is wired into `cli/bin.ts` before `handleHook`, so
+  every scope (memory's `NEURAL_MEMORY_HOST`/`GRAPHITI_PORT`, SOLID's `FUSE_*`, …) reads its vars natively.
+- 5 new tests (`test/dotenv.test.ts`); 172 tests total.
+
 ## [0.1.36] - 2026-06-28
 
 ### Added (fuse-memory-neural port → `memory` scope)
