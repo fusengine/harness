@@ -40,6 +40,6 @@ test("D: integrity sign/verify round-trips; tampered data fails closed", () => {
 
 test("C: protected-path blocks Write + Bash redirect into state", () => {
   expect(protectedPathGuard({ tool: "Write", filePath: "/p/.claude/apex/task.json" })?.kind).toBe("block");
-  expect(protectedPathGuard({ tool: "Bash", command: "echo x > ~/.claude/fuse-harness/state/a/track.json" })?.kind).toBe("block");
+  expect(protectedPathGuard({ tool: "Bash", command: "echo x > ~/project/.harness/track/a.json" })?.kind).toBe("block");
   expect(protectedPathGuard({ tool: "Bash", command: "git status" })).toBeNull();
 });
