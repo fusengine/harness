@@ -2,6 +2,15 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.38] - 2026-06-29
+
+### Fixed (protected-path guard)
+
+- **`policy/guards/protected-path.ts`**: dropped the `/fuse-harness/` fragment from `PROTECTED_FRAGMENTS`.
+  It matched the harness dev repo's own absolute path, so the guard false-blocked every `Write`/`Edit`
+  (and read-only `Bash`) inside the source tree. Deployed copies live under `node_modules`, not a
+  `/fuse-harness/` path, so the fragment protected nothing real.
+
 ## [0.1.37] - 2026-06-28
 
 ### Added (native `.env` loading)
