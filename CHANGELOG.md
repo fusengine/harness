@@ -2,6 +2,15 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.39] - 2026-06-29
+
+### Fixed (protected-path guard test)
+
+- **`test/hardening.test.ts`**: test "C" asserted a redirect into `~/.claude/fuse-harness/state/...` was blocked,
+  which relied on the removed bare `/fuse-harness/` fragment. Repointed the assertion to a genuinely protected
+  state path (`.harness/track`) so it validates the guard's intent, not the dropped fragment. (0.1.38 release
+  job failed on this test; 0.1.38 was never published.)
+
 ## [0.1.38] - 2026-06-29
 
 ### Fixed (protected-path guard)
