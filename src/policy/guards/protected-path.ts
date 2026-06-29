@@ -9,7 +9,6 @@ export const PROTECTED_FRAGMENTS: readonly string[] = [
   ".claude/fusengine-cache",
   ".git/",
   ".claude/apex/",
-  "/fuse-harness/",
   ".harness/track",
   ".harness/memory/state",
 ];
