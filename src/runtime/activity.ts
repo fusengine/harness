@@ -34,6 +34,22 @@ function agentActivity(name: string, ts: number, quality: AgentQuality | undefin
 }
 
 /**
+ * The documentation source a tool satisfies for the doc-consultation gate, or
+ * undefined. Context7/Exa are the primary sources; fuse-browser is the fallback
+ * when Exa is down (`browser_fetch`/`browser_crawl`/`browser_serp_batch`); the
+ * built-in WebSearch/WebFetch also count.
+ * @param tool - The harness tool name.
+ */
+function docSourceOf(tool: string): string | undefined {
+  if (/context7/i.test(tool)) return "context7";
+  if (/exa/i.test(tool)) return "exa";
+  if (/browser_(fetch|crawl|serp)/i.test(tool)) return "fuse-browser";
+  if (tool === "WebSearch") return "websearch";
+  if (tool === "WebFetch") return "webfetch";
+  return undefined;
+}
+
+/**
  * Map a live tool-use to the activity to record, or null when nothing is
  * tracked. Works across harnesses — tool names are globally distinct:
  * - MCP doc calls (`context7` / `exa`, any separator) → `doc`
@@ -42,23 +58,27 @@ function agentActivity(name: string, ts: number, quality: AgentQuality | undefin
  *   → `agent` credited to the matching REQUIRED_AGENTS phase
  * - a read tool opening a `.md` reference → `ref`
  */
-export function activityFor(event: ToolEvent): Activity | null {
-  if (/context7|exa/i.test(event.tool)) {
-    return { kind: "doc", framework: event.framework, sessionId: event.sessionId, source: /exa/i.test(event.tool) ? "exa" : "context7" };
-  }
+export function activityFor(event: ToolEvent): Activity[] {
+  const out: Activity[] = [];
+  // Doc consultation is recorded ALONGSIDE the research-phase credit (Python runs
+  // track-doc-consultation + track-subagent-research as two independent hooks):
+  // context7/exa/WebSearch/WebFetch credit BOTH doc and research-expert; fuse-browser
+  // (the Exa fallback) credits doc only (it is not in RESEARCH_TOOLS).
+  const docSource = docSourceOf(event.tool);
+  if (docSource) out.push({ kind: "doc", framework: event.framework, sessionId: event.sessionId, source: docSource });
+
   if (event.tool === "Task" || event.tool === "Agent") {
     const name = String(event.input?.subagent_type ?? event.input?.name ?? "").split(":").pop() ?? "";
-    if (!name) return null;
-    return agentActivity(name, event.now, qualityFor(event.responseLength, AGENT_QUALITY_MIN));
+    if (name) out.push(agentActivity(name, event.now, qualityFor(event.responseLength, AGENT_QUALITY_MIN)));
+    return out;
   }
   const hit = classifyExplore(event.tool, event.input);
   if (hit) {
     const quality = hit.cacheHit ? "sufficient" : qualityFor(event.responseLength, EXPLORE_QUALITY_MIN);
-    return agentActivity(hit.phase, event.now, quality);
-  }
-  if (READ_TOOLS.has(event.tool)) {
+    out.push(agentActivity(hit.phase, event.now, quality));
+  } else if (READ_TOOLS.has(event.tool)) {
     const path = String(event.input?.file_path ?? event.input?.path ?? "");
-    if (path.endsWith(".md")) return { kind: "ref", path };
+    if (path.endsWith(".md")) out.push({ kind: "ref", path });
   }
-  return null;
+  return out;
 }

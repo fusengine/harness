@@ -26,7 +26,9 @@ bun add @fusengine/harness      # Bun reads the TS source directly — no build 
 ```sh
 cd your-project
 harness init                              # detects the harness, writes its pre+post hooks
-export FUSE_HARNESS_REFS=.claude/skills   # (optional) activate the SOLID-read gate
+# The SOLID-read gate auto-activates from discovered skills (default marketplace: fusengine-plugins).
+export FUSE_HARNESS_MARKETPLACES=fusengine-plugins   # (optional) which marketplaces to auto-scan
+export FUSE_HARNESS_REFS=.claude/skills              # (optional) explicit refs dir, overrides auto-discovery
 ```
 
 That's it. `init` writes the wiring file for the detected harness
@@ -65,8 +67,8 @@ Ten portable guards + the APEX gate chain, all evaluated before a tool runs:
 | interface-separation | top-level interface/type/protocol in a component/controller |
 | protected-path | edits to `.claude/plugins\|logs\|cache`, `.git/` |
 | APEX freshness | `explore-codebase` + `research-expert` not run within the window |
-| APEX doc-consulted | Context7 **and** Exa not consulted this session |
-| APEX solid-read | required SOLID refs (from `FUSE_HARNESS_REFS`) not read |
+| APEX doc-consulted | no doc source (Context7 / Exa / fuse-browser / WebSearch / WebFetch) consulted this session |
+| APEX solid-read | required SOLID refs (auto-discovered, or `FUSE_HARNESS_REFS`) not read |
 | brainstorm | creating a new file without brainstorming (when flagged) |
 | MCP verbosity / cache | caps exa `numResults`; serves a fresh cached MCP/WebFetch result |
 
@@ -78,7 +80,8 @@ through per window without the full APEX gates.
 | Var | Effect |
 |---|---|
 | `FUSE_SOLID_MAX_LINES` | SOLID file-size limit (default `100`). |
-| `FUSE_HARNESS_REFS` | Directory of `.md` SOLID references → activates `solidReadGate`. |
+| `FUSE_HARNESS_REFS` | Explicit `path.delimiter`-list of `.md` SOLID-reference dirs → activates `solidReadGate`. Overrides auto-discovery. |
+| `FUSE_HARNESS_MARKETPLACES` | Comma-list of marketplace names whose `solid-*` skill refs are auto-discovered when `FUSE_HARNESS_REFS` is unset (default `fusengine-plugins`; an absent marketplace contributes nothing). Standalone `.claude`/`.codex`/`.cursor`/`.agents` skills are always scanned. |
 | `FUSE_ENFORCE_TTL_SEC` | APEX freshness window in seconds. |
 | `FUSE_LESSONS_THROTTLE_MIN` | Lessons-injection throttle (memory module). |
 

@@ -41,7 +41,7 @@ function evaluateDoc(auths: AuthEntry[]): DocSatisfactionStatus {
   const readPaths = auths.flatMap((a) => a.read_paths ?? []);
   const liveC7 = sources.some((s) => /context7/i.test(s));
   const liveExa = sources.some((s) => /exa/i.test(s));
-  const liveWeb = sources.some((s) => /web(search|fetch)/i.test(s));
+  const liveWeb = sources.some((s) => /web(search|fetch)|fuse-browser/i.test(s));
   const cacheC7 = readPaths.some((p) => /\/context\/mcp\/context7-/.test(p));
   const cacheExa = readPaths.some((p) => /\/context\/mcp\/(exa-search|exa-code-context)-/.test(p));
   return {
@@ -73,7 +73,7 @@ export function formatDocSatisfactionStatus(
 export function formatDocDeny(framework: string): string {
   return [
     `APEX: Online documentation not consulted for ${framework}!`,
-    "Use ANY ONE of: mcp__context7__query-docs, mcp__exa__web_search_exa, WebSearch, or WebFetch.",
+    "Use ANY ONE of: mcp__context7__query-docs, mcp__exa__web_search_exa (or — if Exa is down — mcp__fuse-browser__browser_fetch / browser_crawl / browser_serp_batch), WebSearch, or WebFetch.",
     "This check is once per session — after consulting one source, Write/Edit will be allowed.",
   ].join("\n");
 }

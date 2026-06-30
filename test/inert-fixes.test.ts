@@ -12,10 +12,10 @@ const task = (len?: number) =>
   activityFor({ tool: "Task", input: { subagent_type: "x:research-expert" }, sessionId: "s", framework: "g", now: 1, responseLength: len });
 
 test("activityFor: agent quality derived from responseLength", () => {
-  expect(task(600)).toEqual({ kind: "agent", name: "research-expert", ts: 1, quality: "sufficient" });
-  const short = task(10);
+  expect(task(600)).toEqual([{ kind: "agent", name: "research-expert", ts: 1, quality: "sufficient" }]);
+  const short = task(10)[0];
   expect(short && short.kind === "agent" ? short.quality : null).toBe("insufficient");
-  const none = task(undefined);
+  const none = task(undefined)[0];
   expect(none && none.kind === "agent" ? "quality" in none : true).toBe(false);
 });
 

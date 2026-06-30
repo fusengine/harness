@@ -80,8 +80,8 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
     const response = payload.tool_response ?? payload.tool_output;
     mcpPostStore(event.tool, event.input, response, mcpDir);
     const designWarn = designGate(payload, event, mcpDir, opts.cwd);
-    const activity = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
-    if (activity) await recordActivity(file, activity);
+    const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
+    for (const activity of activities) await recordActivity(file, activity);
     postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
     const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
     if (seoDeny) return { stdout: seoDeny, exit: 0 };

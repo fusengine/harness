@@ -14,21 +14,24 @@ const ev = (tool: string, input?: Record<string, unknown>, responseLength?: numb
 // #6 — activity.ts: Agent tool + direct exploration/research crediting.
 
 test("activityFor: Agent tool credits bare agent name (prefix stripped)", () => {
-  expect(activityFor(ev("Agent", { subagent_type: "fuse-ai-pilot:explore-codebase" }))).toEqual({ kind: "agent", name: "explore-codebase", ts: 1000 });
+  expect(activityFor(ev("Agent", { subagent_type: "fuse-ai-pilot:explore-codebase" }))).toEqual([{ kind: "agent", name: "explore-codebase", ts: 1000 }]);
 });
 
 test("activityFor: direct exploration credited as explore-codebase", () => {
-  expect(activityFor(ev("Glob", { pattern: "**/*.ts" }))).toEqual({ kind: "agent", name: "explore-codebase", ts: 1000 });
-  expect(activityFor(ev("Bash", { command: "FOO=1 grep -r x src" }))).toEqual({ kind: "agent", name: "explore-codebase", ts: 1000 });
+  expect(activityFor(ev("Glob", { pattern: "**/*.ts" }))).toEqual([{ kind: "agent", name: "explore-codebase", ts: 1000 }]);
+  expect(activityFor(ev("Bash", { command: "FOO=1 grep -r x src" }))).toEqual([{ kind: "agent", name: "explore-codebase", ts: 1000 }]);
   // `cd`-prefixed Bash has executable `cd` → not exploration.
-  expect(activityFor(ev("Bash", { command: "cd /x && echo hi" }))).toBeNull();
+  expect(activityFor(ev("Bash", { command: "cd /x && echo hi" }))).toEqual([]);
 });
 
-test("activityFor: web + MCP cache read credited as research-expert", () => {
-  expect(activityFor(ev("WebSearch", { query: "x" }))).toEqual({ kind: "agent", name: "research-expert", ts: 1000 });
-  expect(activityFor(ev("Read", { file_path: "/x/context/mcp/exa-search-abc.md" }, 10))).toEqual({ kind: "agent", name: "research-expert", ts: 1000, quality: "sufficient" });
+test("activityFor: web credits doc + research-expert; MCP cache read credits research", () => {
+  expect(activityFor(ev("WebSearch", { query: "x" }))).toEqual([
+    { kind: "doc", framework: "react", sessionId: "s1", source: "websearch" },
+    { kind: "agent", name: "research-expert", ts: 1000 },
+  ]);
+  expect(activityFor(ev("Read", { file_path: "/x/context/mcp/exa-search-abc.md" }, 10))).toEqual([{ kind: "agent", name: "research-expert", ts: 1000, quality: "sufficient" }]);
   // A plain .md read remains a ref, not research.
-  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual({ kind: "ref", path: "/p/refs/srp.md" });
+  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual([{ kind: "ref", path: "/p/refs/srp.md" }]);
 });
 
 // #6 — agent-evidence.ts: transcript accepts Agent + strips plugin prefix.
