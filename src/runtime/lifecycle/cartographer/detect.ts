@@ -5,6 +5,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { HOME_DIR } from "../../../config/dotenv";
+import { detectHarness } from "../../../detect/harness";
+import type { HarnessId } from "../../../detect/harness";
 
 /** Sorted entry names of `dir` (alpha, byte-order), or `[]` on error. */
 function sortedNames(dir: string): string[] {
@@ -34,12 +37,15 @@ export function readPluginMeta(pluginPath: string): [string, string] {
 /**
  * Auto-detect the marketplace `plugins` dir that contains `cartographer`,
  * falling back to the first marketplace with a `plugins` dir, else `cwd`.
- * Ports `find_marketplace_plugins`.
+ * Ports `find_marketplace_plugins`, but harness-agnostic: the config dir is
+ * derived from the detected harness (`.claude`, `.codex`, `.cursor`, …) via the
+ * shared `HOME_DIR` mapping instead of a hardcoded `.claude`.
  * @param home - Home directory (defaults to `~`).
+ * @param id - Detected harness id (defaults to runtime detection).
  * @returns The resolved plugins directory.
  */
-export function findMarketplacePlugins(home: string = homedir()): string {
-  const mp = join(home, ".claude", "plugins", "marketplaces");
+export function findMarketplacePlugins(home: string = homedir(), id: HarnessId = detectHarness().id): string {
+  const mp = join(home, HOME_DIR[id] ?? ".claude", "plugins", "marketplaces");
   const markets = sortedNames(mp);
   for (const m of markets) {
     if (existsSync(join(mp, m, "plugins", "cartographer"))) return join(mp, m, "plugins");

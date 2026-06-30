@@ -11,7 +11,7 @@ import { join } from "node:path";
 import type { HarnessId } from "../detect/harness";
 
 /** Home config dir holding the `.env` for each harness (defaults to `.claude`). */
-const HOME_DIR: Partial<Record<HarnessId, string>> = {
+export const HOME_DIR: Partial<Record<HarnessId, string>> = {
   "claude-code": ".claude", codex: ".codex", cursor: ".cursor",
   cline: ".clinerules", "gemini-cli": ".gemini", opencode: ".opencode",
 };

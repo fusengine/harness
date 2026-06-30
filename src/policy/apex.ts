@@ -30,7 +30,7 @@ export interface ApexContext {
 /** A single APEX gate: returns a blocking {@link Prompt}, or null to pass. */
 export type ApexGate = (ctx: ApexContext) => Prompt | null;
 
-/** Gate: Context7 + Exa must have been consulted this session. */
+/** Gate: any one documentation source (Context7, Exa, or web) must have been consulted this session. */
 export const docConsultedGate: ApexGate = (ctx) =>
   isDocConsulted(ctx.authorizations, ctx.sessionId)
     ? null
@@ -38,7 +38,7 @@ export const docConsultedGate: ApexGate = (ctx) =>
         kind: "block",
         title: "APEX: documentation not consulted",
         reason: formatDocDeny(ctx.framework),
-        actions: ["Call mcp__context7__query-docs", "Call mcp__exa__web_search_exa"],
+        actions: ["Use ANY ONE of: mcp__context7__query-docs, mcp__exa__web_search_exa, WebSearch, or WebFetch"],
       };
 
 /** Gate: the routed SOLID references for this edit must have been read. */

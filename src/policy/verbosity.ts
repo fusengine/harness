@@ -1,5 +1,8 @@
-/** Exa MCP tools whose result count + token budget are capped. */
-const EXA_TOOLS = /exa__web_search|exa__get_code_context|exa_web_search|exa_get_code_context/i;
+/** Exa search tool — result count force-capped + token budget capped. */
+const EXA_SEARCH = /exa__web_search|exa_web_search/i;
+/** Exa code-context tool — token budget capped; `numResults` capped only when
+ * already present (parity: limit-mcp-verbosity.py never injects it). */
+const EXA_CODE = /exa__get_code_context|exa_get_code_context/i;
 /** Context7 doc tool whose token budget is capped. */
 const CONTEXT7_TOOLS = /context7__query-docs|context7_query-docs|query-docs/i;
 
@@ -23,8 +26,11 @@ export function capVerbosity(tool: string, input: Record<string, unknown>): Reco
       changed = true;
     }
   };
-  if (EXA_TOOLS.test(tool)) {
+  if (EXA_SEARCH.test(tool)) {
     cap("numResults", MAX_EXA_RESULTS, true);
+    cap("tokensNum", MAX_TOKENS, false);
+  } else if (EXA_CODE.test(tool)) {
+    cap("numResults", MAX_EXA_RESULTS, false);
     cap("tokensNum", MAX_TOKENS, false);
   } else if (CONTEXT7_TOOLS.test(tool)) {
     cap("tokens", MAX_TOKENS, false);

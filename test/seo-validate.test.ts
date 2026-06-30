@@ -1,5 +1,9 @@
 import { test, expect } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isHtmlLike, missingSeoElements } from "../src/policy/seo/validate";
+import { seoPostToolUseResponse } from "../src/runtime/lifecycle/seo/post-tool-use";
 
 const COMPLETE = `<!doctype html><html><head>
   <title>Hello</title>
@@ -27,6 +31,26 @@ test("missingSeoElements: empty doc -> all 7 labels", () => {
 
 test("missingSeoElements: complete doc -> []", () => {
   expect(missingSeoElements(COMPLETE)).toEqual([]);
+});
+
+test("seoPostToolUseResponse: missing meta -> top-level decision:block (not permissionDecision)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fuse-seo-"));
+  writeFileSync(join(dir, ".fuse-seo"), "");
+  const file = join(dir, "page.html");
+  writeFileSync(file, "<html><head></head><body>hi</body></html>");
+  const out = seoPostToolUseResponse({ cwd: dir, tool_input: { file_path: file } });
+  expect(out).not.toBeNull();
+  const parsed = JSON.parse(out as string) as { decision?: string; reason?: string; hookSpecificOutput?: unknown };
+  expect(parsed.decision).toBe("block");
+  expect(parsed.reason).toContain("missing SEO elements");
+  expect(parsed.hookSpecificOutput).toBeUndefined();
+});
+
+test("seoPostToolUseResponse: no .fuse-seo marker -> null (allow)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fuse-seo-"));
+  const file = join(dir, "page.html");
+  writeFileSync(file, "<html><head></head><body>hi</body></html>");
+  expect(seoPostToolUseResponse({ cwd: dir, tool_input: { file_path: file } })).toBeNull();
 });
 
 test("isHtmlLike: .tsx true, .md false, .astro true, .ts false", () => {

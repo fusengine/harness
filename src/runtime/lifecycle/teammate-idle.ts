@@ -1,8 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { homedir } from "node:os";
 import { contextResponse } from "../../adapters/claude";
-import { sessionsDir } from "../home-state";
+import { loadSessionState, sanitizeSessionId } from "../home-state";
+
+/** The `changes` block written by `track-changes.ts` into unified session state. */
+interface Changes {
+  cumulativeCodeFiles?: number;
+  modifiedFiles?: string[];
+}
 
 /**
  * Handle TeammateIdle: when the teammate's session-changes file shows code was
@@ -14,16 +18,12 @@ import { sessionsDir } from "../home-state";
  */
 export function validateTeammateOutput(data: Record<string, unknown>, home: string = homedir()): string {
   const teammate = String(data.teammate_name ?? "unknown");
-  const sessionId = String(data.session_id ?? "unknown");
-  const stateFile = join(sessionsDir(home), `session-${sessionId}-changes.json`);
-  if (!existsSync(stateFile)) return "";
-  try {
-    const state = JSON.parse(readFileSync(stateFile, "utf-8")) as { cumulativeCodeFiles?: number; modifiedFiles?: string[] };
-    const count = state.cumulativeCodeFiles ?? 0;
-    if (count > 0) {
-      const files = (state.modifiedFiles ?? []).slice(0, 5).join(", ");
-      return contextResponse("TeammateIdle", `Teammate '${teammate}' going idle after modifying ${count} code file(s): ${files}. Consider running sniper validation.`);
-    }
-  } catch { /* corrupt state → emit nothing */ }
+  const sessionId = sanitizeSessionId(data.session_id) ?? "unknown";
+  const changes = loadSessionState(sessionId, home).changes as Changes | undefined;
+  const count = changes?.cumulativeCodeFiles ?? 0;
+  if (count > 0) {
+    const files = (changes?.modifiedFiles ?? []).slice(0, 5).join(", ");
+    return contextResponse("TeammateIdle", `Teammate '${teammate}' going idle after modifying ${count} code file(s): ${files}. Consider running sniper validation.`);
+  }
   return "";
 }

@@ -6,6 +6,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { ScanRow } from "../../../policy/cartographer/build-tree";
 import { parseBodyDesc, parseField } from "../../../policy/cartographer/frontmatter";
+import { scanHooks } from "./scan-hooks";
 
 /** Sorted entry names of `dir` (alpha, byte-order), or `[]` on error. */
 function sortedNames(dir: string): string[] {
@@ -68,21 +69,6 @@ function scanCommands(root: string): ScanRow[] {
   return sortedNames(dir)
     .filter((n) => extname(n) === ".md")
     .map((n): ScanRow => ["command", `/${n.replace(/\.md$/, "")}`, fileField(join(dir, n), "description").slice(0, 50)]);
-}
-
-/** Scan `hooks/hooks.json` → a single `("hooks", "<events>", "")` row, or none. */
-function scanHooks(root: string): ScanRow[] {
-  const file = join(root, "hooks", "hooks.json");
-  if (!existsSync(file)) return [];
-  try {
-    const raw: unknown = JSON.parse(readFileSync(file, "utf-8"));
-    const data = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-    const hooks = data.hooks && typeof data.hooks === "object" ? (data.hooks as Record<string, unknown>) : data;
-    const events = Object.keys(hooks).filter((k) => !k.startsWith("_")).sort((a, b) => a.localeCompare(b, "en"));
-    return events.length ? [["hooks", events.join(", "), ""]] : [];
-  } catch {
-    return [];
-  }
 }
 
 /**

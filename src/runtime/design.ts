@@ -1,11 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { Prompt } from "../prompt/types";
 import type { NormalizedEvent } from "./normalize";
-import { type DesignState, loadDesignState, saveDesignState, MIN_SCREENSHOTS } from "../policy/design/state";
-import { recordScreenshot, recordNavigate, recordScroll, recordValidDesignSystem, recordRead } from "../policy/design/transitions";
+import { loadDesignState, saveDesignState, initDesignState } from "../policy/design/state";
+import { recordValidDesignSystem } from "../policy/design/transitions";
 import { activeDesignAgent } from "../policy/design/flag";
 import { runDesignChecks } from "../policy/design/content-checks";
+import { uiDesignSkillGate } from "../policy/design/skill-gate";
+import { collectDesignEvidence } from "../policy/design/skill-evidence";
+import { findDesignSystem, recordPost } from "./design-helpers";
 import {
   htmlCssOnlyGate, stateFileGate, designSystemWriteGate, geminiCreateGate,
   browserNavigateGate, screenshotScrollGate, validateDesignSystem, geminiEnabled,
@@ -13,52 +14,36 @@ import {
 
 const NAV = "mcp__fuse-browser__browser_navigate";
 const SHOT = "mcp__fuse-browser__browser_screenshot";
-const SCROLL = "mcp__fuse-browser__browser_scroll";
 const GEMINI = "mcp__gemini-design__create_frontend";
-
-/** Read design-system.md walking up to 6 parents from `cwd` ("" if absent/unreadable). */
-function findDesignSystem(cwd: string): string {
-  let dir = cwd;
-  for (let i = 0; i < 6; i++) {
-    const p = join(dir, "design-system.md");
-    if (existsSync(p)) {
-      try {
-        return readFileSync(p, "utf8");
-      } catch {
-        return "";
-      }
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return "";
-}
-
-/** Apply a PostToolUse fuse-browser transition to the design state. */
-function recordPost(event: NormalizedEvent, cacheDir: string, state: DesignState): void {
-  if (event.tool === SHOT) saveDesignState(cacheDir, recordScreenshot(state, MIN_SCREENSHOTS[state.mode]));
-  else if (event.tool === NAV) saveDesignState(cacheDir, recordNavigate(state));
-  else if (event.tool === SCROLL) saveDesignState(cacheDir, recordScroll(state));
-  else if (event.tool === GEMINI) saveDesignState(cacheDir, { ...state, geminiCalls: state.geminiCalls + 1 });
-  else if (event.tool === "Read") saveDesignState(cacheDir, recordRead(state, event.filePath ?? ""));
-  else if ((event.tool === "Write" || event.tool === "Edit") && (event.filePath ?? "").endsWith("design-system.md")) {
-    saveDesignState(cacheDir, recordValidDesignSystem(state));
-  }
-}
 
 /**
  * Design-pipeline gate (effectful: reads/writes the design state + design-system.md).
  * Returns a Prompt to block, or null when this isn't a design-agent context / nothing fires.
  */
 export function designGate(payload: Record<string, unknown>, event: NormalizedEvent, cacheDir: string, cwd: string): Prompt | null {
+  // UI design-skill gate (ports check-design-skill.py): fires for ANY agent on a
+  // UI write — requires a design-skill read + ANY doc source (Context7/Exa/web).
+  // Gemini is NEVER required. Runs before the design-agent pipeline state logic.
+  if (event.phase !== "post" && (event.tool === "Write" || event.tool === "Edit")) {
+    const skillBlock = uiDesignSkillGate(event.tool, event.filePath ?? "", event.content ?? "", collectDesignEvidence(event.sessionId, cwd));
+    if (skillBlock) return skillBlock;
+  }
+
   const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
   const active = activeDesignAgent(cacheDir);
   if (active && agentId && agentId !== active) return null;
   const id = active || agentId;
   if (!id) return null;
-  const state = loadDesignState(cacheDir, id);
-  if (!state) return null;
+  // P5 fail-open fix: when the design flag is active but the state file is missing
+  // (e.g. teammate context), auto-init a fresh state instead of disabling all
+  // gating (parity with pipeline-gate.py:38-60). Without the flag, stay inert.
+  let state = loadDesignState(cacheDir, id);
+  if (!state) {
+    if (!active) return null;
+    const dsExists = findDesignSystem(cwd) !== "";
+    state = initDesignState(id, dsExists ? "page" : "full", dsExists);
+    saveDesignState(cacheDir, state);
+  }
 
   if (event.phase === "post") {
     recordPost(event, cacheDir, state);

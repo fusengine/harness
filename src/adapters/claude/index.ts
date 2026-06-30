@@ -26,11 +26,23 @@ export async function readClaudeInput(): Promise<ClaudeHookInput> {
   }
 }
 
-/** A `deny` hook response for a given event. */
+/** A `deny` hook response for a given event. PreToolUse-only field. */
 export function denyResponse(event: string, reason: string): string {
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: event, permissionDecision: "deny", permissionDecisionReason: reason },
   });
+}
+
+/**
+ * A PostToolUse (and Stop/UserPromptSubmit) `block` response. These events
+ * ignore `hookSpecificOutput.permissionDecision` (a PreToolUse-only field) and
+ * only honor the top-level `decision`/`reason` keys, which feed the reason back
+ * to Claude as automated feedback.
+ * @param reason - The block feedback shown to Claude.
+ * @returns The native `{decision:"block",reason}` response string.
+ */
+export function blockResponse(reason: string): string {
+  return JSON.stringify({ decision: "block", reason });
 }
 
 /** An `additionalContext` injection response. */
