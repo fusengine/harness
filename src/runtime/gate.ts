@@ -1,5 +1,5 @@
 import { evaluate, type PolicyResult } from "../policy/evaluate";
-import { existingLineCount } from "./gate-helpers";
+import { existingLineCount, isApexScoped } from "./gate-helpers";
 import { evaluateApex, type ApexContext } from "../policy/apex";
 import { FAIL_CLOSED } from "../policy/guards";
 import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
@@ -29,6 +29,11 @@ export const TRIVIAL_BUDGET = 4;
  * track. Returns the first blocking prompt, or null to allow.
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
+  // Pre-commit lint hard-block runs FIRST: evaluate()'s GIT_ASK branch would
+  // otherwise short-circuit a `git commit` before the linters get to veto it.
+  const precommit = preCommitGate(input.tool, input.command, input.cwd);
+  if (precommit) return precommit;
+
   const existingLines = existingLineCount(input.filePath);
   let quick: PolicyResult;
   try {
@@ -38,8 +43,6 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   }
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
 
-  const precommit = preCommitGate(input.tool, input.command, input.cwd);
-  if (precommit) return precommit;
   const modular = modularGate(input.tool, input.filePath, input.content, input.cwd);
   if (modular) return modular;
   if (!input.filePath) return null;
@@ -49,39 +52,43 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingLines);
   if (solidOrSkill) return solidOrSkill;
 
-  // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
-  const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
-  if (!input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
-    await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
-    return null;
-  }
+  // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py
+  // parity): non-code and exempt paths skip straight to the DRY check below.
+  if (isApexScoped(input.filePath)) {
+    // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
+    const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
+    if (!input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
+      await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
+      return null;
+    }
 
-  // Freshness: prefer platform-authored transcript evidence (the agent cannot
-  // forge a Task tool_use in the runtime-owned transcript). The self-recorded
-  // track is only a fallback when no transcript path is available (tests / other
-  // harnesses) — so a forged track can no longer satisfy the gate.
-  const freshnessFor = (names: string[]): boolean =>
-    input.transcriptPath
-      ? agentsRanFromTranscript(input.transcriptPath, names, window, input.now)
-      : agentsFresh(track, names, window, input.now);
+    // Freshness: prefer platform-authored transcript evidence (the agent cannot
+    // forge a Task tool_use in the runtime-owned transcript). The self-recorded
+    // track is only a fallback when no transcript path is available (tests / other
+    // harnesses) — so a forged track can no longer satisfy the gate.
+    const freshnessFor = (names: string[], windowMs: number = window): boolean =>
+      input.transcriptPath
+        ? agentsRanFromTranscript(input.transcriptPath, names, windowMs, input.now)
+        : agentsFresh(track, names, windowMs, input.now);
 
-  const ctx: ApexContext = {
-    sessionId: input.sessionId,
-    framework: input.framework,
-    filePath: input.filePath,
-    content: input.content ?? "",
-    authorizations: track.authorizations,
-    refs: input.refs,
-    refsRead: track.refsRead,
-    agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
-    brainstormRequired: track.brainstormRequired,
-    brainstormFresh: freshnessFor(["brainstorming"]),
-  };
-  try {
-    const apex = evaluateApex(ctx);
-    if (apex) return apex;
-  } catch {
-    return FAIL_CLOSED;
+    const ctx: ApexContext = {
+      sessionId: input.sessionId,
+      framework: input.framework,
+      filePath: input.filePath,
+      content: input.content ?? "",
+      authorizations: track.authorizations,
+      refs: input.refs,
+      refsRead: track.refsRead,
+      agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
+      brainstormRequired: track.brainstormRequired,
+      brainstormFresh: freshnessFor(["brainstorming"], Number.MAX_SAFE_INTEGER),
+    };
+    try {
+      const apex = evaluateApex(ctx);
+      if (apex) return apex;
+    } catch {
+      return FAIL_CLOSED;
+    }
   }
 
   // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.

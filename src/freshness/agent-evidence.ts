@@ -1,6 +1,6 @@
 /**
  * Platform-authored transcript evidence for APEX agent freshness.
- * Parses the Claude Code session JSONL transcript to find genuine Task
+ * Parses the Claude Code session JSONL transcript to find genuine `Task`/`Agent`
  * tool_use entries — forging this requires writing into the transcript file
  * which the Claude Code platform controls, unlike the self-recorded track.
  */
@@ -36,9 +36,9 @@ function parseTs(raw: string | number | undefined): number | undefined {
 
 /**
  * Return `true` ONLY when, for EVERY name in `names`, the Claude Code
- * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task`
- * tool whose `subagent_type` (or `name`) input field matches, with the entry
- * timestamp within `windowMs` of `now`.
+ * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task` or
+ * `Agent` tool whose `subagent_type` (or `name`) input field matches — after
+ * stripping any plugin prefix — with the entry timestamp within `windowMs` of `now`.
  *
  * **Timestamp note:** when a transcript entry carries no `timestamp` field it
  * is counted as within-window (we cannot prove staleness). This is
@@ -81,9 +81,12 @@ export function agentsRanFromTranscript(
     const content = entry.message?.content;
     if (!Array.isArray(content)) continue;
     for (const block of content as ToolUseBlock[]) {
-      if (block?.type !== "tool_use" || block.name !== "Task") continue;
-      const agent = block.input?.subagent_type ?? block.input?.name;
-      if (typeof agent === "string" && (names as string[]).includes(agent)) {
+      if (block?.type !== "tool_use" || (block.name !== "Task" && block.name !== "Agent")) continue;
+      const raw = block.input?.subagent_type ?? block.input?.name;
+      // Strip any plugin prefix (`fuse-ai-pilot:research-expert` → `research-expert`)
+      // before matching the bare REQUIRED_AGENTS names.
+      const agent = typeof raw === "string" ? raw.split(":").pop() ?? raw : undefined;
+      if (agent !== undefined && (names as string[]).includes(agent)) {
         found.add(agent);
       }
     }

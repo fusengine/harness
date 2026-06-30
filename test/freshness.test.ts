@@ -11,11 +11,19 @@ test("resolveSessions: legacy + new + none", () => {
   expect(resolveSessions({ sessions: ["a", "b"] })).toEqual(["a", "b"]);
 });
 
-test("isDocConsulted: requires Context7 AND Exa", () => {
+test("isDocConsulted: satisfied by ANY single source (OR)", () => {
   const sid = "s1";
   expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7", "exa"] } }, sid)).toBe(true);
-  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7"] } }, sid)).toBe(false);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7"] } }, sid)).toBe(true);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["exa"] } }, sid)).toBe(true);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: [] } }, sid)).toBe(false);
   expect(isDocConsulted(undefined, sid)).toBe(false);
+});
+
+test("isDocConsulted: WebSearch/WebFetch count as a doc source", () => {
+  const sid = "s1";
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["WebSearch"] } }, sid)).toBe(true);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["WebFetch"] } }, sid)).toBe(true);
 });
 
 test("isDocConsulted: satisfied via cache read paths", () => {

@@ -14,7 +14,7 @@ test("security: new critical + ask coverage", () => {
   expect(securityGuard({ tool: "Bash", command: "shred -u secret" })?.kind).toBe("block");
   expect(securityGuard({ tool: "Bash", command: "echo x > /dev/sda" })?.kind).toBe("block");
   expect(securityGuard({ tool: "Bash", command: "rm -rf /usr/local" })?.kind).toBe("block");
-  expect(securityGuard({ tool: "Bash", command: "su root" })?.kind).toBe("ask");
+  expect(securityGuard({ tool: "Bash", command: "su root" })?.kind).toBe("block");
   expect(securityGuard({ tool: "Bash", command: "unlink file" })?.kind).toBe("ask");
 });
 

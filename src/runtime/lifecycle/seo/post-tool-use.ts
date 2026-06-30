@@ -6,15 +6,15 @@
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { isHtmlLike, missingSeoElements } from "../../../policy/seo/validate";
-import { denyResponse } from "../../../adapters/claude";
+import { blockResponse } from "../../../adapters/claude";
 import { walkUpFor } from "../../../util/project-root";
 
 /**
- * Validate the edited file's SEO completeness. Returns a deny message (for a
- * `permissionDecision: deny` response) when HTML-like, opted-in, and missing
+ * Validate the edited file's SEO completeness. Returns a block message (for a
+ * top-level `decision: block` response) when HTML-like, opted-in, and missing
  * elements; otherwise `null` (allow).
  * @param payload - The raw PostToolUse payload.
- * @returns The deny reason string, or `null` to allow.
+ * @returns The block reason string, or `null` to allow.
  */
 export function seoPostToolUse(payload: Record<string, unknown>): string | null {
   const input = payload.tool_input as { file_path?: string } | undefined;
@@ -32,12 +32,14 @@ export function seoPostToolUse(payload: Record<string, unknown>): string | null 
 }
 
 /**
- * SEO PostToolUse as a ready native response: a `permissionDecision: deny`
+ * SEO PostToolUse as a ready native response: a top-level `decision: block`
  * string when the edited file is missing SEO elements, else `null` (allow).
+ * PostToolUse ignores `permissionDecision` (PreToolUse-only), so this must use
+ * the `decision`/`reason` keys to actually feed the failure back to Claude.
  * @param payload - The raw PostToolUse payload.
- * @returns The deny response string, or `null` to allow.
+ * @returns The block response string, or `null` to allow.
  */
 export function seoPostToolUseResponse(payload: Record<string, unknown>): string | null {
-  const deny = seoPostToolUse(payload);
-  return deny ? denyResponse("PostToolUse", deny) : null;
+  const block = seoPostToolUse(payload);
+  return block ? blockResponse(block) : null;
 }

@@ -1,20 +1,10 @@
 import { capVerbosity } from "../policy/verbosity";
-import { cacheLookup, cacheStore } from "../cache/store";
+import { cacheLookup, cacheLookupSubstring } from "../cache/store";
 import { extractText } from "../cache/mcp-response";
+import { mcpCacheWrite, webfetchCacheWrite } from "../cache/mcp-store";
+import { WEBFETCH_TTL_MS, cacheQueryOf, isMcpTool, isWebFetch } from "./mcp-key";
 
-/** Default freshness for cached MCP/WebFetch results (48h). */
-export const MCP_TTL_MS = 172_800_000;
-
-/** MCP doc tools + WebFetch whose calls are cached / verbosity-capped. */
-export function isMcpTool(tool: string): boolean {
-  return /context7|exa|webfetch|web_fetch/i.test(tool) || tool === "WebFetch";
-}
-
-/** The query/url that keys the cache. */
-export function queryOf(input: Record<string, unknown>): string {
-  const q = input.query ?? input.url ?? input.libraryId ?? "";
-  return typeof q === "string" ? q : JSON.stringify(q);
-}
+export { MCP_TTL_MS, WEBFETCH_TTL_MS, cacheQueryOf, isMcpTool, queryOf } from "./mcp-key";
 
 function denyWith(id: string, content: string): string {
   if (id === "claude-code" || id === "codex") {
@@ -52,7 +42,11 @@ export interface McpIntercept {
  */
 export function mcpPreIntercept(id: string, tool: string, input: Record<string, unknown>, dir: string, ttlMs: number, now: number): McpIntercept | null {
   if (!isMcpTool(tool)) return null;
-  const cached = cacheLookup(dir, tool, queryOf(input), ttlMs, now);
+  const web = isWebFetch(tool);
+  const ttl = web ? WEBFETCH_TTL_MS : ttlMs;
+  const key = cacheQueryOf(tool, input);
+  // Exact key first; for MCP docs fall back to a substring hit (Python `rg -i -F`).
+  const cached = cacheLookup(dir, tool, key, ttl, now) ?? (web ? null : cacheLookupSubstring(dir, key, ttl, now));
   if (cached) {
     const served = denyWith(id, cached);
     if (served) return { stdout: served, docSource: docSourceOf(tool) };
@@ -65,8 +59,16 @@ export function mcpPreIntercept(id: string, tool: string, input: Record<string, 
   return null;
 }
 
-/** Post-event: store the MCP/WebFetch response (extracted to markdown) in the cache. */
-export function mcpPostStore(tool: string, input: Record<string, unknown>, response: unknown, dir: string): void {
+/**
+ * Post-event: persist the MCP/WebFetch response (extracted to markdown). MCP docs
+ * go through {@link mcpCacheWrite} (compact + Jaccard-dedup + `index.json`);
+ * WebFetch uses {@link webfetchCacheWrite} (compact, exact key, no index).
+ * @param now - Current epoch ms (timestamp source; defaults to `Date.now()`).
+ */
+export function mcpPostStore(tool: string, input: Record<string, unknown>, response: unknown, dir: string, now: number = Date.now()): void {
   if (!isMcpTool(tool)) return;
-  cacheStore(dir, tool, queryOf(input), extractText(response));
+  const text = extractText(response);
+  const key = cacheQueryOf(tool, input);
+  if (isWebFetch(tool)) webfetchCacheWrite(dir, tool, key, text, now);
+  else mcpCacheWrite(dir, tool, key, text, now);
 }

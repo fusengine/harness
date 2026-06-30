@@ -8,6 +8,7 @@ import { logToolFailure } from "./tool-failure";
 import { saveApexState } from "./pre-compact";
 import { cleanupSession } from "./session-end";
 import { validateRulesLoaded } from "./instructions-loaded";
+import { validateTaskSolid } from "./task-completed";
 import { cartoSessionStart } from "./cartographer/session-start";
 import { dispatchLessons } from "./lessons/dispatch";
 
@@ -66,6 +67,8 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "InstructionsLoaded":
       validateRulesLoaded(input.payload);
       return "";
+    case "TaskCompleted":
+      return validateTaskSolid(input.payload);
     default:
       return null;
   }

@@ -1,8 +1,14 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { contextResponse } from "../../adapters/claude";
-import { sessionsDir } from "../home-state";
+import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } from "../home-state";
+
+/** The `changes` block written by `track-changes.ts` into unified session state. */
+interface Changes {
+  cumulativeCodeFiles?: number;
+  modifiedFiles?: string[];
+}
 
 /** `~/.claude/memory/agents` — agent completion history dir. */
 function memoryDir(home: string): string {
@@ -32,21 +38,17 @@ function recordHistory(home: string, agentId: string, agentType: string, ts: str
 export function trackAgentMemory(data: Record<string, unknown>, home: string = homedir(), now: number = Date.now()): string {
   mkdirSync(sessionsDir(home), { recursive: true });
   const agentType = String(data.agent_type ?? data.subagent_type ?? "unknown");
-  const sessionId = String(data.session_id ?? "unknown");
+  const sessionId = sanitizeSessionId(data.session_id) ?? "unknown";
   const ts = new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z");
   recordHistory(home, String(data.agent_id ?? "unknown"), agentType, ts);
   if (SKIP_AGENTS.test(agentType)) return JSON.stringify({ message: `Agent ${agentType} completed` });
-  const stateFile = join(sessionsDir(home), `session-${sessionId}-changes.json`);
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, "utf-8")) as { cumulativeCodeFiles?: number; modifiedFiles?: string[] };
-      const count = state.cumulativeCodeFiles ?? 0;
-      if (count > 0) {
-        const files = (state.modifiedFiles ?? []).join(", ");
-        writeFileSync(stateFile, JSON.stringify({ ...state, cumulativeCodeFiles: 0 }), "utf-8");
-        return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${count} code file(s): ${files}. Run sniper agent now.`);
-      }
-    } catch { /* fall through to no-change message */ }
+  const state = loadSessionState(sessionId, home);
+  const changes = state.changes as Changes | undefined;
+  const count = changes?.cumulativeCodeFiles ?? 0;
+  if (count > 0) {
+    const files = (changes?.modifiedFiles ?? []).join(", ");
+    saveSessionState(sessionId, { ...state, changes: { ...changes, cumulativeCodeFiles: 0 } }, home);
+    return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${count} code file(s): ${files}. Run sniper agent now.`);
   }
   return JSON.stringify({ message: `Agent ${agentType} completed (no code changes)` });
 }

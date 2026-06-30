@@ -27,7 +27,12 @@ export function extractText(resp: unknown, depth = 0): string {
   }
   if (!resp) return "";
   try {
-    return JSON.stringify(resp);
+    // Stable key order (mirrors Python `json.dumps(sort_keys=True)`) so cache
+    // keys derived from this fallback text are deterministic across key orders.
+    return JSON.stringify(resp, (_k, v) =>
+      v !== null && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+        : v);
   } catch {
     return "";
   }

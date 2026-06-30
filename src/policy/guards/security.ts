@@ -14,17 +14,22 @@ export const CRITICAL_PATTERNS: RegExp[] = [
   /\bdiskutil\s+(?:erase|partitionDisk)/i,
   /(?:>|>>)\s*\/dev\/(?:sda|hda|nvme)/,
   /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*\/(?:etc|usr|var|bin|sbin|boot|lib)\b/,
+  // Privilege escalation — DENY (parity: security_rules.PRIVILEGE_COMMANDS, has_critical=True).
+  /(?:^|[\s;|&])sudo(?:[\s;|&]|$)/,
+  /(?:^|[\s;|&])su(?:[\s;|&]|$)/,
+  /(?:^|[\s;|&])doas(?:[\s;|&]|$)/,
+  /(?:^|[\s;|&])passwd(?:[\s;|&]|$)/,
+  // `del` — DENY (parity: security_rules.CRITICAL_COMMANDS token match).
+  /(?:^|[\s;|&])del(?:[\s;|&]|$)/,
 ];
 
 /** Patterns that warrant explicit confirmation before running. */
 export const ASK_PATTERNS: RegExp[] = [
-  /\bsudo\s/,
   /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\b/,
   /\bchown\s+-R\b/,
   /\beval\s/,
   /(?:>|>>|\btee\b)\s*\/etc\//,
-  /\bsu\s/, /\bdoas\s/, /\bpasswd\b/,
-  /\brm\s/, /\bunlink\s/, /\bdel\s/,
+  /\brm\s/, /\bunlink\s/,
 ];
 
 /**
@@ -60,7 +65,7 @@ export function securityGuard(ctx: GuardContext): Prompt | null {
       return {
         kind: "block",
         title: "Dangerous command",
-        reason: "Command matches a destructive pattern (recursive root delete, fork bomb, remote-script piped to a shell, world-writable root, filesystem format, or disk overwrite).",
+        reason: "Command matches a destructive pattern (recursive root delete, fork bomb, remote-script piped to a shell, world-writable root, filesystem format, disk overwrite, or privilege escalation: sudo/su/doas/passwd).",
         actions: ["Remove the destructive command", "Scope the operation to a specific safe path"],
       };
     }

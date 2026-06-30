@@ -1,8 +1,8 @@
 /**
  * SubagentStop (matcher "sniper") for the ai-pilot scope: capture error
  * patterns + corrected code from the sniper transcript as lessons. Ports
- * `cache-sniper-lessons.ts` (the dead `promote-global-lessons.ts` spawn is
- * dropped — that helper no longer exists). Pure side-effect.
+ * `cache-sniper-lessons.ts`, including the high-frequency promotion to the
+ * global stack cache (`promoteGlobalLessons`). Pure side-effect.
  */
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
@@ -13,6 +13,8 @@ import { cacheDirFor, projectHash } from "./cache-base";
 import { logCacheEvent } from "./analytics";
 import { transcriptEdits, transcriptReport, projectRootFromPaths } from "./transcript";
 import { categorizeEdit } from "./lessons";
+import { detectStack } from "./source-scan";
+import { promoteGlobalLessons } from "./promote-global-lessons";
 import type { LessonEntry } from "./types";
 
 /**
@@ -51,5 +53,6 @@ export async function cacheSniperLessons(transcript: string | undefined, cwd: st
 
   const safeName = timestamp.replace(/:/g, "-");
   await writeJsonFile(join(cacheDir, `${safeName}.json`), { project: projectPath, timestamp, errors }, true);
+  await promoteGlobalLessons(cacheDir, detectStack(projectPath), pHash, home);
   logCacheEvent("lessons", "hit", pHash, { count: edits.length }, home);
 }
