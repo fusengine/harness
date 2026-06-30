@@ -2,6 +2,14 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.41] - 2026-06-30
+
+### Added
+
+- Doc gate: `WebSearch`/`WebFetch`/fuse-browser now satisfy the doc-consulted gate; `activityFor` returns `Activity[]` so doc tools also credit `research-expert` (parity with the Python two-hook model).
+- Auto-discovery of `solid-*/references` across Claude/Codex/Cursor (Open-Agent-Skills layout), deduped by skill name — the SOLID-read gate self-activates with no `FUSE_HARNESS_REFS`.
+- `FUSE_HARNESS_MARKETPLACES` allowlist (default `fusengine-plugins`; an absent marketplace contributes nothing).
+
 ## [0.1.40] - 2026-06-30
 
 ### Fixed — parity with the Python `core-guards` plugin (phase 1)
