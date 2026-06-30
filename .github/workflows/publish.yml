@@ -17,7 +17,7 @@ jobs:
       contents: read
       id-token: write # npm provenance
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -29,10 +29,11 @@ jobs:
         run: bunx tsc --noEmit
       - name: Build
         run: bun run build
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # bun handles install; avoid v5 auto npm/yarn cache
       - name: Publish
         # Provenance (sigstore) + token auth. OIDC trusted publishing deferred until the
         # npmjs trusted-publisher entry matches (registry returns "package not found" otherwise).
