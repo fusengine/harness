@@ -13,6 +13,8 @@ import { handleHook } from "../runtime/handle";
 import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
 import { loadDotenv } from "../config/dotenv";
+import { discoverRefs } from "../refs/discover";
+import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 
 async function readStdin(): Promise<Record<string, unknown>> {
@@ -36,7 +38,9 @@ if (cmd === "hook") {
   const scopeArg = process.argv[4];
   const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory"]);
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
-  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir: process.env.FUSE_HARNESS_REFS, windowMs: resolveTtlSec(process.env) * 1000, scope });
+  const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
+  const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
+  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {
