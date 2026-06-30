@@ -2,6 +2,32 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.40] - 2026-06-30
+
+### Fixed — parity with the Python `core-guards` plugin (phase 1)
+
+- Security: `sudo`/`su`/`doas`/`passwd`/`del` now DENY (were ASK).
+- `bash-write`: close `sed -E -i`, `node`/`ruby -e`, `dd of=` bypasses; exclude `2>`/`>&2`/`/dev/null`; add `.astro`/`.css`.
+- File size counts physical lines (parity `sum(1 for _ in f)`).
+- Doc gate: any ONE source satisfies (Context7 OR Exa OR WebSearch/WebFetch) — was AND.
+- Credit direct exploration (Glob/Grep/Bash/MCP) + accept `Agent`/`Task` with plugin-prefix strip.
+- APEX gates scoped to code files with exemptions; interface-separation PHP/dirs; refs flat scoring;
+  protected-path targets the real write destination; MCP/WebFetch cache substring lookup + prompt-keyed
+  WebFetch + 24h TTL + compaction/dedup/index; `TaskCompleted` SOLID hook; pre-commit lint runs before the
+  git-ask short-circuit; creation-intent skip terms; revived sniper-reminder state readers.
+
+### Fixed — parity with the other ported plugins (phase 2)
+
+- SEO PostToolUse blocks via `decision: block` (was the ignored `permissionDecision` — a silent no-op).
+- Sub-agents (explore/research/sniper) receive APEX + project-lessons injection again.
+- Global lessons promotion (`_global/<stack>.json`) restored.
+- Cartographer plugin-dir resolution is harness-agnostic + handles array-form `hooks.json`.
+
+### Added
+
+- Design UI-write gate (design skill + doc research; Gemini never required, stays opt-in).
+- `ROADMAP.md`.
+
 ## [0.1.39] - 2026-06-29
 
 ### Fixed (protected-path guard test)
