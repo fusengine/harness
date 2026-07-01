@@ -2,6 +2,15 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.48] - 02-07-2026
+
+### Fixed
+
+- SOLID-read TTL was inert: `refsRead` had no timestamps, so a single skill read satisfied `solidReadGate` for the whole session while its message claimed "(expires every 2min)". Every `.md` read is now stamped (`refsReadAt`) and re-validated against `FUSE_ENFORCE_TTL_SEC` (120s) on every edit — parity `require-solid-read.py`/`track-solid-reads.py`. TTL confined to `solidReadGate` (Python TTL-izes SOLID reads exclusively); pre-TTL tracks stay valid (unstamped paths count).
+- `handle-pre`: the `solid` scope now always returns after `validateSolidGate` (mirror of `security`) — no more double `gate()` run per edit when core-guards and solid both wire PreToolUse, and no more over-policing Bash (the Python solid plugin never gated Bash).
+- `explore-tools`: reading a real TS cache file (`<root>/.harness/cache` or `~/.fuse-harness/cache`) now credits research-expert; only the legacy Python cache names (`context7-…`) were recognized.
+- Tests: +7 (6 `parity-b4-*` files + a wiring guard asserting `recordActivity` forwards `ts` into `refsReadAt` — the one-word link the whole TTL hangs on, missed by the integrator and caught by the adversarial review).
+
 ## [0.1.47] - 2026-07-01
 
 ### Added

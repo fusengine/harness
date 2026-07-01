@@ -31,7 +31,7 @@ test("activityFor: web credits doc + research-expert; MCP cache read credits res
   ]);
   expect(activityFor(ev("Read", { file_path: "/x/context/mcp/exa-search-abc.md" }, 10))).toEqual([{ kind: "agent", name: "research-expert", ts: 1000, quality: "sufficient" }]);
   // A plain .md read remains a ref, not research.
-  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual([{ kind: "ref", path: "/p/refs/srp.md" }]);
+  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual([{ kind: "ref", path: "/p/refs/srp.md", ts: 1000 }]);
 });
 
 // #6 — agent-evidence.ts: transcript accepts Agent + strips plugin prefix.

@@ -80,7 +80,10 @@ export function activityFor(event: ToolEvent): Activity[] {
     out.push(agentActivity(hit.phase, event.now, quality));
   } else if (READ_TOOLS.has(event.tool)) {
     const path = String(event.input?.file_path ?? event.input?.path ?? "");
-    if (path.endsWith(".md")) out.push({ kind: "ref", path });
+    // `event.now` is the event timestamp `recordRefRead` stamps into
+    // `refsReadAt` (SOLID read TTL, parity track-solid-reads.py); `record.ts`
+    // forwards it as `recordRefRead(track, path, ts)`.
+    if (path.endsWith(".md")) out.push({ kind: "ref", path, ts: event.now });
   }
   return out;
 }

@@ -23,6 +23,15 @@ test("recordActivity: agent + doc persist via the store", async () => {
   expect(t.authorizations.react?.sources).toContain("context7");
 });
 
+test("recordActivity: a ref read forwards its ts into refsReadAt (SOLID-read TTL wiring)", async () => {
+  const f = fresh();
+  const p = "/skills/solid-react/references/srp.md";
+  await recordActivity(f, { kind: "ref", path: p, ts: 1234 });
+  const t = await loadTrack(f);
+  expect(t.refsRead).toContain(p);
+  expect(t.refsReadAt?.[p]).toBe(1234);
+});
+
 test("gate: stateless deny short-circuits (oversized file)", async () => {
   const p = await gate({ sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts", content: "x\n".repeat(150), now: 5000, trackFile: fresh() });
   expect(p?.title).toContain("file-size");
