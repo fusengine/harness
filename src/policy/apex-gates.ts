@@ -24,7 +24,12 @@ export const solidReadGate: ApexGate = (ctx: ApexContext) => {
     };
   }
   const read = new Set(ctx.refsRead ?? []);
-  const missing = routed.required.map((r) => r.meta.filePath).filter((p) => !read.has(p));
+  // Parity with the 3 other refsRead-consuming gates (skillTriggerGate's
+  // `skills/${s}/` substring match, shadcnBaseSkillRead, designSkillRead):
+  // reading the ref's PARENT SKILL.md counts as proof of consultation too,
+  // not just the exact ref file path.
+  const skillRead = !!routed.skillPath && read.has(routed.skillPath);
+  const missing = skillRead ? [] : routed.required.map((r) => r.meta.filePath).filter((p) => !read.has(p));
   if (missing.length === 0) return null;
   const optional = routed.optional.map((r) => r.meta.filePath);
   const reason = [
