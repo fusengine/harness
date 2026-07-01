@@ -2,6 +2,32 @@
 
 Améliorations futures (hors parité Python, déjà faite). Une case = une tâche.
 
+## Reliquats parité (batch `fix/parity-audit-batch3` — 2026-07-01)
+
+- [ ] **trackframework (G2) — `tracking.py::track_mcp_research` classification framework par mots-clés**
+      — DÉFÉRÉ volontairement. Le Python classe le framework depuis le texte de la query MCP
+      (`react`/`next`/`tailwind`/`swift`…) pour créditer un fichier `{framework}-{session_id}`.
+      Le TS a remplacé tout ce mécanisme fichier par `SessionTrack` signé (`src/tracking/`) ; la
+      pertinence de cette dérivation par-query est incertaine et toucher `activity.ts` (crédit
+      doc-consultation) est risqué. À reprendre seulement si un cas réel le motive.
+- [ ] **`enforce-apex-phases.ts::isAuthorized`** — 2e mécanisme de doc-consultation par-skill/TTL
+      (distinct de `isDocConsulted`, déjà porté). Jamais implémenté (~7-8 fichiers).
+- [ ] **Préambule APEX** — le texte « task.json (auto-created on first Write/Edit) »
+      (`claude-md-context.ts:51`) est légèrement trompeur : `.claude/apex/docs/` EST auto-créé
+      (`auto-document-reads.ts`), mais `task.json`/`AGENTS.md` viennent de la commande `/apex`,
+      pas d'un hook. À reformuler.
+
+### Faux « gaps » confirmés — NE PAS re-porter (vérifiés absents/morts côté Python)
+
+- **`init-apex-tracking.py`** — N'EXISTE PAS. Aucun hook Python ne crée `task.json`/`AGENTS.md`/`.gitignore`
+  (ils viennent de la commande LLM `/apex`). La seule infra créée (`.claude/apex/docs/`) est déjà portée
+  fidèlement (`auto-document-reads.ts`). Hallucination de l'audit.
+- **`detectProjectType` (16 branches) pour le préambule APEX** — le vrai `read-claude-md.py` n'a que 4 branches
+  (= `detectClaudeMdProjectType`). Swapper introduirait des régressions (Laravel+Tailwind → « tailwind »,
+  perte du fallback `*.xcodeproj`). NE PAS swapper.
+- **`check-browser-browsing.py` / `preScreenshotWriteGate`** — script mort (non câblé dans aucun `hooks.json`).
+  RETIRÉ du port au batch 3 (le quota screenshot vit dans `designSystemWriteGate`).
+
 ## Harnais (adapters)
 
 - [ ] **Support Hermes** — ajouter `hermes: ".hermes"` à `HOME_DIR` (`src/config/dotenv.ts`)

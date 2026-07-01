@@ -1,5 +1,5 @@
-/** Build-output / dependency paths excluded from React/Next.js SOLID gating. */
-const JS_EXCLUDE_RE: RegExp = /(node_modules|dist|build|\.next)/;
+/** Build/dep paths excluded from React/Next.js SOLID gating — segment-anchored (parity `r"/(node_modules|dist|build|\.next)/"`), NOT a bare substring, so `distance.ts`/`rebuild/` stay gated. */
+const JS_EXCLUDE_RE: RegExp = /(^|\/)(node_modules|dist|build|\.next)(\/|$)/;
 /** Vendored dependency paths excluded from Laravel/PHP SOLID gating. */
 const PHP_EXCLUDE_RE: RegExp = /\/vendor\//;
 /** Derived/build artifact paths excluded from Swift SOLID gating. */

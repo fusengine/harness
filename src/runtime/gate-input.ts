@@ -15,6 +15,8 @@ export interface GateInput {
   windowMs?: number;
   isReplaceAll?: boolean;
   agentType?: string;
+  /** Claude `agent_id` when the tool-use comes from a subagent (parity require-apex-agents.py:41 — subagents inherit the lead's brainstorm decision). */
+  agentId?: string;
   /** Absolute path to the session transcript (Claude `transcript_path`) for evidence-based freshness. */
   transcriptPath?: string;
 }

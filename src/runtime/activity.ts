@@ -47,6 +47,7 @@ function docSourceOf(tool: string): string | undefined {
   if (tool === "WebSearch") return "websearch";
   if (tool === "WebFetch") return "webfetch";
   if (/^mcp__shadcn__/i.test(tool)) return "shadcn-mcp";
+  if (/^mcp__gemini-design__/i.test(tool)) return "gemini-mcp";
   return undefined;
 }
 

@@ -4,7 +4,7 @@ import type { GuardContext } from "./context";
 /** TS/JS component files: top-level `interface`/`type Foo`. */
 export const TS_DECL_RE: RegExp = /^\s*(export\s+)?(interface|type)\s+[A-Z]/m;
 /** Python view models: class subclassing a schema/protocol base. */
-export const PY_MODEL_RE: RegExp = /^\s*class\s+\w+\((BaseModel|TypedDict|Protocol)\)/m;
+export const PY_MODEL_RE: RegExp = /^\s*class\s+\w+\s*\([^)]*\b(?:BaseModel|TypedDict|Protocol)\b/m;
 /**
  * PHP controllers: top-level `interface`, `abstract class`, or a concrete
  * `class …Interface/DTO/Request`. Union of the TS-only `abstract class` rule

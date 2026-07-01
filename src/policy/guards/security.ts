@@ -62,30 +62,36 @@ function stripHeredoc(cmd: string): string {
   return out;
 }
 
-/** Guards against dangerous Bash commands (critical → block, sensitive → ask). */
+/**
+ * Guards against dangerous Bash commands. Parity `security_rules.validate_command`
+ * + `security-guard.py`: ACCUMULATE every matched violation, then deny when any
+ * critical matched else ask, joining all violation labels in the reason. The
+ * generic `rm` ask is exempt when the command targets a trash location (parity
+ * `not re.search('trash', cmd)`).
+ */
 export function securityGuard(ctx: GuardContext): Prompt | null {
   if (ctx.tool !== "Bash" || !ctx.command) return null;
   const cmd: string = stripHeredoc(ctx.command);
+  const hasTrash: boolean = /trash/i.test(cmd);
 
-  for (const { re, label } of CRITICAL_PATTERNS) {
-    if (re.test(cmd)) {
-      return {
-        kind: "block",
-        title: "Dangerous command",
-        reason: `${label}.`,
-        actions: ["Remove the destructive command", "Scope the operation to a specific safe path"],
-      };
-    }
+  const critical: string[] = CRITICAL_PATTERNS.filter(({ re }) => re.test(cmd)).map((p) => p.label);
+  const ask: string[] = ASK_PATTERNS.filter(
+    ({ re, label }) => re.test(cmd) && !(hasTrash && label.startsWith("DELETE: 'rm'")),
+  ).map((p) => p.label);
+  if (critical.length === 0 && ask.length === 0) return null;
+
+  if (critical.length > 0) {
+    return {
+      kind: "block",
+      title: "Dangerous command",
+      reason: `${[...critical, ...ask].join(", ")}.`,
+      actions: ["Remove the destructive command", "Scope the operation to a specific safe path"],
+    };
   }
-  for (const { re, label } of ASK_PATTERNS) {
-    if (re.test(cmd)) {
-      return {
-        kind: "ask",
-        title: "Dangerous command",
-        reason: `${label}.`,
-        actions: ["Confirm this command is intended", "Run with least privilege"],
-      };
-    }
-  }
-  return null;
+  return {
+    kind: "ask",
+    title: "Dangerous command",
+    reason: `${ask.join(", ")}.`,
+    actions: ["Confirm this command is intended", "Run with least privilege"],
+  };
 }

@@ -34,3 +34,21 @@ export const PROJECT_INSTALL: ReadonlyArray<RegExp> = [
 export function matchPatterns(cmd: string, patterns: ReadonlyArray<RegExp>): boolean {
   return patterns.some((re) => re.test(cmd));
 }
+
+/** Git commands exempt from confirmation when Ralph mode is on (parity git-guard.py RALPH_SAFE). */
+export const RALPH_SAFE: ReadonlyArray<string> = [
+  "git add", "git commit", "git checkout -b", "git branch --show-current",
+  "git status", "git diff", "git log",
+];
+
+/**
+ * OPT-IN autonomous "Ralph" mode: OFF unless `RALPH_MODE` is `1`/`true`, read
+ * fresh on each call. Only the env var activates it — the Python source also
+ * auto-enabled on a `.claude/ralph/prd.json` file or a `feature/*` branch, but
+ * those silent activations are dropped here: a mode that removes git/install
+ * confirmations must never turn on implicitly (owner: default OFF, env opt-in).
+ */
+export function isRalphMode(): boolean {
+  const v = process.env.RALPH_MODE;
+  return v === "1" || v === "true";
+}
