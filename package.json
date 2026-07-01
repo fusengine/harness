@@ -59,11 +59,6 @@
       "types": "./dist/refs/index.d.mts",
       "import": "./dist/refs/index.mjs"
     },
-    "./state": {
-      "bun": "./src/state/index.ts",
-      "types": "./dist/state/index.d.mts",
-      "import": "./dist/state/index.mjs"
-    },
     "./statusline": {
       "bun": "./src/statusline/index.ts",
       "types": "./dist/statusline/index.d.mts",
@@ -132,7 +127,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "docs:api": "typedoc",
-    "build": "tsdown src/index.ts src/config/index.ts src/util/index.ts src/detect/index.ts src/policy/index.ts src/prompt/index.ts src/memory/index.ts src/cache/index.ts src/freshness/index.ts src/refs/index.ts src/state/index.ts src/statusline/index.ts src/cli/index.ts src/cli/bin.ts src/init/index.ts src/tracking/index.ts src/runtime/index.ts src/adapters/claude/index.ts src/adapters/codex/index.ts src/adapters/cursor/index.ts src/adapters/cline/index.ts src/adapters/gemini/index.ts --dts --format esm --clean --out-dir dist",
+    "build": "tsdown src/index.ts src/config/index.ts src/util/index.ts src/detect/index.ts src/policy/index.ts src/prompt/index.ts src/memory/index.ts src/cache/index.ts src/freshness/index.ts src/refs/index.ts src/statusline/index.ts src/cli/index.ts src/cli/bin.ts src/init/index.ts src/tracking/index.ts src/runtime/index.ts src/adapters/claude/index.ts src/adapters/codex/index.ts src/adapters/cursor/index.ts src/adapters/cline/index.ts src/adapters/gemini/index.ts --dts --format esm --clean --out-dir dist",
     "prepublishOnly": "bun test && tsc --noEmit && bun run build"
   },
   "publishConfig": {
