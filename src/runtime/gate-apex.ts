@@ -20,8 +20,10 @@ import type { Prompt } from "../prompt/types";
  */
 export async function apexScopedGate(input: GateInput, track: SessionTrack, window: number): Promise<Prompt | null> {
   // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
+  // Parity enforce-apex-phases.ts: only Edit ever qualifies as "trivial" — Write
+  // always creates/replaces a file wholesale and must go through the full gate.
   const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
-  if (!input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
+  if (input.tool === "Edit" && !input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
     await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
     return null;
   }
@@ -40,7 +42,11 @@ export async function apexScopedGate(input: GateInput, track: SessionTrack, wind
     refs: input.refs,
     refsRead: track.refsRead,
     agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
-    brainstormRequired: track.brainstormRequired,
+    missingAgents: REQUIRED_AGENTS.filter((name) => !freshnessFor([name])),
+    windowMs: window,
+    // Parity require-apex-agents.py: only Write creates new files, so Edit is
+    // always exempt from the brainstorm requirement, regardless of the flag.
+    brainstormRequired: input.tool === "Edit" ? false : track.brainstormRequired,
     brainstormFresh: freshnessFor(["brainstorming"], Number.MAX_SAFE_INTEGER),
   };
   try {

@@ -7,6 +7,7 @@ import {
   detectClaudeMdProjectType,
   DEV_VERBS,
 } from "../src/policy/claude-md-context";
+import { getExpertAgent } from "../src/policy/expert-agents";
 import {
   buildApexTaskContext,
   buildApexTaskInjection,
@@ -39,13 +40,14 @@ test("detectClaudeMdProjectType: package.json next/react then generic", () => {
 
 test("buildApexInstruction: exact APEX preamble text", () => {
   const out = buildApexInstruction("nextjs", 100);
+  const agent = getExpertAgent("nextjs");
   expect(out.startsWith("INSTRUCTION: This is a development task. Use APEX methodology:")).toBe(true);
   for (const frag of [
     "**TRACKING FILE**: [project]/.claude/apex/task.json",
     "Project type detected: nextjs",
-    "explore-codebase + research-expert + nextjs-expert",
+    `explore-codebase + research-expert + ${agent}`,
     "2. **PLAN**: Use TaskCreate to break down tasks (<100 lines per file)",
-    "3. **EXECUTE**: nextjs-expert, follow SOLID principles, split at 90 lines",
+    `3. **EXECUTE**: ${agent}, follow SOLID principles, split at 90 lines`,
     "4. **EXAMINE**: Run sniper agent after ANY modification",
   ]) expect(out).toContain(frag);
   expect(out.endsWith("**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.")).toBe(true);

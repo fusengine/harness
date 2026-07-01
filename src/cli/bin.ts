@@ -9,6 +9,7 @@
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
 import { scanChangelog } from "../changelog/fetch";
+import { runSecurityScan } from "../runtime/lifecycle/security/scan";
 import { handleHook } from "../runtime/handle";
 import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
@@ -44,7 +45,7 @@ if (cmd === "--version" || cmd === "-v") {
   const id = process.argv[3] ?? detectHarness().id;
   loadDotenv(id as HarnessId);
   const scopeArg = process.argv[4];
-  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory"]);
+  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory", "tailwindcss"]);
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
   const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
   const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
@@ -69,6 +70,10 @@ if (cmd === "--version" || cmd === "-v") {
     process.stdout.write(JSON.stringify({ status: "error", message: e instanceof Error ? e.message : "changelog fetch failed" }) + "\n");
     process.exit(1);
   }
+} else if (cmd === "scan") {
+  const dir = process.argv[3] ?? process.cwd();
+  process.stdout.write(JSON.stringify(runSecurityScan(dir), null, 2) + "\n");
+  process.exit(0);
 } else {
   const files = stagedFiles();
   if (files.length === 0) process.exit(0);

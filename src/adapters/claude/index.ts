@@ -50,6 +50,11 @@ export function contextResponse(event: string, text: string): string {
   return JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: text } });
 }
 
+/** A raw `systemMessage` notice — shown to the user without blocking the tool. Mirrors the shared Python `hook_output.allow_pass`/`post_pass` convention. */
+export function systemMessage(text: string): string {
+  return JSON.stringify({ systemMessage: text });
+}
+
 /**
  * Render a portable {@link Prompt} as a Claude Code hook response:
  * `block` → `permissionDecision: deny`, `ask` → `permissionDecision: ask`

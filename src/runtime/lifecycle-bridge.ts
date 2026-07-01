@@ -1,9 +1,22 @@
 import { dispatchLifecycle, postEditTypescript, trackSessionChanges, type PluginScope } from "./lifecycle";
+import { autoDocumentRead } from "./lifecycle/auto-document-reads";
+import { contextResponse } from "../adapters/claude";
 import type { NormalizedEvent } from "./normalize";
 
 /** Raw event name from a payload (Cline lacks one; lifecycle is Claude-only). */
 function rawEvent(payload: Record<string, unknown>): string {
   return typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
+}
+
+/** Extract the `additionalContext` body from a `contextResponse(...)` stdout string ("" when empty/unparseable). */
+function additionalContextOf(stdout: string): string {
+  if (!stdout) return "";
+  try {
+    const parsed = JSON.parse(stdout) as { hookSpecificOutput?: { additionalContext?: string } };
+    return parsed.hookSpecificOutput?.additionalContext ?? "";
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -22,17 +35,23 @@ export function lifecycleStdout(payload: Record<string, unknown>, cwd: string, s
 }
 
 /**
- * Post-edit additions for core-scope PostToolUse Write/Edit: track cumulative
- * session changes (sniper reminder) + report eslint/prettier issues. Returns the
- * combined extra stdout (track-changes wins; lint appended only when no track
- * output), or "" when nothing to emit.
+ * Post-edit additions for core-scope PostToolUse: auto-document a Read of a
+ * SKILL.md/README/docs file; else (Write/Edit) track cumulative session
+ * changes (sniper reminder) AND report eslint/prettier issues — parity
+ * core-guards hooks.json, which runs both as independent PostToolUse commands
+ * rather than short-circuiting one on the other. Returns the combined extra
+ * stdout, or "" when nothing to emit.
  * @param scope - The invoking plugin scope.
  * @param event - The normalized event.
  * @param now - Clock.
  * @returns The extra stdout (possibly empty).
  */
-export function postEditContext(scope: PluginScope, event: NormalizedEvent, now: number): string {
-  if (scope !== "core" || (event.tool !== "Write" && event.tool !== "Edit") || !event.filePath) return "";
+export async function postEditContext(scope: PluginScope, event: NormalizedEvent, now: number): Promise<string> {
+  if (scope !== "core" || !event.filePath) return "";
+  if (event.tool === "Read") return autoDocumentRead(event.filePath, now);
+  if (event.tool !== "Write" && event.tool !== "Edit") return "";
   const sniper = trackSessionChanges(event.sessionId, event.filePath, undefined, now);
-  return sniper || postEditTypescript(event.filePath);
+  const lint = postEditTypescript(event.filePath);
+  if (!sniper || !lint) return sniper || lint;
+  return contextResponse("PostToolUse", `${additionalContextOf(sniper)}\n\n${additionalContextOf(lint)}`);
 }

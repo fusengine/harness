@@ -4,12 +4,13 @@
  *
  * Fires for ANY agent writing a UI file (.tsx/.jsx/.scss/.vue/.svelte) in a
  * UI-ish path (or with Tailwind classes). Blocks unless BOTH: (1) a design skill
- * reference was read this session (reuses the `refsRead` track), and (2) ANY doc
- * source was consulted (Context7 OR Exa OR web) via {@link isDocConsulted}.
+ * reference was read this session (reuses the `refsRead` track), and (2) both
+ * Context7 AND Exa were consulted via {@link isDocConsulted}.
  * Gemini is NEVER a condition — doc research alone satisfies the gate.
  * @packageDocumentation
  */
 import type { Prompt } from "../../prompt/types";
+import { missingDomainSkills } from "./skill-triggers";
 
 /** UI source files the gate polices (.html/.css are handled by the pipeline gate, not here). */
 const UI_FILE_RE = /\.(tsx|jsx|scss|vue|svelte)$/;
@@ -61,11 +62,19 @@ export function uiDesignSkillGate(tool: string, filePath: string, content: strin
       "Read a design skill reference, then retry",
     );
   }
+  const missing = missingDomainSkills(content, ev.refsRead);
+  if (missing.length) {
+    return block(
+      `BLOCKED: code uses ${missing.join(", ")} but the matching design skill(s) were not consulted. `
+      + `Read the SKILL.md for: ${missing.join(", ")}, then retry.`,
+      `Read design skill(s): ${missing.join(", ")}, then retry`,
+    );
+  }
   if (!ev.docConsulted) {
     return block(
-      "BLOCKED: no documentation consulted. Use ANY ONE of mcp__context7__query-docs, "
-      + "mcp__exa__web_search_exa, WebSearch, or WebFetch. Gemini is NOT required.",
-      "Consult Context7, Exa, or web docs (Gemini not required), then retry",
+      "BLOCKED: no documentation consulted. Use BOTH mcp__context7__query-docs AND "
+      + "mcp__exa__web_search_exa, or a web fallback alone (WebSearch/WebFetch). Gemini is NOT required.",
+      "Consult Context7+Exa, or web docs alone (Gemini not required), then retry",
     );
   }
   return null;

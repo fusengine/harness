@@ -8,11 +8,10 @@ import { join } from "node:path";
 import { readJsonFile } from "../../../util/json-io";
 import { readText, pathExists } from "../../../util/runtime-io";
 import { contextResponse } from "../../../adapters/claude";
-import { cacheDirFor, cacheAge, projectHash } from "./cache-base";
+import { cacheDirFor, cacheAge, projectHash, DOC_CACHE_TTL_SECONDS } from "./cache-base";
 import { logCacheEvent } from "./analytics";
 import type { CacheEntry, CacheIndex } from "./types";
 
-const TTL_SECONDS = 604_800;
 const MAX_SIZE = 8192;
 
 /** Concatenate fresh, dedup-by-hash cached doc bodies. */
@@ -24,7 +23,7 @@ async function buildDocsContext(entries: CacheEntry[], docsDir: string, now: num
   for (const entry of entries) {
     if (!entry.timestamp) continue;
     const age = cacheAge(entry.timestamp, now);
-    if (age >= TTL_SECONDS) continue;
+    if (age >= DOC_CACHE_TTL_SECONDS) continue;
     if (age > maxAge) maxAge = age;
     if (!entry.hash || seen.has(entry.hash)) continue;
     seen.add(entry.hash);

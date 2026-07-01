@@ -30,3 +30,14 @@ test("scoreReferences + routeReferences", () => {
   expect(routeReferences([], "x", "")).toBeNull();
   expect(routeReferences([ref("z", "architecture", "**/*.py")], "x.ts", "")).toBeNull();
 });
+
+test("routeReferences: skillPath derivation vs explicit override", () => {
+  // Real on-disk skill layout: <skill>/references/<file>.md
+  const onDisk: RefMeta = { ...ref("srp", "principle"), filePath: "/skills/solid-react/references/srp.md" };
+  // 3-arg call (as solidReadGate does in production): derive <skill>/SKILL.md from the ref path.
+  expect(routeReferences([onDisk], "src/x.ts", "")?.skillPath).toBe("/skills/solid-react/SKILL.md");
+  // Explicit 4th arg wins over derivation, even when derivation would yield a non-empty path.
+  expect(routeReferences([onDisk], "src/x.ts", "", "/explicit/SKILL.md")?.skillPath).toBe("/explicit/SKILL.md");
+  // Ad-hoc path without a "/references/" segment → "" (no regression).
+  expect(routeReferences([ref("srp", "principle")], "src/x.ts", "")?.skillPath).toBe("");
+});

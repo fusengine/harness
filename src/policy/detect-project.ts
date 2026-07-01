@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Project types detected from filesystem indicators. */
@@ -55,6 +55,24 @@ export function requiredArchSkill(cwd: string): string | null {
   }
 }
 
+/** Config file names that mark a project as using Tailwind (v3 JS config or legacy). */
+const TAILWIND_CONFIG_FILES = ["tailwind.config.js", "tailwind.config.ts", "tailwind.config.mjs", "tailwind.config.cjs"];
+
+/** True when `package.json` lists `tailwindcss` as a dep (Tailwind v4 CSS-first, no config file). */
+function hasTailwindDependency(dir: string): boolean {
+  const pkgPath = join(dir, "package.json");
+  if (!existsSync(pkgPath)) return false;
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    return "tailwindcss" in { ...pkg.dependencies, ...pkg.devDependencies };
+  } catch {
+    return false;
+  }
+}
+
 /** Detect the project type by scanning config files in `dir`. */
 export function detectProjectType(dir: string): ProjectType {
   const has = (f: string): boolean => existsSync(join(dir, f));
@@ -64,7 +82,7 @@ export function detectProjectType(dir: string): ProjectType {
   if (has("svelte.config.js") || has("svelte.config.ts")) return "svelte";
   if (has("vite.config.ts") && has("src/App.vue")) return "vue";
   if (has("vite.config.ts") || has("vite.config.js")) return "react";
-  if (has("tailwind.config.js") || has("tailwind.config.ts")) return "tailwind";
+  if (TAILWIND_CONFIG_FILES.some(has) || hasTailwindDependency(dir)) return "tailwind";
   if (has("composer.json") && has("artisan")) return "laravel";
   if (has("Gemfile") && has("config/routes.rb")) return "rails";
   if (has("requirements.txt") || has("pyproject.toml") || has("setup.py")) {

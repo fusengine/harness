@@ -48,6 +48,37 @@ test("agentsRanFromTranscript: accepts Agent tool + strips plugin prefix", () =>
   expect(agentsRanFromTranscript(file, ["research-expert"], 120_000, now)).toBe(true);
 });
 
+// agent-evidence.ts: transcript also credits DIRECT explore/research tool_use
+// (Glob/Grep/mcp__*/WebSearch/WebFetch/Bash-explore) via classifyExplore — parity
+// with track-subagent-research.py, not only nested Task/Agent spawns.
+
+/** Write a one-line transcript wrapping a single `tool_use` block, timestamped `ts`. */
+function transcriptBlock(block: Record<string, unknown>, ts: number): string {
+  const dir = mkdtempSync(join(tmpdir(), "fh-tr3-"));
+  const line = JSON.stringify({ timestamp: new Date(ts).toISOString(), message: { content: [block] } });
+  const file = join(dir, "t.jsonl");
+  writeFileSync(file, line + "\n");
+  return file;
+}
+
+test("agentsRanFromTranscript: direct Grep tool_use (no Task/Agent) credits explore-codebase", () => {
+  const now = 1_000_000;
+  const file = transcriptBlock({ type: "tool_use", name: "Grep", input: { pattern: "x" } }, now);
+  expect(agentsRanFromTranscript(file, ["explore-codebase"], 120_000, now)).toBe(true);
+});
+
+test("agentsRanFromTranscript: direct mcp__context7 tool_use credits research-expert", () => {
+  const now = 1_000_000;
+  const file = transcriptBlock({ type: "tool_use", name: "mcp__context7__query-docs", input: { query: "x" } }, now);
+  expect(agentsRanFromTranscript(file, ["research-expert"], 120_000, now)).toBe(true);
+});
+
+test("agentsRanFromTranscript: transcript with no explore/research tool_use → false", () => {
+  const now = 1_000_000;
+  const file = transcriptBlock({ type: "tool_use", name: "Edit", input: { file_path: "/x.ts" } }, now);
+  expect(agentsRanFromTranscript(file, ["explore-codebase"], 120_000, now)).toBe(false);
+});
+
 // #16c — readers consume unified session state `.changes` (written by track-changes).
 
 test("lifecycle readers consume unified state .changes", () => {

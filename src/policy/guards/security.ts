@@ -1,35 +1,42 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
 
-/** Critical patterns that must always be blocked. */
-export const CRITICAL_PATTERNS: RegExp[] = [
-  /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*(?:\/|~)(?:\s|$)/,
-  /:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
-  /\b(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/,
-  /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\s+\//,
-  /\bmkfs(?:\.[a-z0-9]+)?\b/,
-  /\bdd\b[^\n]*\bof=\/dev\/(?:r?disk|sd|hd|nvme|mmcblk|vd|xvd)/i,
-  /\bshred\b/,
-  /\bfdisk\b/,
-  /\bdiskutil\s+(?:erase|partitionDisk)/i,
-  /(?:>|>>)\s*\/dev\/(?:sda|hda|nvme)/,
-  /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*\/(?:etc|usr|var|bin|sbin|boot|lib)\b/,
+/** A pattern paired with the violation label to name in the deny/ask reason. */
+export interface LabeledPattern {
+  re: RegExp;
+  label: string;
+}
+
+/** Critical patterns that must always be blocked — parity `security_rules.py`'s cumulated violation names. */
+export const CRITICAL_PATTERNS: LabeledPattern[] = [
+  { re: /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*(?:\/|~)(?:\s|$)/, label: "DANGEROUS PATTERN: recursive delete of / or ~" },
+  { re: /:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/, label: "DANGEROUS PATTERN: fork bomb" },
+  { re: /\b(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/, label: "DANGEROUS PATTERN: remote script piped to a shell" },
+  { re: /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\s+\//, label: "DANGEROUS PATTERN: chmod 777 on /" },
+  { re: /\bmkfs(?:\.[a-z0-9]+)?\b/, label: "CRITICAL: Detected dangerous command 'mkfs'" },
+  { re: /\bdd\b[^\n]*\bof=\/dev\/(?:r?disk|sd|hd|nvme|mmcblk|vd|xvd)/i, label: "CRITICAL: Detected dangerous command 'dd if='" },
+  { re: /\bshred\b/, label: "CRITICAL: Detected dangerous command 'shred'" },
+  { re: /\bfdisk\b/, label: "CRITICAL: Detected dangerous command 'fdisk'" },
+  { re: /\bdiskutil\s+(?:erase|partitionDisk)/i, label: "CRITICAL: Detected dangerous command 'diskutil erase'" },
+  { re: /(?:>|>>)\s*\/dev\/(?:sda|hda|nvme)/, label: "DANGEROUS PATTERN: redirect to a raw disk device" },
+  { re: /\brm\s+(?:-[a-z]*\s+)*-[a-z]*[rf][a-z]*\s+(?:-[a-z]+\s+)*\/(?:etc|usr|var|bin|sbin|boot|lib)\b/, label: "DANGEROUS PATTERN: recursive delete of a system directory" },
   // Privilege escalation — DENY (parity: security_rules.PRIVILEGE_COMMANDS, has_critical=True).
-  /(?:^|[\s;|&])sudo(?:[\s;|&]|$)/,
-  /(?:^|[\s;|&])su(?:[\s;|&]|$)/,
-  /(?:^|[\s;|&])doas(?:[\s;|&]|$)/,
-  /(?:^|[\s;|&])passwd(?:[\s;|&]|$)/,
+  { re: /(?:^|[\s;|&])sudo(?:[\s;|&]|$)/, label: "PRIVILEGE ESCALATION: sudo" },
+  { re: /(?:^|[\s;|&])su(?:[\s;|&]|$)/, label: "PRIVILEGE ESCALATION: su" },
+  { re: /(?:^|[\s;|&])doas(?:[\s;|&]|$)/, label: "PRIVILEGE ESCALATION: doas" },
+  { re: /(?:^|[\s;|&])passwd(?:[\s;|&]|$)/, label: "PRIVILEGE ESCALATION: passwd" },
   // `del` — DENY (parity: security_rules.CRITICAL_COMMANDS token match).
-  /(?:^|[\s;|&])del(?:[\s;|&]|$)/,
+  { re: /(?:^|[\s;|&])del(?:[\s;|&]|$)/, label: "CRITICAL: Detected dangerous command 'del'" },
 ];
 
-/** Patterns that warrant explicit confirmation before running. */
-export const ASK_PATTERNS: RegExp[] = [
-  /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\b/,
-  /\bchown\s+-R\b/,
-  /\beval\s/,
-  /(?:>|>>|\btee\b)\s*\/etc\//,
-  /\brm\s/, /\bunlink\s/,
+/** Patterns that warrant explicit confirmation before running — parity `security_rules.py`'s ask-level violation names. */
+export const ASK_PATTERNS: LabeledPattern[] = [
+  { re: /\bchmod\s+(?:-[a-zA-Z]+\s+)*777\b/, label: "DANGEROUS PATTERN: chmod 777" },
+  { re: /\bchown\s+-R\b/, label: "DANGEROUS PATTERN: recursive chown" },
+  { re: /\beval\s/, label: "DANGEROUS PATTERN: eval" },
+  { re: /(?:>|>>|\btee\b)\s*\/etc\//, label: "DANGEROUS PATTERN: write to /etc" },
+  { re: /\brm\s/, label: "DELETE: 'rm' permanently deletes - confirmation required" },
+  { re: /\bunlink\s/, label: "DELETE: 'unlink' command detected - confirmation required" },
 ];
 
 /**
@@ -60,22 +67,22 @@ export function securityGuard(ctx: GuardContext): Prompt | null {
   if (ctx.tool !== "Bash" || !ctx.command) return null;
   const cmd: string = stripHeredoc(ctx.command);
 
-  for (const re of CRITICAL_PATTERNS) {
+  for (const { re, label } of CRITICAL_PATTERNS) {
     if (re.test(cmd)) {
       return {
         kind: "block",
         title: "Dangerous command",
-        reason: "Command matches a destructive pattern (recursive root delete, fork bomb, remote-script piped to a shell, world-writable root, filesystem format, disk overwrite, or privilege escalation: sudo/su/doas/passwd).",
+        reason: `${label}.`,
         actions: ["Remove the destructive command", "Scope the operation to a specific safe path"],
       };
     }
   }
-  for (const re of ASK_PATTERNS) {
+  for (const { re, label } of ASK_PATTERNS) {
     if (re.test(cmd)) {
       return {
         kind: "ask",
         title: "Dangerous command",
-        reason: "Command requests elevated privileges or alters sensitive targets (sudo, chmod 777, recursive chown, eval, or writing to /etc).",
+        reason: `${label}.`,
         actions: ["Confirm this command is intended", "Run with least privilege"],
       };
     }

@@ -66,15 +66,30 @@ export function detectDuplication(filePath: string, content: string, cwd: string
   return { names, duplicates };
 }
 
-/** Blocking prompt when a Write/Edit re-declares 2+ existing symbols, else null. */
+/**
+ * Prompt when a Write/Edit re-declares an existing symbol: a single match is a
+ * softer non-blocking "inform" (could be a false positive / same-name coincidence),
+ * escalating to a hard "block" once 2+ existing declarations are found. Returns
+ * `null` when no duplicate symbol is found at all.
+ */
 export function dryGate(tool: string, filePath: string, content: string | undefined, cwd: string | undefined): Prompt | null {
   if (!cwd || (tool !== "Write" && tool !== "Edit") || !content) return null;
   const dup = detectDuplication(filePath, content, cwd);
-  if (dup.duplicates.length < 2) return null;
+  if (dup.duplicates.length === 0) return null;
+  const names = dup.names.slice(0, 5).join(", ");
+  const files = dup.duplicates.slice(0, 3).join(", ");
+  if (dup.duplicates.length === 1) {
+    return {
+      kind: "inform",
+      title: "Possible duplicate code (DRY)",
+      reason: `[${names}] already declared in: ${files}. Consider importing and reusing instead of re-declaring.`,
+      actions: ["Import the existing symbol instead of re-declaring it", "Extend the existing module"],
+    };
+  }
   return {
     kind: "block",
     title: "Duplicate code (DRY)",
-    reason: `[${dup.names.slice(0, 5).join(", ")}] already declared in: ${dup.duplicates.slice(0, 3).join(", ")}. Import and reuse instead of re-declaring.`,
+    reason: `[${names}] already declared in: ${files}. Import and reuse instead of re-declaring.`,
     actions: ["Import the existing symbol instead of re-declaring it", "Extend the existing module"],
   };
 }

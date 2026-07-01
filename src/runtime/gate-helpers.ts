@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { countLines } from "../policy/file-size";
+import { countFrameworkCodeLines, countLines } from "../policy/file-size";
 
 /** Source extensions the APEX gates apply to (parity: require-apex-agents.py CODE_EXT). */
 const CODE_EXT = /\.(ts|tsx|js|jsx|py|go|rs|java|php|cpp|c|rb|swift|kt|dart|vue|svelte|astro)$/;
@@ -25,20 +25,26 @@ export function isApexScoped(filePath: string | undefined): boolean {
   return !EXEMPT_PATTERNS.some((p) => p.test(filePath));
 }
 
+/** Raw + code-only line counts of the existing on-disk file. */
+export interface ExistingLineCounts {
+  /** Raw physical count — parity with core-guards `enforce-file-size.py` (`sum(1 for _ in f)`), fed to the generic `evaluate()` ceiling. */
+  raw?: number;
+  /** Code-only count (blank/comment lines excluded) — parity with the framework validators' `count_code_lines`, fed to `frameworkSkillGate`. */
+  code?: number;
+}
+
 /**
- * Code-only line count of the existing on-disk file (undefined if
- * absent/unreadable). Uses {@link countLines} (skips blank/comment lines) so a
- * partial Edit judges the full file by the SAME metric as the incoming snippet —
- * a raw `split("\n").length` would over-count JSDoc/blank lines (and add a
- * trailing-newline off-by-one), falsely blocking well-documented files.
+ * Read `path` once and derive both line-count metrics, so the generic
+ * core-guards ceiling (`raw`) and the framework SOLID gates (`code`) each get
+ * the metric their own Python origin measures, without reading the file twice.
  * @param path - Absolute path of the file being edited (or undefined).
- * @returns Code-only line count, or undefined when the file is absent/unreadable.
  */
-export function existingLineCount(path: string | undefined): number | undefined {
-  if (!path) return undefined;
+export function existingLineCounts(path: string | undefined): ExistingLineCounts {
+  if (!path || !existsSync(path)) return {};
   try {
-    return existsSync(path) ? countLines(readFileSync(path, "utf8")) : undefined;
+    const content = readFileSync(path, "utf8");
+    return { raw: countLines(content), code: countFrameworkCodeLines(content) };
   } catch {
-    return undefined;
+    return {};
   }
 }

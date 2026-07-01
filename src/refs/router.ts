@@ -48,5 +48,16 @@ export function routeReferences(
   };
   hoist("principle");
   hoist("template");
-  return { required: scored.slice(0, 2), optional: scored.slice(2, 4), skillPath };
+  return { required: scored.slice(0, 2), optional: scored.slice(2, 4), skillPath: skillPath || skillPathFromRef(scored[0]?.meta.filePath ?? "") };
+}
+
+/**
+ * Derive a skill's `SKILL.md` path from one of its `references/` file paths
+ * (`<skill>/references/...` → `<skill>/SKILL.md`), matching the on-disk skill
+ * layout {@link discoverRefs} walks. Returns "" when the ref's path doesn't
+ * follow that layout (e.g. ad-hoc refs dirs used in tests).
+ */
+function skillPathFromRef(refFilePath: string): string {
+  const i = refFilePath.indexOf("/references/");
+  return i === -1 ? "" : `${refFilePath.slice(0, i)}/SKILL.md`;
 }

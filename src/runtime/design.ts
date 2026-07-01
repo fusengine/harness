@@ -10,6 +10,7 @@ import { findDesignSystem, recordPost } from "./design-helpers";
 import {
   htmlCssOnlyGate, stateFileGate, designSystemWriteGate, geminiCreateGate,
   browserNavigateGate, screenshotScrollGate, validateDesignSystem, geminiEnabled,
+  preScreenshotWriteGate,
 } from "../policy/design/gates";
 
 const NAV = "mcp__fuse-browser__browser_navigate";
@@ -30,10 +31,10 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   }
 
   const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
+  if (!agentId) return null; // top-level (lead) calls are never design-agent-scoped
   const active = activeDesignAgent(cacheDir);
-  if (active && agentId && agentId !== active) return null;
-  const id = active || agentId;
-  if (!id) return null;
+  if (active && agentId !== active) return null;
+  const id = agentId;
   // P5 fail-open fix: when the design flag is active but the state file is missing
   // (e.g. teammate context), auto-init a fresh state instead of disabling all
   // gating (parity with pipeline-gate.py:38-60). Without the flag, stay inert.
@@ -55,7 +56,7 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   }
   if (event.tool === "Write" || event.tool === "Edit") {
     const fp = event.filePath ?? "";
-    const base = stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? designSystemWriteGate(fp, state);
+    const base = stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? preScreenshotWriteGate(fp, state) ?? designSystemWriteGate(fp, state);
     if (base) return base;
     if (geminiEnabled() && state.geminiCalls === 0 && /\.(html|css)$/.test(fp)) {
       return { kind: "block", title: "Design pipeline", reason: "BLOCKED: generate the frontend via create_frontend before hand-writing HTML/CSS.", actions: ["Call mcp__gemini-design__create_frontend first"] };

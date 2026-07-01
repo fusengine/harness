@@ -27,7 +27,7 @@ function fileField(path: string, field: string): string {
 }
 
 /** Scan `agents/*.md` → `("agent", name, desc[:50])` rows. */
-function scanAgents(root: string): ScanRow[] {
+export function scanAgents(root: string): ScanRow[] {
   const dir = join(root, "agents");
   return sortedNames(dir)
     .filter((n) => extname(n) === ".md")

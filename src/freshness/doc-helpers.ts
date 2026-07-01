@@ -52,13 +52,21 @@ function evaluateDoc(auths: AuthEntry[]): DocSatisfactionStatus {
   };
 }
 
-/** True when ANY documentation source (Context7, Exa, or web) was satisfied for the session. */
+/**
+ * True when documentation research is satisfied for the session. Primary path
+ * is parity with the Python `mcp_research_done`
+ * (`_shared/scripts/check_skill_common.py`): `"context7:" in content and
+ * "exa:" in content`, a strict AND (the Python source has no web-alone path).
+ * `web` (WebSearch/WebFetch/fuse-browser) is a deliberate TS-side addition —
+ * it alone satisfies the gate, since fuse-browser is this harness's preferred
+ * doc-research fast-path (see CLAUDE.md) and Context7/Exa can be unavailable.
+ */
 export function isDocConsulted(
   authorizations: Record<string, AuthEntry> | undefined,
   sessionId: string,
 ): boolean {
   const s = evaluateDoc(sessionAuthsFor(authorizations, sessionId));
-  return s.context7 || s.exa || s.web;
+  return (s.context7 && s.exa) || s.web;
 }
 
 /** Report how each doc source was satisfied for a session. */
@@ -72,8 +80,9 @@ export function formatDocSatisfactionStatus(
 /** Deny message when online documentation has not been consulted. */
 export function formatDocDeny(framework: string): string {
   return [
-    `APEX: Online documentation not consulted for ${framework}!`,
-    "Use ANY ONE of: mcp__context7__query-docs, mcp__exa__web_search_exa (or — if Exa is down — mcp__fuse-browser__browser_fetch / browser_crawl / browser_serp_batch), WebSearch, or WebFetch.",
-    "This check is once per session — after consulting one source, Write/Edit will be allowed.",
+    `BLOCKED: No MCP research done for ${framework}. Use BOTH:`,
+    "1) mcp__context7__query-docs AND 2) mcp__exa__web_search_exa",
+    "— OR a web fallback alone: mcp__fuse-browser__browser_fetch / browser_crawl / browser_serp_batch, WebSearch, or WebFetch.",
+    "This check is once per session — after consulting the required source(s), Write/Edit will be allowed.",
   ].join("\n");
 }
