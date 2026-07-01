@@ -26,6 +26,17 @@ test("solidReadGate: block until the required refs are read", () => {
   expect(solidReadGate({ ...ctx, refsRead: gate?.actions })).toBeNull();
 });
 
+test("solidReadGate: reading the ref's parent SKILL.md alone satisfies the gate (parity with skillTriggerGate/design/shadcn)", () => {
+  const refs = [
+    { ...ref("srp", "principle"), filePath: "/skills/solid-react/references/srp.md" },
+    { ...ref("tpl", "template"), filePath: "/skills/solid-react/references/tpl.md" },
+  ];
+  const ctx = { ...base, authorizations: consulted, refs };
+  expect(solidReadGate(ctx)?.kind).toBe("block");
+  // Neither exact ref path was read — only the skill's own SKILL.md was.
+  expect(solidReadGate({ ...ctx, refsRead: ["/skills/solid-react/SKILL.md"] })).toBeNull();
+});
+
 test("solidReadGate: no refs (empty or undefined) -> allow (discoverRefs contract, unchanged)", () => {
   expect(solidReadGate(base)).toBeNull();
   expect(solidReadGate({ ...base, refs: [] })).toBeNull();
