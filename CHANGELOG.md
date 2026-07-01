@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.43] - 2026-07-01
+
+### Fixed
+
+- `harness doctor`/`--version` stderr version banner was printed on every CLI invocation, including `harness hook <scope>` — up to 9 separate hook processes per Edit/Write spammed the transcript. Now emitted only on explicit `--version`/`-v`/`doctor` commands.
+
 ## [0.1.42] - 2026-07-01
 
 ### Added

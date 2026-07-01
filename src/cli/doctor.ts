@@ -51,7 +51,7 @@ export function runningVersion(moduleUrl: string): { version: string; path: stri
   return { version: found?.version ?? "unknown", path: found?.path ?? "unknown" };
 }
 
-/** One-line `pkg vX.Y.Z` banner (written to stderr on every CLI invocation). */
+/** One-line `pkg vX.Y.Z` banner (stderr, only on explicit `--version`/`doctor` commands — never on `hook`, to avoid spamming automated invocations). */
 export function versionBanner(moduleUrl: string): string {
   return `${PKG} v${runningVersion(moduleUrl).version}`;
 }

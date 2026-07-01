@@ -33,12 +33,12 @@ async function readStdin(): Promise<Record<string, unknown>> {
 
 const cmd = process.argv[2];
 
-process.stderr.write(versionBanner(import.meta.url) + "\n");
-
 if (cmd === "--version" || cmd === "-v") {
+  process.stderr.write(versionBanner(import.meta.url) + "\n");
   process.stdout.write(runningVersion(import.meta.url).version + "\n");
   process.exit(0);
 } else if (cmd === "doctor") {
+  process.stderr.write(versionBanner(import.meta.url) + "\n");
   process.exit(await runDoctor(import.meta.url));
 } else if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
