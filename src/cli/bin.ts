@@ -16,6 +16,7 @@ import { loadDotenv } from "../config/dotenv";
 import { discoverRefs } from "../refs/discover";
 import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
+import { runDoctor, runningVersion, versionBanner } from "./doctor";
 
 async function readStdin(): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
@@ -32,7 +33,14 @@ async function readStdin(): Promise<Record<string, unknown>> {
 
 const cmd = process.argv[2];
 
-if (cmd === "hook") {
+process.stderr.write(versionBanner(import.meta.url) + "\n");
+
+if (cmd === "--version" || cmd === "-v") {
+  process.stdout.write(runningVersion(import.meta.url).version + "\n");
+  process.exit(0);
+} else if (cmd === "doctor") {
+  process.exit(await runDoctor(import.meta.url));
+} else if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
   loadDotenv(id as HarnessId);
   const scopeArg = process.argv[4];

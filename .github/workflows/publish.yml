@@ -40,3 +40,40 @@ jobs:
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  verify-published:
+    # Post-publish live check: prove that `bunx` actually serves the version we
+    # just published, on a FRESH runner with no pre-existing bun global or bunx
+    # cache — the exact profile of the stale-global bug (oven-sh/bun#5791) that
+    # once left the LIVE hooks running an old harness. The local smoke test never
+    # catches this; only a real bunx resolution does.
+    name: verify bunx serves the published version
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Resolve tag version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Purge any bun global + bunx cache (reproduce a clean env)
+        run: |
+          bun remove -g @fusengine/harness || true
+          bun pm cache rm || true
+      - name: Poll npm until the just-published version is installable
+        # No fixed sleep: npm propagation has no reliable deadline (seconds to
+        # tens of minutes). Poll the pinned spec with backoff, fail after ~10 min.
+        run: |
+          for i in $(seq 1 60); do
+            if bunx "@fusengine/harness@${{ steps.ver.outputs.version }}" --version >/dev/null 2>&1; then
+              echo "installable after attempt ${i}"; exit 0
+            fi
+            echo "waiting for npm propagation (attempt ${i})..."; sleep 10
+          done
+          echo "timed out waiting for npm propagation"; exit 1
+      - name: Pinned bunx must serve the exact published version
+        run: |
+          got="$(bunx "@fusengine/harness@${{ steps.ver.outputs.version }}" --version)"
+          echo "bunx pinned -> ${got} (expected ${{ steps.ver.outputs.version }})"
+          test "${got}" = "${{ steps.ver.outputs.version }}"

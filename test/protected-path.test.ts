@@ -26,7 +26,7 @@ test("`.git` scoping: real .git segment blocks, foo.git/.github do not", () => {
   expect(protectedPathGuard({ tool: "Write", filePath: "/x/.github/workflows/ci.yml" })).toBeNull();
 });
 
-test("fusengine-cache: only the sessions subtree is protected (safe_paths parity)", () => {
-  expect(protectedPathGuard({ tool: "Write", filePath: "/x/.claude/fusengine-cache/lessons/roots.json" })).toBeNull();
-  expect(protectedPathGuard({ tool: "Write", filePath: "/x/.claude/fusengine-cache/sessions/s.json" })?.kind).toBe("block");
+test("cache: only the sessions subtree is protected (safe_paths parity)", () => {
+  expect(protectedPathGuard({ tool: "Write", filePath: "/x/.fuse-harness/cache/lessons/roots.json" })).toBeNull();
+  expect(protectedPathGuard({ tool: "Write", filePath: "/x/.fuse-harness/cache/sessions/s.json" })?.kind).toBe("block");
 });

@@ -3,17 +3,22 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { atomicWrite } from "../util/json-io";
 
-/** Home `~/.claude` dir (single source for every home-based hook path). */
+/** Home `~/.claude` dir — per-harness config (CLAUDE.md, logs, plugins). */
 export function claudeHome(home: string = homedir()): string {
   return join(home, ".claude");
 }
 
-/** `~/.claude/fusengine-cache` base dir for legacy session/cache state. */
-export function fusengineCache(home: string = homedir()): string {
-  return join(claudeHome(home), "fusengine-cache");
+/** Neutral, harness-agnostic home for fuse-harness's OWN cache/state: `~/.fuse-harness`. */
+export function fuseHarnessHome(home: string = homedir()): string {
+  return join(home, ".fuse-harness");
 }
 
-/** `~/.claude/fusengine-cache/sessions` — per-session JSON state dir. */
+/** `~/.fuse-harness/cache` base dir for session/cache state (shared across harnesses). */
+export function fusengineCache(home: string = homedir()): string {
+  return join(fuseHarnessHome(home), "cache");
+}
+
+/** `~/.fuse-harness/cache/sessions` — per-session JSON state dir. */
 export function sessionsDir(home: string = homedir()): string {
   return join(fusengineCache(home), "sessions");
 }

@@ -3,10 +3,11 @@
  * `~/.claude/logs/00-memory` + project-type detection. Ports the shared
  * filesystem helpers of the four memory-neural scripts.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { claudeHome } from "../../home-state";
+import { atomicWrite } from "../../../util/json-io";
 
 /** `~/.claude/logs/00-memory` log directory. */
 export function memoryLogDir(home: string = homedir()): string {
@@ -31,7 +32,7 @@ export function appendMemoryLog(name: string, line: string, rotateAt = 0, keep =
     appendFileSync(file, `${line}\n`, "utf-8");
     if (rotateAt > 0) {
       const lines = readFileSync(file, "utf-8").split("\n").filter((l) => l.length > 0);
-      if (lines.length > rotateAt) writeFileSync(file, `${lines.slice(-keep).join("\n")}\n`, "utf-8");
+      if (lines.length > rotateAt) atomicWrite(file, `${lines.slice(-keep).join("\n")}\n`);
     }
   } catch { /* best effort */ }
 }

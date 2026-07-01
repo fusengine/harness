@@ -1,7 +1,7 @@
 /**
  * Shared cache-path + age helpers for the ai-pilot scope.
  * Reuses the harness home-state (`fusengineCache`) so the ai-pilot caches live
- * under the same `~/.claude/fusengine-cache` tree as the core MCP cache — no
+ * under the same `~/.fuse-harness/cache` tree as the core MCP cache — no
  * second cache layer.
  */
 import { createHash } from "node:crypto";
@@ -20,12 +20,12 @@ export function projectHash(projectPath: string): string {
   return hashText16(projectPath);
 }
 
-/** `~/.claude/fusengine-cache` base dir (shared with the core MCP cache). */
+/** `~/.fuse-harness/cache` base dir (shared with the core MCP cache). */
 export function cacheBaseDir(home: string = homedir()): string {
   return fusengineCache(home);
 }
 
-/** Per-type, per-project cache dir: `fusengine-cache/<type>/<projectHash>`. */
+/** Per-type, per-project cache dir: `cache/<type>/<projectHash>`. */
 export function cacheDirFor(type: string, projectPath: string, home: string = homedir()): string {
   return join(cacheBaseDir(home), type, projectHash(projectPath));
 }

@@ -1,14 +1,12 @@
 import { evaluate, type PolicyResult } from "../policy/evaluate";
 import { existingLineCount, isApexScoped } from "./gate-helpers";
-import { evaluateApex, type ApexContext } from "../policy/apex";
 import { FAIL_CLOSED } from "../policy/guards";
-import { agentsFresh, recordTrivialEdit, trivialCount } from "../tracking/session-state";
-import { agentsRanFromTranscript } from "../freshness/agent-evidence";
-import { loadTrack, saveTrack } from "../tracking/store";
+import { loadTrack } from "../tracking/store";
 import { dryGate } from "./dry";
 import { preCommitGate } from "./precommit";
 import { modularGate } from "./modular";
 import { frameworkSkillGate } from "./framework-skill-gate";
+import { apexScopedGate } from "./gate-apex";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
 
@@ -55,40 +53,8 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py
   // parity): non-code and exempt paths skip straight to the DRY check below.
   if (isApexScoped(input.filePath)) {
-    // Trivial-edit fast path: a few tiny, non-replace edits skip the APEX gates.
-    const lineCount = input.content === undefined ? Number.POSITIVE_INFINITY : input.content.split("\n").length;
-    if (!input.isReplaceAll && lineCount < 5 && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
-      await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
-      return null;
-    }
-
-    // Freshness: prefer platform-authored transcript evidence (the agent cannot
-    // forge a Task tool_use in the runtime-owned transcript). The self-recorded
-    // track is only a fallback when no transcript path is available (tests / other
-    // harnesses) — so a forged track can no longer satisfy the gate.
-    const freshnessFor = (names: string[], windowMs: number = window): boolean =>
-      input.transcriptPath
-        ? agentsRanFromTranscript(input.transcriptPath, names, windowMs, input.now)
-        : agentsFresh(track, names, windowMs, input.now);
-
-    const ctx: ApexContext = {
-      sessionId: input.sessionId,
-      framework: input.framework,
-      filePath: input.filePath,
-      content: input.content ?? "",
-      authorizations: track.authorizations,
-      refs: input.refs,
-      refsRead: track.refsRead,
-      agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
-      brainstormRequired: track.brainstormRequired,
-      brainstormFresh: freshnessFor(["brainstorming"], Number.MAX_SAFE_INTEGER),
-    };
-    try {
-      const apex = evaluateApex(ctx);
-      if (apex) return apex;
-    } catch {
-      return FAIL_CLOSED;
-    }
+    const apex = await apexScopedGate(input, track, window);
+    if (apex) return apex;
   }
 
   // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.

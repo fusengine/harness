@@ -6,7 +6,7 @@ import { removeOldFiles } from "../fs-cleanup";
 /**
  * Handle SessionEnd: remove stale `*.tmp` (>1h) under `session-tmp/` and stale
  * legacy `claude_solid_reads_*` / `claude_session_changes_*` files (>2h) under
- * `fusengine-cache`. Ports `session-end/cleanup-session.py`. No stdout.
+ * `cache`. Ports `session-end/cleanup-session.py`. No stdout.
  * @param home - Home dir (defaults to `~`).
  * @param now - Clock (defaults to `Date.now()`).
  */

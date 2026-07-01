@@ -6,7 +6,7 @@ import { claudeHome, fusengineCache, sessionsDir } from "../home-state";
 import { devContext } from "../dev-context";
 import { pruneEmptyDirs, purgeTtlTree, removeOldFiles, trimLogFile } from "../fs-cleanup";
 
-/** TTLs (seconds) for purgeable fusengine-cache subtrees (cleanup-old-caches.py). */
+/** TTLs (seconds) for purgeable cache subtrees (cleanup-old-caches.py). */
 const PURGEABLE: Record<string, number> = { sessions: 48 * 3600, webfetch: 24 * 3600, doc: 48 * 3600, explore: 48 * 3600 };
 
 /** Read `~/.claude/CLAUDE.md`, or "" when missing/unreadable. */

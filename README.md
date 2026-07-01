@@ -45,6 +45,11 @@ automatically under `<project>/.harness/` (track, cache, memory).
 | `harness init [id]` | Write the pre+post hook wiring for the detected (or named) harness. |
 | `harness hook <id>` | Runtime: read a hook payload on stdin, gate (pre) or record (post), print the native response. (Hooks call this — you don't.) |
 | `harness check` | cli-mode: check staged files in a pre-commit step, exit non-zero on a violation. For harnesses without hooks. |
+| `harness doctor` | Print the version + resolved path of the harness *actually executing*, and compare it to npm's latest — the fast way to catch a stale global (see Pinning). |
+| `harness --version` | Print the running version (bare, on stdout) and exit. |
+
+Every invocation writes a `@fusengine/harness vX.Y.Z` banner to **stderr** (never
+stdout — the hook JSON contract stays clean) so you can see which version ran.
 
 cli-mode (Aider / Windsurf / OpenHands), as a pre-commit step:
 
@@ -52,6 +57,48 @@ cli-mode (Aider / Windsurf / OpenHands), as a pre-commit step:
 # .husky/pre-commit
 npx harness check
 ```
+
+### Pinning (required for hook consumers)
+
+Any consumer `hooks.json` / `settings.json` that runs the harness via `bunx`
+**MUST pin an exact version** — `@fusengine/harness@X.Y.Z` — never a range
+(`^` / `~`) and never the bare or `@latest` spec:
+
+```jsonc
+// .claude/settings.json — correct: exact pin
+"command": "bunx @fusengine/harness@0.1.41 hook claude"
+// WRONG — may silently keep running a stale global install:
+"command": "bunx @fusengine/harness hook claude"
+```
+
+**Why.** A still-open bun bug ([oven-sh/bun#5791]) makes an unpinned `bunx <pkg>`
+prefer an already-installed **global** copy over npm-latest, and publishing a new
+version updates neither that global nor the bunx cache (`bun pm cache rm` does
+**not** remove the global). A hook wired without an exact pin can therefore keep
+executing an old harness indefinitely after you publish a fix — the failure is
+silent because the smoke test (importing the local dist) never exercises the
+`bunx`-resolved binary. Pinning `@X.Y.Z` forces the exact version to resolve.
+
+Run `harness doctor` to see which version is actually executing and whether npm
+has a newer one:
+
+```sh
+harness doctor
+# @fusengine/harness doctor
+#   running:    0.1.41
+#   package:    /Users/you/.bun/install/global/node_modules/@fusengine/harness
+#   runtime:    /Users/you/.bun/bin/bun
+#   npm latest: 0.1.42
+#   ! stale — npm serves 0.1.42. Pin "@fusengine/harness@0.1.42" in hooks.json.
+```
+
+If `doctor` reports a stale global, clear it and re-pin:
+
+```sh
+bun remove -g @fusengine/harness && bun pm cache rm
+```
+
+[oven-sh/bun#5791]: https://github.com/oven-sh/bun/issues/5791
 
 ## What it enforces
 

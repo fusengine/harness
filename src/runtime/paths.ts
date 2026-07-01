@@ -2,7 +2,7 @@
  * @module paths
  * Runtime path helpers — per-project, out-of-tree harness state.
  *
- * Default base: ~/.claude/fuse-harness/state/<projectHash>/
+ * Default base: ~/.fuse-harness/state/<projectHash>/
  * where projectHash = 8-char MD5 of CLAUDE_PROJECT_DIR (or cwd).
  * Persistent and not world-writable (unlike /tmp), and OUTSIDE the repo so the
  * agent has no "legitimate" reason to write it (the protected-path guard denies
@@ -11,9 +11,9 @@
  * @packageDocumentation
  */
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { hashText } from "../util/json-io";
+import { fuseHarnessHome } from "./home-state";
 
 /** Resolve the project root from the environment or fall back to cwd. */
 function resolveProjectDir(): string {
@@ -33,13 +33,13 @@ export function projectHash(projectDir?: string): string {
 
 /**
  * Canonical base directory for per-project harness state.
- * Resolves to: ~/.claude/fuse-harness/state/<projectHash>/
+ * Resolves to: ~/.fuse-harness/state/<projectHash>/
  *
  * @param projectDir - Optional override for hashing; defaults to CLAUDE_PROJECT_DIR/cwd.
  * @returns Absolute directory path (not yet created on disk).
  */
 export function defaultStateDir(projectDir?: string): string {
-  return join(homedir(), ".claude", "fuse-harness", "state", projectHash(projectDir));
+  return join(fuseHarnessHome(), "state", projectHash(projectDir));
 }
 
 /**
@@ -50,7 +50,7 @@ export function defaultStateDir(projectDir?: string): string {
  * @param sessionId - Claude session identifier (raw value accepted; sanitised internally).
  * @param baseDir   - Override the base directory. Omit in production; pass an explicit
  *                    temp path in unit tests to avoid touching $HOME.
- * @returns Absolute path, e.g. ~/.claude/fuse-harness/state/a1b2c3d4/track-abc123.json
+ * @returns Absolute path, e.g. ~/.fuse-harness/state/a1b2c3d4/track-abc123.json
  */
 export function trackFile(sessionId: string, baseDir?: string): string {
   const dir = baseDir ?? defaultStateDir();

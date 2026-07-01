@@ -3,10 +3,11 @@
  * `~/.claude/logs/00-security`. Ports the state helpers of
  * `check-security-skill.py` / `track-skill-read.py` / `track-mcp-research.py`.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { claudeHome } from "../../home-state";
+import { atomicWrite } from "../../../util/json-io";
 
 /** `~/.claude/logs/00-security` state directory. */
 export function securityStateDir(home: string = homedir()): string {
@@ -42,6 +43,5 @@ export function loadSecurityState(now: number = Date.now(), home: string = homed
 
 /** Persist today's security state (indent 2, no trailing newline). */
 export function saveSecurityState(state: Record<string, unknown>, now: number = Date.now(), home: string = homedir()): void {
-  mkdirSync(securityStateDir(home), { recursive: true });
-  writeFileSync(securityStatePath(now, home), JSON.stringify(state, null, 2), "utf-8");
+  atomicWrite(securityStatePath(now, home), JSON.stringify(state, null, 2));
 }
