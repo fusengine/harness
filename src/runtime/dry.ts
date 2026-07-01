@@ -77,7 +77,8 @@ export function dryGate(tool: string, filePath: string, content: string | undefi
   const dup = detectDuplication(filePath, content, cwd);
   if (dup.duplicates.length === 0) return null;
   const names = dup.names.slice(0, 5).join(", ");
-  const files = dup.duplicates.slice(0, 3).join(", ");
+  let files = dup.duplicates.slice(0, 3).join(", ");
+  if (dup.duplicates.length > 3) files += ` (+${dup.duplicates.length - 3} more)`;
   if (dup.duplicates.length === 1) {
     return {
       kind: "inform",

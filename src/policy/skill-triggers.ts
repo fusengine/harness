@@ -7,6 +7,7 @@
 import type { Prompt } from "../prompt/types";
 import { CASE_SENSITIVE_FRAMEWORKS, SKILL_TRIGGERS } from "./skill-trigger-patterns";
 import { isShadcnProject } from "./shadcn-project";
+import { resolveSkillPath } from "./skill-path";
 
 export { SKILL_TRIGGERS } from "./skill-trigger-patterns";
 
@@ -91,6 +92,6 @@ export function skillTriggerGate(
     reason:
       `${framework}: code uses APIs covered by ${missing.join(", ")} ` +
       "but its skill reference was not read this session.",
-    actions: missing.map((s) => `Read skills/${s}/ before writing this code`),
+    actions: missing.map((s) => `Read ${resolveSkillPath(s)}`),
   };
 }
