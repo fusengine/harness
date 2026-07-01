@@ -2,6 +2,17 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.45] - 2026-07-01
+
+### Fixed
+
+- Design pipeline gates (`stateFileGate`, `htmlCssOnlyGate`, `browserNavigateGate`, `designSystemWriteGate`, `geminiCreateGate`): restored the anti-loop warning + phase sequence, the domain-expert handoff phrase, the 2 distinct SKILL.md paths (phase 0 vs phase 1) + explicit 9-domain inspiration catalog, and numbered RECOVERY steps with explicit MCP tool names — all lost in the initial port (`gates.ts` split into `gates-pipeline.ts` to stay under the SOLID file-size limit).
+- MCP/WebFetch cache-hit interception served the raw cached body with no wrapper; restored the `CACHE HIT (~NKB economise, cached il y a Hh): {body}` notice (WebFetch variant differs slightly), parity `webfetch-cache-lookup.py`/`mcp-cache-lookup.py`.
+- `shadcn-skill-gate.ts` lost the `mcp__shadcn__search_items_in_registries` unblock option (text AND logic) — restored, with a real live tracking path (`activity.ts`'s `docSourceOf` now recognizes `mcp__shadcn__*` calls as a new `"shadcn-mcp"` doc source, wired end-to-end through the existing `authorizations` pipeline).
+- `skill-triggers.ts`'s missing sub-skill message pointed at a relative `skills/<name>/` fragment instead of the real, absolute `SKILL.md` path — restored via a NEW dynamic resolver (`skill-path.ts::resolveSkillPath`) that scans installed marketplace plugins for the skill on disk, rather than a hardcoded framework->plugin-dir table (which would have mis-resolved cross-plugin skills like `react-shadcn`, actually installed under `shadcn-expert`).
+- `modular.ts`'s Next.js/FuseCore modular-architecture messages lost 3 fragments: the explicit `app/` convention file list, the "Cores must be independent" rationale, and the word "from" in the cross-module-import message.
+- `dry.ts`'s duplicate-file list silently dropped files beyond the first 3 with no indication more existed — now shows `(+N more)` when applicable, parity `detect_duplication.py`.
+
 ## [0.1.44] - 2026-07-01
 
 ### Added
