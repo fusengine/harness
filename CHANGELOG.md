@@ -2,6 +2,27 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.47] - 2026-07-01
+
+### Added
+
+- Tailwind base-skill gate (ports `check-tailwind-skill.py` Phase 1): a `.tsx/.jsx` write with Tailwind utility classes now requires a `tailwindcss-v4`/`tailwindcss-utilities` skill read this session.
+- Opt-in Gemini Design MCP gate (`FUSE_ENFORCE_GEMINI_MCP`, default off): blocks hand-written Tailwind UI until a `mcp__gemini-design__*` call is made.
+- Ralph mode (`RALPH_MODE`, env-only, default off): exempts safe git commands from the confirmation ask and auto-approves project installs; destructive git and system installs still gate. The Python source's silent `feature/*`-branch / `prd.json` auto-activation is intentionally dropped.
+
+### Fixed
+
+- `detect-framework`: complete the Next.js signal set (`NextRequest`/`NextResponse`/`getServerSideProps`/`middleware`) so Next.js files stop mis-classifying as react.
+- `framework-solid-exclude`: anchor the JS build-dir exclude on path segments so `distance.ts` / `rebuild/` are no longer skipped from SOLID checks.
+- `framework-skill-gate`: skip the sub-skill gate on build/vendor artifacts (parity with the Python `check-*-skill.py` early return).
+- `security`: accumulate every matched violation (deny when any is critical) and exempt a `trash`-targeted `rm` from the ask.
+- APEX gates: exempt subagents from the brainstorm requirement; exempt `.claude/fusengine-cache/` paths; widen the dev-verb trigger to the full `DEV_KEYWORDS`.
+- `modular`/`skill-triggers`/`design`: precise FuseCore target sub-path, dedicated FuseCore skill message, dedicated `design-system.md` not-found message.
+
+### Removed
+
+- Dead `src/state/*` (duplicate of `apex-task-store`) and dead `preScreenshotWriteGate` (its `check-browser-browsing.py` source is not wired in any hooks.json; the screenshot quota lives in `designSystemWriteGate`).
+
 ## [0.1.46] - 2026-07-01
 
 ### Fixed
