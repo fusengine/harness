@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.46] - 2026-07-01
+
+### Fixed
+
+- `solidReadGate` required the exact `references/*.md` path to be read, unlike the 3 other `refsRead`-consuming gates (`skillTriggerGate`, `shadcnBaseSkillRead`, `designSkillRead`), which already accept reading the skill's parent `SKILL.md` as proof of consultation. Reading only the `SKILL.md` — the natural reflex, and what the gate's own message suggests — satisfied 3 of 4 gates but never this one. Now accepts either.
+
 ## [0.1.45] - 2026-07-01
 
 ### Fixed
