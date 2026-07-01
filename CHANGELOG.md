@@ -2,7 +2,7 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.1.44] - 2026-07-01
 
 ### Added
 
@@ -38,6 +38,17 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 - `DOC_CACHE_TTL_SECONDS` (doc cache freshness, 7d): `inject-doc.ts` and `doc-cache-gate.ts` each defined their own local `TTL_SECONDS` for the same cache — extracted into a single export in `cache-base.ts`, imported by both, to remove the silent-drift risk that caused the `DEFAULT_TTL_SEC`/`DEFAULT_WINDOW_MS` regression above.
 - `solidReadGate`'s deny message lost the Python `formatRoutedDeny`'s TTL label, optional refs, and "Full skill:" pointer during the initial port — all 3 restored. Note: `routed.skillPath` is currently always empty in production (`solidReadGate` never threads a resolved skill dir through `ApexContext`) — tracked as a follow-up, not fixed here.
 - `evaluateFileSize`'s deny message was reduced to "File has N lines (max: M)." — the Python `enforce-file-size.py` includes the filename, a framework-resolved SOLID reference path, and a 3-step split plan. Restored via new optional `filePath`/`framework` params (backward-compatible defaults).
+- `respond.ts`: an `inform` prompt (e.g. `dryGate`'s single-duplicate note) collapsed into a blocking interactive `ask`/`permission:"ask"` in the real production hook pipeline (`gate()` → `handle-pre.ts` → `respond()`), because `respond()` only distinguished `block` from everything else — a prior sniper pass had validated the 3-kind behavior against `toClaudeResponse` (used only by the separate `guard()`/CLI path), not the function actually on the hook path. `respond()` now honors all 3 `PromptKind`s for every harness.
+- `security.ts`: deny/ask messages listed 4-7 possible causes in parentheses instead of naming which one actually matched — each `CRITICAL_PATTERNS`/`ASK_PATTERNS` entry now carries its own label (parity `security_rules.py`'s cumulated violation names).
+- `interface-separation.ts`: the destination text for TS/JS/Vue/Svelte, PHP and Swift now matches the current `claude-rules/rules/04-solid-dry-rules.md` ("SOLID Skill per Stack" table) — `modules/[feature]/src/interfaces/`, `app/Contracts/`, `Sources/Interfaces/` — instead of the older `enforce-interfaces.py` wording; Go/Python/Java/Kotlin aren't covered by that table and keep a reasonable default.
+- `bash-write.ts`: the 7 in-place-edit patterns and 2 ask-writer patterns were collapsed into 2 shared generic messages, never naming which motif (heredoc/sed/perl/awk/patch/tee/dd) matched — each now carries its own `desc`, split into `bash-write-patterns.ts` to stay under the SOLID file-size limit.
+- SOLID file-size framework resolution (`evaluate.ts`) used the same `detectFramework()` as the unrelated `require-solid-read` gate (filename/content heuristics), diverging from `enforce-file-size.py::get_solid_ref()` (a same-directory `next.config.*` check) — misresolved nested Next.js App Router files and `.vue`/`.svelte` files. New `resolveSolidRefFramework()` matches the Python algorithm exactly.
+- SOLID file-size scope (`evaluate.ts`) included `.css` via the broader `isCodeFile()`, contradicting the same decision already applied to `isApexScoped`; new `isFileSizeScoped()` excludes it, matching `enforce-file-size.py`'s `CODE_EXT`.
+- SOLID file-size deny message on a `Write` showed the *incoming* (new) line count instead of the pre-existing on-disk count when both are over the limit — `enforce-file-size.py` always displays the pre-edit count.
+- `solidReadGate` silently allowed when SOLID references were loaded but none scored for the edited file; `require-solid-read.py` still denies in that case, pointing at the framework's `SKILL.md`. Now blocks (the "no refs installed at all" case correctly stays allow, per `discoverRefs()`'s documented contract).
+- `freshnessGate` always named both `explore-codebase` and `research-expert` as missing, even when only one actually was; now names the precise missing agent(s) via a new `ApexContext.missingAgents` field.
+- `claude-md-context.ts::buildApexInstruction` templated the 3rd ANALYZE agent as `${projectType}-expert` (e.g. `generic-expert`, `laravel-expert` — neither is a real installed agent id). Replaced with `expert-agents.ts::getExpertAgent()`, which resolves the real `<plugin>:<agent>` id by scanning installed marketplace plugins (falls back to `general-purpose` when none match) — never a hardcoded table that can drift from what's actually installed.
+- `lifecycle-bridge.ts::postEditContext`: `trackSessionChanges || postEditTypescript` always short-circuited on the first (unconditionally truthy for any `.ts`/`.tsx` edit), making the eslint/prettier check unreachable dead code; both now run and their `additionalContext` is merged.
 
 ### Changed
 
