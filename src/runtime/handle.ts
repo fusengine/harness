@@ -1,25 +1,17 @@
 import { projectLayout } from "../config/layout";
 import { detectFramework } from "../policy/detect-framework";
 import { detectCreationIntent } from "../policy/creation-intent";
-import { extractText } from "../cache/mcp-response";
 import { recordBrainstormRequired } from "../tracking/session-state";
 import { loadTrack, saveTrack } from "../tracking/store";
-import { activityFor } from "./activity";
-import { mcpPostStore } from "./mcp";
 import { normalizeEvent } from "./normalize";
 import { defaultStateDir, trackFile } from "./paths";
-import { recordActivity } from "./record";
-import { respond } from "./respond";
-import { designGate } from "./design";
 import { designLifecycle } from "./design-lifecycle";
 import { promptSubmitContext } from "./inject-context";
-import { lifecycleStdout, postEditContext } from "./lifecycle-bridge";
-import { postTrackingSideEffects } from "./lifecycle/post-tracking";
+import { lifecycleStdout } from "./lifecycle-bridge";
 import { handlePre } from "./handle-pre";
-import { aipilotPostToolUse } from "./lifecycle";
+import { handlePost } from "./handle-post";
 import { asyncScopeStdout } from "./handle-scope-async";
 import type { PluginScope } from "./lifecycle";
-import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 
 /** Raw Claude hook event name from a payload (empty when absent). */
 function rawEventName(payload: Record<string, unknown>): string {
@@ -77,20 +69,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   }
 
   if (event.phase === "post") {
-    const response = payload.tool_response ?? payload.tool_output;
-    mcpPostStore(event.tool, event.input, response, mcpDir);
-    const designWarn = designGate(payload, event, mcpDir, opts.cwd);
-    const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
-    for (const activity of activities) await recordActivity(file, activity);
-    postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
-    const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
-    if (seoDeny) return { stdout: seoDeny, exit: 0 };
-    if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate")) {
-      const out = await aipilotPostToolUse(payload, opts.cwd);
-      if (out) return { stdout: out, exit: 0 };
-    }
-    const extra = postEditContext(opts.scope ?? "core", event, opts.now);
-    return { stdout: designWarn ? respond(id, designWarn) : extra, exit: 0 };
+    return handlePost({ id, payload, event, framework, mcpDir, file, opts });
   }
 
   return handlePre({ id, payload, event, framework, mcpDir, file, opts });

@@ -16,11 +16,11 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { fuseHarnessHome } from "../runtime/home-state";
 import type { SessionTrack } from "./session-state";
 
-const HARNESS_DIR = join(homedir(), ".claude", "fuse-harness");
+const HARNESS_DIR = fuseHarnessHome();
 const KEY_PATH = join(HARNESS_DIR, ".key");
 const NONCE_PATH = join(HARNESS_DIR, ".nonce");
 

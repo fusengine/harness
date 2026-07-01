@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { atomicWrite } from "../util/json-io";
 import { projectLayout } from "../config/layout";
 import { ensureMemoryGitignore } from "./gitignore";
 
@@ -39,7 +40,7 @@ export function setStateField(file: string, key: keyof ReminderState, value: num
   const dir = dirname(file);
   mkdirSync(dir, { recursive: true });
   ensureMemoryGitignore(dir);
-  writeFileSync(file, JSON.stringify(next));
+  atomicWrite(file, JSON.stringify(next));
 }
 
 /** Local wall-clock timestamp for a lesson bullet: `YYYY-MM-DD HH:MM`. */

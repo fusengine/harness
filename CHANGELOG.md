@@ -2,6 +2,19 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.42] - 2026-07-01
+
+### Added
+
+- `harness doctor`/`harness --version` command + stderr version banner + post-publish CI check to catch stale `bunx` installs (bug oven-sh/bun#5791).
+- Differential Python↔TS test harness plus a golden-snapshot regression suite under `test/parity` (`FUSE_PARITY_PYTHON_ROOT` override).
+- `FUSE_MCP_TTL_SEC`/`FUSE_WEBFETCH_TTL_SEC` env vars for the MCP/WebFetch cache TTLs.
+
+### Changed
+
+- Migrated ad-hoc `fs` writes to `atomicWrite`; moved the fuse-harness cache to a neutral `~/.fuse-harness/cache` (was nested under `~/.claude`).
+- Extracted cross-module types into `interfaces/` (ISP) and split `handle.ts`/`gate.ts` under the 90-line SOLID limit.
+
 ## [0.1.41] - 2026-06-30
 
 ### Added

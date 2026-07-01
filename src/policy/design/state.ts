@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, readdirSync, statSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { atomicWrite } from "../../util/json-io";
 
 /** Pipeline mode — drives the screenshot quota and phase expectations. */
 export type DesignMode = "full" | "page" | "component";
@@ -36,8 +37,7 @@ export function loadDesignState(cacheDir: string, agentId: string): DesignState 
 
 /** Persist the design state under its agent id. */
 export function saveDesignState(cacheDir: string, state: DesignState): void {
-  mkdirSync(cacheDir, { recursive: true });
-  writeFileSync(stateFile(cacheDir, state.agentId), JSON.stringify(state, null, 2));
+  atomicWrite(stateFile(cacheDir, state.agentId), JSON.stringify(state, null, 2));
 }
 
 /** Build the initial state for a design agent starting a run. */

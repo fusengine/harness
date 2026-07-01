@@ -1,10 +1,16 @@
 /** Cache-key + tool-class helpers for the MCP/WebFetch interception pipeline. */
+import { parseEnvInt } from "../config/env";
 
-/** Default freshness for cached MCP doc results (48h). */
-export const MCP_TTL_MS = 172_800_000;
+/** Default cached-MCP freshness in seconds (48h). */
+const MCP_TTL_DEFAULT_SEC = 172_800;
+/** Default WebFetch freshness in seconds (24h, parity with Python). */
+const WEBFETCH_TTL_DEFAULT_SEC = 86_400;
 
-/** WebFetch freshness — pages go stale faster than docs (24h, parity with Python). */
-export const WEBFETCH_TTL_MS = 86_400_000;
+/** Cached-MCP freshness (ms) from `FUSE_MCP_TTL_SEC` (default 48h). */
+export const MCP_TTL_MS: number = parseEnvInt(process.env.FUSE_MCP_TTL_SEC, MCP_TTL_DEFAULT_SEC) * 1000;
+
+/** WebFetch freshness (ms) from `FUSE_WEBFETCH_TTL_SEC` (default 24h; pages stale faster than docs). */
+export const WEBFETCH_TTL_MS: number = parseEnvInt(process.env.FUSE_WEBFETCH_TTL_SEC, WEBFETCH_TTL_DEFAULT_SEC) * 1000;
 
 /** WebFetch prompt slice folded into its cache key (parity with Python prompt[:500]). */
 const PROMPT_TRUNC = 500;

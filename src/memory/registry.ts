@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 /** Registry path relative to the home dir. */
-const SUBPATH = ".claude/fusengine-cache/lessons/roots.json";
+const SUBPATH = ".fuse-harness/cache/lessons/roots.json";
 
 /** Absolute path of the global roots registry, or null when home is unusable. */
 export function registryFile(home: string | undefined = process.env.HOME): string | null {

@@ -4,15 +4,15 @@ import type { GuardContext } from "./context";
 /**
  * Path fragments that mark a location as internal/generated state.
  *
- * Parity with safe_paths.py: `~/.claude/fusengine-cache` is a *writable* cache
- * the harness owns (lessons, MCP cache, per-type state) — only the
- * `fusengine-cache/sessions` subtree is protected, not the whole cache.
+ * Parity with safe_paths.py: `~/.fuse-harness/cache` is a *writable*
+ * cache the harness owns (lessons, MCP cache, per-type state) — only the
+ * `cache/sessions` subtree is protected, not the whole cache.
  */
 export const PROTECTED_FRAGMENTS: readonly string[] = [
   ".claude/plugins/marketplaces",
   ".claude/plugins/cache",
   ".claude/logs/00-apex",
-  ".claude/fusengine-cache/sessions",
+  ".fuse-harness/cache/sessions",
   ".claude/apex/",
   ".harness/track",
   ".harness/memory/state",

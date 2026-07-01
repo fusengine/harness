@@ -1,6 +1,6 @@
 /**
  * Promote high-frequency project lessons (occurrence count >= 3) to the global,
- * stack-scoped cache (`fusengine-cache/lessons/_global/<stack>.json`, cap 25).
+ * stack-scoped cache (`cache/lessons/_global/<stack>.json`, cap 25).
  * Ports the ai-pilot `promote-global-lessons.ts` (a spawned subprocess) as an
  * in-process call from `cacheSniperLessons`. Pure side-effect.
  */

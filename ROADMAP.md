@@ -20,9 +20,18 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 
 ## Qualité / preuve de parité
 
-- [ ] **Harnais de test différentiel Python↔TS** — envoyer N commandes/inputs au plugin Python
-      ET au harness TS, asserter l'égalité des décisions (block/ask/allow), en excluant
-      explicitement les écarts volontaires documentés. Donne une garantie « clone » mesurable.
+- [x] **Harnais de test différentiel Python↔TS** — fait (`test/parity/`). Chaque payload d'une
+      matrice de 38 commandes Bash `PreToolUse` est envoyé AU plugin Python `core-guards`
+      (chaîne `bash-write`/`git`/`install`/`security`, via `python3`) ET au harness TS
+      (`guard()`), avec assertion d'égalité des décisions (block/ask/allow) — `differential.test.ts`.
+      Le différentiel tourne en local quand la référence Python est présente
+      (`~/Downloads/agents-main/plugins/core-guards`, override `FUSE_PARITY_PYTHON_ROOT`) et
+      s'auto-skippe en CI. Un **golden-snapshot** (`golden.test.ts` + `golden.snapshot.json`)
+      verrouille la sortie exacte du harness et sert de filet anti-régression CI (sans Python).
+      Écarts volontaires exclus de la matrice (cf. section suivante) + trouvés par le diff :
+      fork bomb, `mkfs.ext4`, `dd of=/dev/*`, `chmod 777`, `eval` (TS bloque/ask, Python laisse passer).
+      Limite connue restante : la matrice ne couvre que les guards de décision `PreToolUse` Bash ;
+      les events de cycle de vie (SessionStart/injections) et les caches TTL restent non diffés.
 
 ## Écarts volontaires (assumés — à revoir si clone strict souhaité)
 
@@ -34,9 +43,11 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 
 ## Phase 2 — reliquats (LOW, non bloquants)
 
-- [ ] **Chemins harness-agnostiques** — plusieurs handlers hardcodent `~/.claude/fusengine-cache`,
-      `~/.claude/logs/00-*`, `~/.claude/.../state` (Claude-only). Les dériver du home du harness
-      détecté (réutiliser `HOME_DIR` de `src/config/dotenv.ts` + `src/detect/harness.ts`). Chantier transverse.
+- [x] **Chemins harness-agnostiques (cache/état fuse-harness)** — le cache/état propre à
+      fuse-harness (sessions, lessons, MCP cache, analytics) est déparenté de `~/.claude/` vers
+      `~/.fuse-harness/cache/` (neutre, partagé entre tous les harnais). Les logs par-harness
+      (`~/.claude/logs/00-*`) restent volontairement sous le home du harness détecté — hors scope
+      de ce point (cache propre au harness vs logs par-harness sont deux choses différentes).
 - [ ] **design** : regex « emoji-as-icon » (`content-checks.ts`) flagge tout non-ASCII → faux positif
       sur texte accenté (français/CJK) ; restreindre à la classe emoji du Python.
 - [ ] **SEO** : matcher PostToolUse limité à `Write|Edit|MultiEdit` ; whitespace/entities/casse (port plus strict).
