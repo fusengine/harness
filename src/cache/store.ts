@@ -22,12 +22,25 @@ export function cachePath(dir: string, tool: string, query: string): string {
   return join(dir, `${mcpCacheKey(tool, query)}.md`);
 }
 
+/** A cache hit's body plus its age in ms (now − mtime), for caller-side reporting. */
+export interface CacheHit {
+  body: string;
+  ageMs: number;
+}
+
 /** Read a cached entry if it exists and is fresh (mtime within `ttlMs`), else null. */
 export function cacheLookup(dir: string, tool: string, query: string, ttlMs: number, now: number): string | null {
+  return cacheLookupMeta(dir, tool, query, ttlMs, now)?.body ?? null;
+}
+
+/** Like {@link cacheLookup}, but also reports the entry's age (for `CACHE HIT` wrapper text). */
+export function cacheLookupMeta(dir: string, tool: string, query: string, ttlMs: number, now: number): CacheHit | null {
   const path = cachePath(dir, tool, query);
   try {
-    if (!existsSync(path) || now - statSync(path).mtimeMs > ttlMs) return null;
-    return readFileSync(path, "utf8");
+    if (!existsSync(path)) return null;
+    const ageMs = now - statSync(path).mtimeMs;
+    if (ageMs > ttlMs) return null;
+    return { body: readFileSync(path, "utf8").slice(0, MAX_BODY), ageMs };
   } catch {
     return null;
   }
@@ -43,6 +56,11 @@ export function cacheLookup(dir: string, tool: string, query: string, ttlMs: num
  * @param now - Current epoch ms.
  */
 export function cacheLookupSubstring(dir: string, query: string, ttlMs: number, now: number): string | null {
+  return cacheLookupSubstringMeta(dir, query, ttlMs, now)?.body ?? null;
+}
+
+/** Like {@link cacheLookupSubstring}, but also reports the matched entry's age. */
+export function cacheLookupSubstringMeta(dir: string, query: string, ttlMs: number, now: number): CacheHit | null {
   const needle = query.replace(/[\r\n]+/g, " ").slice(0, NEEDLE_LEN).trim().toLowerCase();
   if (!needle) return null;
   let names: string[];
@@ -55,9 +73,10 @@ export function cacheLookupSubstring(dir: string, query: string, ttlMs: number, 
     if (!name.endsWith(".md")) continue;
     const path = join(dir, name);
     try {
-      if (now - statSync(path).mtimeMs > ttlMs) continue;
+      const ageMs = now - statSync(path).mtimeMs;
+      if (ageMs > ttlMs) continue;
       const body = readFileSync(path, "utf8").slice(0, MAX_BODY);
-      if (body.toLowerCase().includes(needle)) return body;
+      if (body.toLowerCase().includes(needle)) return { body, ageMs };
     } catch {
       continue;
     }

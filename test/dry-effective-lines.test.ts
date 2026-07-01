@@ -32,6 +32,27 @@ test("dryGate: 2 duplicates -> block (unchanged)", () => {
   expect(p?.title).toBe("Duplicate code (DRY)");
 });
 
+test("dryGate: exactly 3 duplicates -> block WITHOUT a '(+N more)' suffix (boundary)", () => {
+  const cwd = tmp();
+  writeFileSync(join(cwd, "e1.ts"), decl(1));
+  writeFileSync(join(cwd, "e2.ts"), decl(2));
+  writeFileSync(join(cwd, "e3.ts"), decl(3));
+  const p = dryGate("Write", join(cwd, "new-file.ts"), decl(4), cwd);
+  expect(p?.kind).toBe("block");
+  expect(p?.reason).not.toContain("more)");
+});
+
+test("dryGate: 4 duplicates -> block truncates to 3 files with a '(+1 more)' suffix (parity detect_duplication.py)", () => {
+  const cwd = tmp();
+  writeFileSync(join(cwd, "e1.ts"), decl(1));
+  writeFileSync(join(cwd, "e2.ts"), decl(2));
+  writeFileSync(join(cwd, "e3.ts"), decl(3));
+  writeFileSync(join(cwd, "e4.ts"), decl(4));
+  const p = dryGate("Write", join(cwd, "new-file.ts"), decl(5), cwd);
+  expect(p?.kind).toBe("block");
+  expect(p?.reason).toContain("(+1 more)");
+});
+
 const base: GateInput = {
   sessionId: "s1",
   framework: "react",

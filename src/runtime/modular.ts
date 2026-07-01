@@ -22,7 +22,7 @@ function nextModular(filePath: string, content: string, cwd: string): Prompt | n
   const rel = relative(cwd, filePath);
   const bn = basename(filePath);
   if ((rel.startsWith("app/") || rel.startsWith("src/app/")) && !NEXT_CONVENTION.test(bn) && !NEXT_STATIC.test(bn)) {
-    return block(`BLOCKED: modular Next.js — '${bn}' is not an app/ convention file. Move business logic to modules/[feature]/.`);
+    return block(`BLOCKED: modular Next.js — '${bn}' is not an app/ convention file. Move business logic to modules/[feature]/. Only page.tsx, layout.tsx, route.ts allowed in app/.`);
   }
   const mod = filePath.match(/\/modules\/([^/]+)\//);
   if (!mod) return null;
@@ -30,9 +30,9 @@ function nextModular(filePath: string, content: string, cwd: string): Prompt | n
   for (const m of content.matchAll(/from\s+['"][@.][^'"]*?\/modules\/([^/]+)\//g)) {
     const imported = m[1] ?? "";
     if (current === "cores") {
-      if (imported !== "cores" && imported !== "core") return block(`BLOCKED: modules/cores/ must not import from modules/${imported}/.`);
+      if (imported !== "cores" && imported !== "core") return block(`BLOCKED: modules/cores/ must not import from modules/${imported}/. Cores must be independent.`);
     } else if (imported !== current && imported !== "cores" && imported !== "core") {
-      return block(`BLOCKED: cross-module import — '${current}' imports '${imported}'. Only modules/cores/ is shared.`);
+      return block(`BLOCKED: cross-module import — '${current}' imports from '${imported}'. Only modules/cores/ is shared.`);
     }
   }
   return null;

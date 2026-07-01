@@ -8,10 +8,10 @@ import { uiDesignSkillGate } from "../policy/design/skill-gate";
 import { collectDesignEvidence } from "../policy/design/skill-evidence";
 import { findDesignSystem, recordPost } from "./design-helpers";
 import {
-  htmlCssOnlyGate, stateFileGate, designSystemWriteGate, geminiCreateGate,
-  browserNavigateGate, screenshotScrollGate, validateDesignSystem, geminiEnabled,
-  preScreenshotWriteGate,
+  htmlCssOnlyGate, stateFileGate, screenshotScrollGate, validateDesignSystem,
+  geminiEnabled, preScreenshotWriteGate,
 } from "../policy/design/gates";
+import { designSystemWriteGate, geminiCreateGate, browserNavigateGate } from "../policy/design/gates-pipeline";
 
 const NAV = "mcp__fuse-browser__browser_navigate";
 const SHOT = "mcp__fuse-browser__browser_screenshot";

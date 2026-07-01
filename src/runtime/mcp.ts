@@ -1,5 +1,5 @@
 import { capVerbosity } from "../policy/verbosity";
-import { cacheLookup, cacheLookupSubstring } from "../cache/store";
+import { cacheLookupMeta, cacheLookupSubstringMeta, type CacheHit } from "../cache/store";
 import { extractText } from "../cache/mcp-response";
 import { mcpCacheWrite, webfetchCacheWrite } from "../cache/mcp-store";
 import { WEBFETCH_TTL_MS, cacheQueryOf, isMcpTool, isWebFetch } from "./mcp-key";
@@ -29,6 +29,19 @@ function docSourceOf(tool: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Wrap a cache hit's body in the harness-facing `CACHE HIT` notice — parity with
+ * `webfetch-cache-lookup.py` / `mcp-cache-lookup.py` (KB = body chars/1024 + 1,
+ * age hours = ageMs/3_600_000, both floored).
+ */
+function cacheHitText(web: boolean, hit: CacheHit): string {
+  const kb = Math.floor(hit.body.length / 1024) + 1;
+  const hours = Math.floor(hit.ageMs / 3_600_000);
+  return web
+    ? `CACHE HIT WebFetch (~${kb}KB economise, cached il y a ${hours}h):\n\n${hit.body}\n\nPour forcer un nouveau fetch, modifie l'URL ou la query.`
+    : `CACHE HIT (~${kb}KB economise, cached il y a ${hours}h): ${hit.body}\n\nReformule pour forcer un re-call.`;
+}
+
 /** A pre-event MCP interception: the native response + any doc source it satisfied. */
 export interface McpIntercept {
   stdout: string;
@@ -46,9 +59,9 @@ export function mcpPreIntercept(id: string, tool: string, input: Record<string, 
   const ttl = web ? WEBFETCH_TTL_MS : ttlMs;
   const key = cacheQueryOf(tool, input);
   // Exact key first; for MCP docs fall back to a substring hit (Python `rg -i -F`).
-  const cached = cacheLookup(dir, tool, key, ttl, now) ?? (web ? null : cacheLookupSubstring(dir, key, ttl, now));
-  if (cached) {
-    const served = denyWith(id, cached);
+  const hit = cacheLookupMeta(dir, tool, key, ttl, now) ?? (web ? null : cacheLookupSubstringMeta(dir, key, ttl, now));
+  if (hit) {
+    const served = denyWith(id, cacheHitText(web, hit));
     if (served) return { stdout: served, docSource: docSourceOf(tool) };
   }
   const capped = capVerbosity(tool, input);

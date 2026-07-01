@@ -46,6 +46,7 @@ function docSourceOf(tool: string): string | undefined {
   if (/browser_(fetch|crawl|serp)/i.test(tool)) return "fuse-browser";
   if (tool === "WebSearch") return "websearch";
   if (tool === "WebFetch") return "webfetch";
+  if (/^mcp__shadcn__/i.test(tool)) return "shadcn-mcp";
   return undefined;
 }
 

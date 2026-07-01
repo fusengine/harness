@@ -27,6 +27,8 @@ const EXEMPT_RE = /(^|\/)(node_modules|dist|build)\//;
 const SHADCN_PATH_RE = /(components|ui|shadcn|components\.json)/;
 /** A read reference proving one of the two named base skills was consulted (Phase 1). */
 const SHADCN_BASE_SKILL_RE = /skills\/(shadcn-detection|shadcn-components)\//;
+/** Session `authorizations` source proving a live `mcp__shadcn__*` call was made this session (Phase 1, option 3). */
+const SHADCN_MCP_SOURCE_RE = /shadcn-mcp/i;
 
 /** Session evidence the gate consumes: read references + doc authorizations. */
 export interface ShadcnEvidence {
@@ -51,6 +53,14 @@ export function shadcnBaseSkillRead(refsRead: readonly string[]): boolean {
   return refsRead.some((p) => SHADCN_BASE_SKILL_RE.test(p));
 }
 
+/** True when a `mcp__shadcn__*` tool call was recorded this session (Phase 1's 3rd unblock option). */
+export function shadcnMcpConsulted(authorizations: Record<string, AuthEntry> | undefined, sessionId: string): boolean {
+  if (!authorizations) return false;
+  return Object.values(authorizations).some(
+    (a) => a.doc_sessions?.includes(sessionId) && (a.sources ?? (a.source ? [a.source] : [])).some((s) => SHADCN_MCP_SOURCE_RE.test(s)),
+  );
+}
+
 /**
  * Gate a shadcn-scoped write. Phase 1 requires a base skill read
  * (shadcn-detection or shadcn-components); Phase 2 requires the domain
@@ -67,12 +77,12 @@ export function shadcnSkillGate(
   ev: ShadcnEvidence,
 ): Prompt | null {
   if (!isShadcnWrite(tool, filePath)) return null;
-  if (!shadcnBaseSkillRead(ev.refsRead)) {
+  if (!shadcnBaseSkillRead(ev.refsRead) && !shadcnMcpConsulted(ev.authorizations, ev.sessionId)) {
     return {
       kind: "block",
       title: "shadcn/ui skill",
-      reason: "BLOCKED: shadcn skill not consulted. Read shadcn-detection/SKILL.md or shadcn-components/SKILL.md, then retry.",
-      actions: ["Read skills/shadcn-detection/ or skills/shadcn-components/, then retry"],
+      reason: "BLOCKED: shadcn skill not consulted. Read shadcn-detection/SKILL.md or shadcn-components/SKILL.md, or use mcp__shadcn__search_items_in_registries, then retry.",
+      actions: ["Read skills/shadcn-detection/ or skills/shadcn-components/, or call mcp__shadcn__search_items_in_registries, then retry"],
     };
   }
   const domainBlock = skillTriggerGate("shadcn", content, ev.refsRead);

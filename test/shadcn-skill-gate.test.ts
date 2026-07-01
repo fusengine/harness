@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { isShadcnWrite, shadcnBaseSkillRead, shadcnSkillGate } from "../src/policy/shadcn-skill-gate";
+import { isShadcnWrite, shadcnBaseSkillRead, shadcnMcpConsulted, shadcnSkillGate } from "../src/policy/shadcn-skill-gate";
 import { SHADCN_TRIGGERS } from "../src/policy/skill-patterns/shadcn-subskills";
 
 const BASE_SKILL = "~/.claude/plugins/marketplaces/x/plugins/shadcn-expert/skills/shadcn-detection/SKILL.md";
@@ -49,6 +49,35 @@ test("shadcnSkillGate: allows once base skill + domain skill + doc research are 
     shadcn: { sources: ["mcp__context7__query-docs", "mcp__exa__web_search_exa"], doc_sessions: ["s4"] },
   };
   const p = shadcnSkillGate("Write", CSS_PATH, content, { refsRead, sessionId: "s4", authorizations });
+  expect(p).toBeNull();
+});
+
+test("shadcnMcpConsulted: matches a recorded shadcn-mcp source for the same session only", () => {
+  const auths = { react: { sources: ["shadcn-mcp"], doc_sessions: ["sMcp"] } };
+  expect(shadcnMcpConsulted(auths, "sMcp")).toBe(true);
+  // wrong session -> not consulted
+  expect(shadcnMcpConsulted(auths, "other")).toBe(false);
+  // legacy single `source` field is honored too
+  expect(shadcnMcpConsulted({ react: { source: "shadcn-mcp", doc_sessions: ["sMcp"] } }, "sMcp")).toBe(true);
+  // non-shadcn sources / undefined authorizations -> not consulted (no throw)
+  expect(shadcnMcpConsulted({ react: { sources: ["context7"], doc_sessions: ["sMcp"] } }, "sMcp")).toBe(false);
+  expect(shadcnMcpConsulted(undefined, "sMcp")).toBe(false);
+});
+
+test("shadcnSkillGate: a live mcp__shadcn__* call (source shadcn-mcp) unblocks Phase 1 without a base-skill read", () => {
+  // No shadcn-detection/shadcn-components ref is read — Phase 1 is satisfied ONLY
+  // by the recorded mcp call (the new 3rd unblock option). Phase 2 (domain skill)
+  // and Phase 3 (Context7+Exa) are satisfied as in the "allows" test above.
+  const refsRead = ["skills/shadcn-theming/SKILL.md"];
+  expect(shadcnBaseSkillRead(refsRead)).toBe(false);
+  const content = ":root { --primary: oklch(0.5 0.2 250); }";
+  const authorizations = {
+    react: {
+      sources: ["shadcn-mcp", "mcp__context7__query-docs", "mcp__exa__web_search_exa"],
+      doc_sessions: ["sMcp"],
+    },
+  };
+  const p = shadcnSkillGate("Write", CSS_PATH, content, { refsRead, sessionId: "sMcp", authorizations });
   expect(p).toBeNull();
 });
 
