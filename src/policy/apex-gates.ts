@@ -4,11 +4,27 @@ import { DEFAULT_TTL_SEC, ttlLabel } from "../config/ttl";
 import { PLUGINS_DIR, SOLID_REF } from "./file-size";
 import type { ApexContext, ApexGate } from "./apex";
 
-/** Gate: the routed SOLID references for this edit must have been read. */
+/**
+ * True when the SOLID ref read at `path` still counts. Parity require-solid-read.py
+ * `_check_solid_read` (FUSE_ENFORCE_TTL_SEC, default 120s): a SOLID read older than
+ * the window has expired and must be redone. PARITY NOTE: the TTL applies ONLY to
+ * this gate — Python TTL-izes SOLID reads exclusively; the other refsRead consumers
+ * (skillTriggerGate, shadcn/tailwind/design gates) stay session-scoped, so this
+ * predicate must never leak into them. Backward compat: a path with no `refsReadAt`
+ * stamp (tracks recorded before the field existed) or a context without a clock
+ * (`now` absent) counts as read.
+ */
+function refReadFresh(ctx: ApexContext, path: string, windowMs: number): boolean {
+  const at = ctx.refsReadAt?.[path];
+  return at === undefined || ctx.now === undefined || ctx.now - at < windowMs;
+}
+
+/** Gate: the routed SOLID references for this edit must have been read within the TTL. */
 export const solidReadGate: ApexGate = (ctx: ApexContext) => {
   if (!ctx.refs?.length) return null;
   const routed = routeReferences(ctx.refs, ctx.filePath, ctx.content);
-  const ttl = ttlLabel(Math.round((ctx.windowMs ?? DEFAULT_TTL_SEC * 1000) / 1000));
+  const windowMs = ctx.windowMs ?? DEFAULT_TTL_SEC * 1000;
+  const ttl = ttlLabel(Math.round(windowMs / 1000));
   if (!routed) {
     // Parity require-solid-read.py::_build_reason (the `not routed` branch):
     // refs ARE loaded but none score for this file — Python still denies here,
@@ -23,7 +39,10 @@ export const solidReadGate: ApexGate = (ctx: ApexContext) => {
       actions: [`Read ${PLUGINS_DIR}/${ref}SKILL.md`],
     };
   }
-  const read = new Set(ctx.refsRead ?? []);
+  // Only reads still inside the TTL window count — a stale read re-blocks
+  // (parity require-solid-read.py, which re-validates the TTL on EVERY edit,
+  // making the "(expires every …)" wording below actually true).
+  const read = new Set((ctx.refsRead ?? []).filter((p) => refReadFresh(ctx, p, windowMs)));
   // Parity with the 3 other refsRead-consuming gates (skillTriggerGate's
   // `skills/${s}/` substring match, shadcnBaseSkillRead, designSkillRead):
   // reading the ref's PARENT SKILL.md counts as proof of consultation too,

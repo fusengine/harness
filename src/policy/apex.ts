@@ -18,11 +18,22 @@ export interface ApexContext {
   refs?: RefMeta[];
   /** Absolute paths of SOLID refs already read this session. */
   refsRead?: string[];
+  /**
+   * Epoch-ms read timestamp per `refsRead` path (parity track-solid-reads.py
+   * `solid_reads[].timestamp`). PARITY: the TTL applies ONLY to solidReadGate —
+   * Python TTL-izes SOLID reads exclusively (require-solid-read.py); the
+   * skill-trigger/design/shadcn gates stay session-scoped (no TTL). A path in
+   * `refsRead` with no stamp here (tracks recorded before this field existed)
+   * counts as read — backward compat.
+   */
+  refsReadAt?: Record<string, number>;
+  /** Current epoch ms for the SOLID-read TTL check; absent → reads never expire. */
+  now?: number;
   /** Whether the required prior agents (explore + research) ran within the freshness window. */
   agentsFresh?: boolean;
   /** Names of REQUIRED_AGENTS that have NOT run fresh (subset), for a precise freshnessGate message. Absent → generic wording. */
   missingAgents?: string[];
-  /** Freshness window in ms, used only to label the block message with its TTL (e.g. "2min"). */
+  /** Freshness window in ms: labels the block messages' TTL (e.g. "2min") and bounds the SOLID-read TTL in solidReadGate. */
   windowMs?: number;
   /** Whether brainstorming is required for this edit (creation intent on a new file). */
   brainstormRequired?: boolean;

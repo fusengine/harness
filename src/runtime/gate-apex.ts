@@ -41,6 +41,8 @@ export async function apexScopedGate(input: GateInput, track: SessionTrack, wind
     authorizations: track.authorizations,
     refs: input.refs,
     refsRead: track.refsRead,
+    refsReadAt: track.refsReadAt, // SOLID-read TTL stamps (absent → no expiry)
+    now: input.now,
     agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
     missingAgents: REQUIRED_AGENTS.filter((name) => !freshnessFor([name])),
     windowMs: window,

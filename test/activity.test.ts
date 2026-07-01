@@ -36,7 +36,7 @@ test("activityFor: agent spawn via Task subagent_type (bare name)", () => {
 });
 
 test("activityFor: ref read of a .md only", () => {
-  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual([{ kind: "ref", path: "/p/refs/srp.md" }]);
+  expect(activityFor(ev("Read", { file_path: "/p/refs/srp.md" }))).toEqual([{ kind: "ref", path: "/p/refs/srp.md", ts: 1000 }]);
   expect(activityFor(ev("read_file", { path: "/p/a.ts" }))).toEqual([]);
   expect(activityFor(ev("write_to_file", { path: "/p/a.ts" }))).toEqual([]);
 });

@@ -46,9 +46,13 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     return { stdout: securityAdvisory(event.tool, event.filePath ?? "", opts.now), exit: 0 };
   }
 
-  if (opts.scope === "solid" && event.filePath) {
-    const solidDeny = validateSolidGate(event.tool, event.filePath, event.content ?? "");
-    if (solidDeny) return { stdout: solidDeny, exit: 0 };
+  // Solid scope mirrors security above: run ONLY the ported validate-solid
+  // check (deny on violation, else allow) and ALWAYS return — NEVER fall
+  // through to the core APEX/SOLID/file-size gate chain: core-guards owns
+  // it, so falling through would run gate() twice per edit when both
+  // plugins wire PreToolUse Write|Edit (duplicate denies + added latency).
+  if (opts.scope === "solid") {
+    return { stdout: validateSolidGate(event.tool, event.filePath ?? "", event.content ?? ""), exit: 0 };
   }
 
   // PreToolUse Task: inject APEX sub-agent context when .claude/apex/ exists.

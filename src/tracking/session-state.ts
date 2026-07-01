@@ -7,6 +7,15 @@ export type AgentQuality = "sufficient" | "insufficient";
 export interface SessionTrack {
   authorizations: Record<string, AuthEntry>;
   refsRead: string[];
+  /**
+   * Epoch-ms timestamp of each reference read, keyed by `refsRead` path (parity
+   * track-solid-reads.py `solid_reads[].timestamp`). Optional: tracks persisted
+   * before this field existed only carry `refsRead`, and such paths count as
+   * read (backward compat). PARITY: only the SOLID-read gate TTL-checks these —
+   * Python TTL-izes SOLID reads exclusively (require-solid-read.py); the other
+   * refsRead consumers (skill-trigger/shadcn/tailwind/design) stay session-scoped.
+   */
+  refsReadAt?: Record<string, number>;
   agents: { name: string; ts: number; quality?: AgentQuality }[];
   trivialEdits: number[];
   brainstormRequired?: boolean;
@@ -30,9 +39,18 @@ export function recordDoc(track: SessionTrack, framework: string, sessionId: str
   };
 }
 
-/** Record that a SOLID reference file was read (deduped). Immutable. */
-export function recordRefRead(track: SessionTrack, path: string): SessionTrack {
-  return track.refsRead.includes(path) ? track : { ...track, refsRead: [...track.refsRead, path] };
+/**
+ * Record that a SOLID reference file was read (deduped). Immutable. When `now`
+ * (epoch ms — the tool event's own timestamp, never a fresh `Date.now()`) is
+ * supplied, the read is stamped in `refsReadAt`, refreshed on re-reads so the
+ * LATEST read drives the SOLID TTL (parity track-solid-reads.py, which appends
+ * a timestamped entry per read; require-solid-read.py checks the most recent).
+ * Callers that omit `now` keep the legacy untimestamped behavior.
+ */
+export function recordRefRead(track: SessionTrack, path: string, now?: number): SessionTrack {
+  const refsRead = track.refsRead.includes(path) ? track.refsRead : [...track.refsRead, path];
+  if (now === undefined) return refsRead === track.refsRead ? track : { ...track, refsRead };
+  return { ...track, refsRead, refsReadAt: { ...track.refsReadAt, [path]: now } };
 }
 
 /** Record an agent/tool call with a timestamp + optional quality. Immutable. */

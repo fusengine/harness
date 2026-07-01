@@ -5,7 +5,7 @@ import { recordAgent, recordDoc, recordRefRead, type AgentQuality } from "../tra
 export type Activity =
   | { kind: "agent"; name: string; ts: number; quality?: AgentQuality }
   | { kind: "doc"; framework: string; sessionId: string; source: string }
-  | { kind: "ref"; path: string };
+  | { kind: "ref"; path: string; ts?: number };
 
 /** Apply an activity to a session's track and persist it (PostToolUse path). */
 export async function recordActivity(file: string, activity: Activity): Promise<void> {
@@ -15,6 +15,6 @@ export async function recordActivity(file: string, activity: Activity): Promise<
       ? recordAgent(track, activity.name, activity.ts, activity.quality)
       : activity.kind === "doc"
         ? recordDoc(track, activity.framework, activity.sessionId, activity.source)
-        : recordRefRead(track, activity.path);
+        : recordRefRead(track, activity.path, activity.ts);
   await saveTrack(file, next);
 }

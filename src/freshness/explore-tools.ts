@@ -33,8 +33,17 @@ const RESEARCH_TOOLS = new Set([
 /** Bash executables that count as exploration (parity `EXPLORE_BASH_CMDS`). */
 const EXPLORE_BASH_CMDS = new Set(["grep", "rg", "find", "ls", "fd", "ast-grep", "tree", "cat", "head", "tail"]);
 
-/** Cached MCP result reads count as research (parity `CACHE_READ_RE` + doc-helpers). */
+/** Legacy Python cache names still credited (parity `CACHE_READ_RE` + doc-helpers). */
 const CACHE_READ_RE = /\/context\/mcp\/(exa-search|exa-code-context|context7)-/;
+
+/**
+ * Real TS cache stores: `<root>/.harness/cache/<fnv16>.md` (core MCP store,
+ * `projectLayout().cacheDir`) and `~/.fuse-harness/cache/**` (ai-pilot doc
+ * caches, `cache-base.cacheBaseDir`). Segment-matched — not resolved against
+ * `homedir()` — so tilde-prefixed and absolute paths both hit; the `.md`
+ * suffix keeps session-state JSON reads from counting as research.
+ */
+const TS_CACHE_READ_RE = /\.(?:fuse-)?harness[\\/]cache[\\/].*\.md$/;
 
 /**
  * First non-assignment shell token's basename, or "" — mirrors Python
@@ -63,7 +72,7 @@ export function classifyExplore(tool: string, input: Record<string, unknown> | u
   if (EXPLORE_TOOLS.has(tool)) return { phase: "explore-codebase", cacheHit: false };
   if (tool === "Read") {
     const path = String(input?.file_path ?? input?.path ?? "");
-    if (path && CACHE_READ_RE.test(path)) return { phase: "research-expert", cacheHit: true };
+    if (path && (CACHE_READ_RE.test(path) || TS_CACHE_READ_RE.test(path))) return { phase: "research-expert", cacheHit: true };
     return null;
   }
   if (tool === "Bash") {
