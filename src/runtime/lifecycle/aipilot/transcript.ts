@@ -32,8 +32,8 @@ export function projectRootFromPaths(filePaths: string[]): string | null {
   return bestRoot;
 }
 
-/** Extract all absolute file paths from tool_use entries in a JSONL transcript. */
-export async function transcriptFilePaths(transcriptPath: string): Promise<string[]> {
+/** Extract absolute file paths from tool_use entries in a JSONL transcript, optionally restricted to `toolNames` (default: any tool). */
+export async function transcriptFilePaths(transcriptPath: string, toolNames?: readonly string[]): Promise<string[]> {
   const text = readText(transcriptPath);
   const paths = new Set<string>();
   for (const line of text.split("\n").filter(Boolean)) {
@@ -42,6 +42,7 @@ export async function transcriptFilePaths(transcriptPath: string): Promise<strin
       if (!Array.isArray(content)) continue;
       for (const block of content) {
         if (block?.type !== "tool_use") continue;
+        if (toolNames && !toolNames.includes(block.name)) continue;
         const fp = block.input?.file_path ?? block.input?.path ?? "";
         if (typeof fp === "string" && fp.startsWith("/")) paths.add(fp);
       }

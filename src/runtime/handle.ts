@@ -50,7 +50,12 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
-  if (designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) return { stdout: "", exit: 0 };
+  // Claude-Code-only: `agent_type`/`agent_id`/Subagent hooks are Claude's Agent SDK
+  // vocabulary — Codex/Cursor/etc. have no equivalent, so this is gated explicitly
+  // rather than relying on those fields being merely absent from other harnesses.
+  if (id === "claude-code" && designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) {
+    return { stdout: "", exit: 0 };
+  }
 
   // Async per-scope lifecycle (aipilot cache handlers + memory-neural Graphiti).
   const asyncOut = await asyncScopeStdout(opts.scope, rawEventName(payload), payload, opts.cwd, opts.now);

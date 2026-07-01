@@ -7,6 +7,7 @@ import { respond } from "./respond";
 import { designGate } from "./design";
 import { taskContext } from "./inject-context";
 import { securityAdvisory } from "./lifecycle/security/check-skill";
+import { validateSolidGate } from "./lifecycle";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -43,6 +44,11 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // core APEX/SOLID/file-size gate chain (the security plugin never did).
   if (opts.scope === "security") {
     return { stdout: securityAdvisory(event.tool, event.filePath ?? "", opts.now), exit: 0 };
+  }
+
+  if (opts.scope === "solid" && event.filePath) {
+    const solidDeny = validateSolidGate(event.tool, event.filePath, event.content ?? "");
+    if (solidDeny) return { stdout: solidDeny, exit: 0 };
   }
 
   // PreToolUse Task: inject APEX sub-agent context when .claude/apex/ exists.

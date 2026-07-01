@@ -1,58 +1,62 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
+import { hasSafeWriteTarget, isSafeCommandTarget, isSafeWritePath } from "./bash-write-safe-paths";
+import {
+  ASK_WRITERS, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, NODE_WRITES,
+  RUBY_WRITES, SAFE_PREFIXES, SESSION_STATE_FRAGMENT,
+} from "./bash-write-patterns";
 
-/** Redirect (`>`/`>>`) targeting a code-file extension. */
-export const CODE_REDIRECT: RegExp =
-  /(?:>>?)\s*[^\s|;&]*\.(?:ts|tsx|js|jsx|py|go|rb|rs|java|kt|php|swift|vue|svelte|astro|css|c|cpp|h)\b/;
+export { ASK_WRITERS, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, SAFE_PREFIXES, SESSION_STATE_FRAGMENT } from "./bash-write-patterns";
 
-/** Interpreters / tools that mutate source in place, plus heredoc-into-file.
- * `sed`/`perl`/`awk` allow intervening flags before `-i` (parity bash-write-guard.py). */
-export const CODE_MUTATORS: RegExp =
-  /\bpython3?\s+-c\b|\bpython3?\s+-\s*<<|\bsed\b[^|]*\s-i|\bperl\b[^|]*\s-[pi]i?\b|\bawk\b[^|]*-i\s*inplace|\bpatch\b|<<[-~]?\s*['"]?\w+['"]?[\s\S]*?>/;
-
-/** File-mutating one-liners via `node -e` / `ruby -e` (parity NODE_WRITES/RUBY_WRITES). */
-const NODE_WRITES: RegExp =
-  /writeFile|appendFile|createWriteStream|fs\.(?:write|rename|unlink|mkdir|rmdir|copyFile)|execSync|spawnSync|child_process/;
-const RUBY_WRITES: RegExp =
-  /File\.(?:write|open|delete|rename)|IO\.write|FileUtils|\bsystem\b|\bexec\b|`[^`]/;
-
-/** Redirect to a non-code file. Excludes `/dev/null`, `2>`/`N>` and `>&N` fd
- * redirects via the `(?<![0-9&])` lookbehind + `(?!…|&)` (parity has_file_redirect). */
-export const FILE_REDIRECT: RegExp =
-  /(?<![0-9&])\s*>>?\s*(?!\/dev\/null|&)[a-zA-Z./~$]/;
-
-/** Other ambiguous file writers (ASK): `tee <file>` (not `tee -a`/path) and `dd … of=`. */
-export const ASK_WRITERS: RegExp = /\btee\s+[^-/\s]|\bdd\b[^|]*\bof=/;
+function blockCodeWrite(reason: string): Prompt {
+  return { kind: "block", title: "Bash write to code file", reason, actions: ["Use the Write/Edit tool instead"] };
+}
+function askFileWrite(reason: string): Prompt {
+  return { kind: "ask", title: "Bash file write", reason, actions: ["Use the Write/Edit tool instead"] };
+}
 
 /**
  * Blocks shell commands that mutate code files in place (and heredocs/redirects
- * to source files); asks before other file-writing shell commands. Forces use
- * of the Write/Edit tool so APEX/SOLID checks are not bypassed.
+ * to source files); asks before other file-writing shell commands unless the
+ * target is a harness-owned safe path. Forces use of the Write/Edit tool so
+ * APEX/SOLID checks are not bypassed.
  */
 export function bashWriteGuard(ctx: GuardContext): Prompt | null {
   if (ctx.tool !== "Bash" || !ctx.command) return null;
   const cmd: string = ctx.command;
+  const stripped = cmd.trim();
 
-  if (CODE_MUTATORS.test(cmd) || CODE_REDIRECT.test(cmd)) {
+  if (SAFE_PREFIXES.some((p) => stripped.startsWith(p)) && !FILE_REDIRECT.test(stripped)) {
+    return null;
+  }
+
+  if (cmd.includes(SESSION_STATE_FRAGMENT)) {
     return {
       kind: "block",
-      title: "Bash write to code file",
-      reason: "Shell in-place edits / redirects to source files bypass APEX/SOLID checks.",
-      actions: ["Use the Write/Edit tool instead"],
+      title: "Session-state tampering",
+      reason: "Bash access to the harness session-state directory is a hook-bypass vector — the freshness/APEX enforcement reads it to decide block/allow.",
+      actions: ["Never read or write session state from the shell"],
     };
   }
-  if (
-    FILE_REDIRECT.test(cmd) ||
-    ASK_WRITERS.test(cmd) ||
-    (/\bnode\s+-e\b/.test(cmd) && NODE_WRITES.test(cmd)) ||
-    (/\bruby\s+-e\b/.test(cmd) && RUBY_WRITES.test(cmd))
-  ) {
-    return {
-      kind: "ask",
-      title: "Bash file write",
-      reason: "This command writes a file from the shell; confirm it is intended.",
-      actions: ["Use the Write/Edit tool instead"],
-    };
+
+  const mutator = CODE_MUTATORS.find((m) => m.re.test(cmd));
+  if (mutator) return blockCodeWrite(`${mutator.desc} — Use Edit/Write tools instead`);
+
+  if (FILE_REDIRECT.test(cmd)) {
+    if (isSafeWritePath(cmd)) return null;
+    return CODE_REDIRECT.test(cmd)
+      ? blockCodeWrite("Bash redirect to code file — Use Write/Edit tools (enforces APEX + SOLID specs)")
+      : askFileWrite("Shell redirect to file detected. Authorize?");
+  }
+
+  if (/\bnode\s+-e\b/.test(cmd) && NODE_WRITES.test(cmd)) {
+    return hasSafeWriteTarget(cmd) ? null : askFileWrite("Node.js write operation detected. Authorize?");
+  }
+  if (/\bruby\s+-e\b/.test(cmd) && RUBY_WRITES.test(cmd)) return askFileWrite("Ruby write operation detected. Authorize?");
+
+  const asker = ASK_WRITERS.find((a) => a.re.test(cmd));
+  if (asker) {
+    return isSafeCommandTarget(cmd) ? null : askFileWrite(`${asker.desc} detected. Authorize?`);
   }
   return null;
 }

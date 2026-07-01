@@ -1,6 +1,5 @@
-import { isCodeFile } from "../util/project-root";
+import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
-import { detectFramework } from "./detect-framework";
 import { matchPatterns, GIT_BLOCKED, GIT_ASK } from "./patterns";
 import { runGuards } from "./guards";
 import type { PolicyContext, PolicyResult } from "./interfaces/types";
@@ -40,11 +39,17 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
       },
     };
   }
-  if (ctx.filePath && isCodeFile(ctx.filePath) && ctx.agentType !== "Explore" && ctx.agentType !== "Plan") {
+  if (ctx.filePath && isFileSizeScoped(ctx.filePath) && ctx.agentType !== "Explore" && ctx.agentType !== "Plan") {
     const incoming = ctx.content !== undefined ? countLines(ctx.content) : 0;
     // Write provides the full new content → judge it. Edit is partial → judge the on-disk file.
     const lines = ctx.tool === "Edit" ? Math.max(incoming, ctx.existingLines ?? 0) : incoming || (ctx.existingLines ?? 0);
-    const verdict = evaluateFileSize(lines, ctx.maxLines);
+    const framework = resolveSolidRefFramework(ctx.filePath);
+    // Python parity (enforce-file-size.py:44-57): the block message always
+    // reports the pre-existing on-disk count, even for a Write whose new
+    // content is itself over the limit — the incoming count only ever gates
+    // an early "shrunk to compliant" allow, it's never what gets displayed.
+    const displayLines = ctx.tool === "Write" ? ctx.existingLines ?? lines : lines;
+    const verdict = evaluateFileSize(lines, ctx.maxLines, ctx.filePath, framework, displayLines);
     if (lines > 0 && !verdict.ok) {
       return {
         decision: "deny",
@@ -55,7 +60,7 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
           reason: verdict.message ?? "",
           actions: [`Split into modules under ${verdict.max} lines (Single Responsibility)`, "Then re-run the write"],
         },
-        meta: { framework: detectFramework(ctx.filePath, ctx.content ?? ""), lines: verdict.lines, max: verdict.max },
+        meta: { framework, lines: verdict.lines, max: verdict.max },
       };
     }
   }

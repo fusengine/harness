@@ -31,6 +31,27 @@ export function detectRequiredSkills(framework: string, content: string): string
 }
 
 /**
+ * `.tsx`/`.jsx` — the only extensions `check-tailwind-skill.py` actually gates
+ * (its regex also lists `.css`/`.html`, but both hit an early return right
+ * after, in the Python source).
+ */
+const TAILWIND_FILE = /\.(tsx|jsx)$/;
+
+/** Ported verbatim from `check-tailwind-skill.py`'s `TW_PATTERN`. */
+const TAILWIND_CONTENT = /(className|class).*['"].*\b(flex|grid|p-|m-|w-|h-|text-|bg-|border-)/;
+
+/**
+ * True when `filePath`/`content` match the Python Tailwind gate's trigger
+ * condition. React/Next.js components embed Tailwind utility classes in
+ * `className` — this check fires IN ADDITION TO the primary framework gate,
+ * never instead of it: {@link detectFramework} keeps returning "react"/
+ * "nextjs" for these files (framework SOLID rules stay correct).
+ */
+export function usesTailwindUtilities(filePath: string, content: string): boolean {
+  return TAILWIND_FILE.test(filePath) && TAILWIND_CONTENT.test(content);
+}
+
+/**
  * Block when a required sub-skill's `skills/<name>/` path is absent from
  * `refsRead`. Mirrors `specific_skill_consulted`, which confirms a skill was
  * read by checking the tracking file contains `skills/<name>/`.
@@ -40,16 +61,24 @@ export function detectRequiredSkills(framework: string, content: string): string
  * @param forcedSkill - a skill the detected modular architecture forces (optional).
  * @param cwd - project root; when set and not a shadcn project, `*-shadcn`
  *   requirements are skipped (ports the Python `is_shadcn_project` filter).
+ * @param filePath - the file being written; when it's a `.tsx`/`.jsx` file
+ *   with Tailwind utility classes in `className`, the "tailwind" domain
+ *   skills are merged in alongside `framework`'s own (ports the separate
+ *   `check-tailwind-skill.py` gate, independent of react/nextjs).
  * @returns a `block` Prompt naming the missing sub-skills, or `null` when satisfied.
  */
 export function skillTriggerGate(
   framework: string,
   content: string,
-  refsRead: string[],
+  refsRead: readonly string[],
   forcedSkill?: string | null,
   cwd?: string,
+  filePath?: string,
 ): Prompt | null {
   let required = detectRequiredSkills(framework, content);
+  if (framework !== "tailwind" && filePath && usesTailwindUtilities(filePath, content)) {
+    required = [...required, ...detectRequiredSkills("tailwind", content)];
+  }
   if (forcedSkill && !required.includes(forcedSkill)) required.push(forcedSkill);
   if (cwd && !isShadcnProject(cwd)) required = required.filter((s) => !s.endsWith("-shadcn"));
   const missing = required.filter(

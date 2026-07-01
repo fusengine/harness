@@ -6,7 +6,7 @@ import { respond } from "./respond";
 import { designGate } from "./design";
 import { postEditContext } from "./lifecycle-bridge";
 import { postTrackingSideEffects } from "./lifecycle/post-tracking";
-import { aipilotPostToolUse } from "./lifecycle";
+import { aipilotPostToolUse, checkFileSize, validateTailwind } from "./lifecycle";
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
@@ -28,10 +28,18 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
   if (seoDeny) return { stdout: seoDeny, exit: 0 };
-  if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate")) {
+  if (opts.scope === "solid" && event.filePath) {
+    const solidWarn = checkFileSize(event.tool, event.filePath);
+    if (solidWarn) return { stdout: solidWarn, exit: 0 };
+  }
+  if (opts.scope === "tailwindcss" && event.filePath) {
+    const tailwindWarn = validateTailwind(event.tool, event.filePath);
+    if (tailwindWarn) return { stdout: tailwindWarn, exit: 0 };
+  }
+  if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate" || event.tool === "Write" || event.tool === "Edit")) {
     const out = await aipilotPostToolUse(payload, opts.cwd);
     if (out) return { stdout: out, exit: 0 };
   }
-  const extra = postEditContext(opts.scope ?? "core", event, opts.now);
+  const extra = await postEditContext(opts.scope ?? "core", event, opts.now);
   return { stdout: designWarn ? respond(id, designWarn) : extra, exit: 0 };
 }

@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { resolveMaxLines } from "../config/limits";
+import type { ProjectType } from "./detect-project";
+import { getExpertAgent } from "./expert-agents";
 
 /** Dev-verb regex (FR/EN) that triggers the APEX preamble (case-insensitive). */
 export const DEV_VERBS: RegExp =
@@ -15,7 +17,7 @@ export const DEV_VERBS: RegExp =
  * @param cwd - Project root to scan.
  * @returns The detected project type label.
  */
-export function detectClaudeMdProjectType(cwd: string): string {
+export function detectClaudeMdProjectType(cwd: string): ProjectType {
   const pkg = join(cwd, "package.json");
   if (existsSync(pkg)) {
     try {
@@ -42,15 +44,16 @@ export function detectClaudeMdProjectType(cwd: string): string {
  * @param maxLines - SOLID per-file line ceiling.
  * @returns The APEX instruction text.
  */
-export function buildApexInstruction(projectType: string, maxLines: number): string {
+export function buildApexInstruction(projectType: ProjectType, maxLines: number): string {
+  const expertAgent = getExpertAgent(projectType);
   return (
     `INSTRUCTION: This is a development task. Use APEX methodology:\n\n` +
     `**TRACKING FILE**: [project]/.claude/apex/task.json (auto-created on first Write/Edit)\n\n` +
     `1. **ANALYZE** (MANDATORY - 3 AGENTS IN PARALLEL):\n` +
-    `   - explore-codebase + research-expert + ${projectType}-expert (framework expertise)\n` +
+    `   - explore-codebase + research-expert + ${expertAgent} (framework expertise)\n` +
     `   - Project type detected: ${projectType}\n\n` +
     `2. **PLAN**: Use TaskCreate to break down tasks (<${maxLines} lines per file)\n\n` +
-    `3. **EXECUTE**: ${projectType}-expert, follow SOLID principles, split at ${maxLines - 10} lines\n\n` +
+    `3. **EXECUTE**: ${expertAgent}, follow SOLID principles, split at ${maxLines - 10} lines\n\n` +
     `4. **EXAMINE**: Run sniper agent after ANY modification\n\n` +
     `**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.`
   );

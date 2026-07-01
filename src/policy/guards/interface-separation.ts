@@ -23,6 +23,12 @@ export const JAVA_DECL_RE: RegExp = /^\s*(?:public\s+|private\s+|protected\s+|in
  * controller files (Interface Segregation). Fires only when BOTH the path
  * category AND the content pattern match.
  *
+ * Destination text for TS/JS/Vue/Svelte, PHP and Swift matches the user's own
+ * `claude-rules/rules/04-solid-dry-rules.md` ("SOLID Skill per Stack" table),
+ * the current authoritative convention — NOT the older `enforce-interfaces.py`
+ * text, which this guard originally ported. Go/Python/Java/Kotlin aren't
+ * covered by that table, so their destinations stay as a reasonable default.
+ *
  * Parity note: enforce-interfaces.py only inspects `Write` (tool_input.content).
  * We deliberately also fire on `Edit` — an in-place edit can introduce the same
  * violation — and the path fragments accept singular *and* plural directory
@@ -34,19 +40,34 @@ export function interfaceSeparationGuard(ctx: GuardContext): Prompt | null {
   const content: string | undefined = ctx.content;
   if (!path || !content) return null;
 
-  const block: Prompt = {
+  const blockWith = (msg: string, action: string): Prompt => ({
     kind: "block",
     title: "Separate the interface",
-    reason: "Top-level interface/type/protocol declarations belong in their own file, not in a component/view/controller.",
-    actions: ["Move the interface/type to its own file (Interface Segregation)"],
-  };
+    reason: `SOLID VIOLATION: ${msg}`,
+    actions: [action],
+  });
 
   const inAny = (...frags: string[]): boolean => frags.some((f) => path.includes(f));
-  if (/\.(tsx|jsx|vue|svelte)$/.test(path) && TS_DECL_RE.test(content)) return block;
-  if (/\.py$/.test(path) && inAny("view/", "views/", "controller/", "controllers/", "route/", "routes/") && PY_MODEL_RE.test(content)) return block;
-  if (/\.go$/.test(path) && inAny("handler/", "handlers/", "controller/", "controllers/") && GO_DECL_RE.test(content)) return block;
-  if (/\.(java|kt)$/.test(path) && inAny("controller/", "controllers/", "handler/", "handlers/") && JAVA_DECL_RE.test(content)) return block;
-  if (/\.php$/.test(path) && inAny("Controller/", "Controllers/", "Handler/", "Handlers/") && PHP_DECL_RE.test(content)) return block;
-  if (/\.swift$/.test(path) && inAny("View/", "Views/", "Component/", "Components/") && SWIFT_PROTO_RE.test(content)) return block;
+  if (/\.(tsx|jsx|vue|svelte)$/.test(path) && TS_DECL_RE.test(content)) {
+    return blockWith(
+      "Interface/type in component file. Move to modules/[feature]/src/interfaces/",
+      "Move the interface/type to modules/[feature]/src/interfaces/",
+    );
+  }
+  if (/\.py$/.test(path) && inAny("view/", "views/", "controller/", "controllers/", "route/", "routes/") && PY_MODEL_RE.test(content)) {
+    return blockWith("Type class in view file. Move to src/interfaces/", "Move the type class to src/interfaces/");
+  }
+  if (/\.go$/.test(path) && inAny("handler/", "handlers/", "controller/", "controllers/") && GO_DECL_RE.test(content)) {
+    return blockWith("Interface in handler file. Move to internal/interfaces/", "Move the interface to internal/interfaces/");
+  }
+  if (/\.(java|kt)$/.test(path) && inAny("controller/", "controllers/", "handler/", "handlers/") && JAVA_DECL_RE.test(content)) {
+    return blockWith("Interface in controller file. Move to interfaces/ package", "Move the interface to the interfaces/ package");
+  }
+  if (/\.php$/.test(path) && inAny("Controller/", "Controllers/", "Handler/", "Handlers/") && PHP_DECL_RE.test(content)) {
+    return blockWith("Interface in controller file. Move to app/Contracts/", "Move the interface to app/Contracts/");
+  }
+  if (/\.swift$/.test(path) && inAny("View/", "Views/", "Component/", "Components/") && SWIFT_PROTO_RE.test(content)) {
+    return blockWith("Protocol in view file. Move to Sources/Interfaces/", "Move the protocol to Sources/Interfaces/");
+  }
   return null;
 }

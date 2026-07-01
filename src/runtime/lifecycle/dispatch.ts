@@ -13,7 +13,7 @@ import { cartoSessionStart } from "./cartographer/session-start";
 import { dispatchLessons } from "./lessons/dispatch";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
-export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory";
+export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss";
 
 /** Inputs the lifecycle dispatcher needs (clock + roots injected). */
 export interface LifecycleInput {

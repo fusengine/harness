@@ -41,6 +41,29 @@ export function designSystemWriteGate(filePath: string, state: DesignState): Pro
   return null;
 }
 
+/**
+ * Ports browser_helpers.is_exempt: design-system.md is NOT exempt (it must meet
+ * the quota); other `.md` files and vendored dirs ARE exempt from the check.
+ */
+function screenshotExempt(filePath: string): boolean {
+  if (filePath.endsWith("design-system.md")) return false;
+  return filePath.endsWith(".md") || EXEMPT_DIRS.some((d) => filePath.includes(d));
+}
+
+/**
+ * Block ANY non-exempt write (html/css/design-system.md) until the per-mode
+ * screenshot quota is met. Ports check-browser-browsing.py's "Browse N sites
+ * BEFORE writing" deny for the active design agent.
+ */
+export function preScreenshotWriteGate(filePath: string, state: DesignState): Prompt | null {
+  if (screenshotExempt(filePath)) return null;
+  const needed = MIN_SCREENSHOTS[state.mode];
+  if (state.screenshotsCount < needed) {
+    return deny(`BLOCKED: ${state.screenshotsCount}/${needed} fuse-browser screenshots for mode '${state.mode}'. Browse ${needed - state.screenshotsCount} more site(s) BEFORE writing. Read design-inspiration.md, then browser_open + browser_navigate + browser_screenshot.`);
+  }
+  return null;
+}
+
 /** Return the requirements missing from a design-system.md (empty = valid). */
 export function validateDesignSystem(content: string): string[] {
   const missing: string[] = [];

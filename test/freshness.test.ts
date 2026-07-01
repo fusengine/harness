@@ -11,16 +11,16 @@ test("resolveSessions: legacy + new + none", () => {
   expect(resolveSessions({ sessions: ["a", "b"] })).toEqual(["a", "b"]);
 });
 
-test("isDocConsulted: satisfied by ANY single source (OR)", () => {
+test("isDocConsulted: requires BOTH context7 AND exa (parity with mcp_research_done)", () => {
   const sid = "s1";
   expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7", "exa"] } }, sid)).toBe(true);
-  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7"] } }, sid)).toBe(true);
-  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["exa"] } }, sid)).toBe(true);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["context7"] } }, sid)).toBe(false);
+  expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["exa"] } }, sid)).toBe(false);
   expect(isDocConsulted({ react: { doc_sessions: [sid], sources: [] } }, sid)).toBe(false);
   expect(isDocConsulted(undefined, sid)).toBe(false);
 });
 
-test("isDocConsulted: WebSearch/WebFetch count as a doc source", () => {
+test("isDocConsulted: WebSearch/WebFetch alone satisfy the gate (TS-side fast-path addition)", () => {
   const sid = "s1";
   expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["WebSearch"] } }, sid)).toBe(true);
   expect(isDocConsulted({ react: { doc_sessions: [sid], sources: ["WebFetch"] } }, sid)).toBe(true);

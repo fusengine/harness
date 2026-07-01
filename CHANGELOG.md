@@ -2,6 +2,58 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.44] - 2026-07-01
+
+### Added
+
+- `harness scan [dir]`: OWASP security scanner (18 patterns JS/PHP/Python/Swift), ports `security-scan.py`.
+- shadcn/ui skill gate: 5 sub-skills (`shadcn-detection/components/theming/registries/migration`) + standalone gate for `components|ui|shadcn|components.json`-scoped writes, independent of the detected framework — ports `shadcn-expert`'s `check-skill-loaded.py` (previously entirely unported).
+- `detectPrimitiveLib()`: weighted Radix UI vs Base UI detection (package.json/components.json/imports/data-attrs), ports `detect-primitive-lib.py`.
+- `checkFileSize()`: adaptive SOLID file-size warning keyed off the detected project type (`SOLID_FILE_LIMIT`), ports `solid/check-file-size.py` — the limit was computed but never read.
+- `checkSolidCompliance()` / `checkSolidFromTranscript()`: ai-pilot PostToolUse/SubagentStop SOLID + interface-location checks, ports `check-solid-compliance.py` / `check-solid-from-transcript.py`.
+- `autoDocumentRead()`: auto-generates `.claude/apex/docs/task-<n>-<framework>.md` on a SKILL.md/README/docs Read, ports `auto-document-reads.py`.
+- `doc-cache-gate`: PreToolUse deny for a redundant Context7/Exa query when the doc is already cached fresh (<7d).
+- `SAFE_PREFIXES` + a harness-owned-path allowlist (`~/.fuse-harness/cache`, `~/.claude/logs`) in the bash-write guard, ports `bash-write-guard.py`'s fast-path + `safe_paths.py`.
+- Tailwind utility-class detection on `.tsx`/`.jsx` (in addition to the react/nextjs framework gate, not instead of it) — the previous port only matched `.css`, the inverse of the real use case.
+- `countFrameworkCodeLines()`: comment/blank-excluding line counter for the react/nextjs/laravel/swift SOLID gates, ports `validate_solid_common.py::count_code_lines`.
+- `validate-solid.ts`: Go interface-location and Python ABC checks (PostToolUse, scope `solid`), ports `validate-solid.py`'s `check_go`/`check_python` (`check_nextjs`/`check_laravel`/`check_swift` deliberately not ported — already covered by `framework-solid-gates.ts`).
+- `validate-tailwind.ts`: deprecated `@tailwind` directive / excessive `@apply` / overlong `className` warnings (PostToolUse, new scope `tailwindcss`), ports `validate-tailwind.py`.
+- `hasTailwindDependency()`: `tailwindcss` package.json dependency fallback for Tailwind v4 CSS-first projects with no config file, ports `is_tailwind_project`.
+- `test/parity-freshness.test.ts`/`test/bash-write.test.ts`: non-regression tests for the `agentsRanFromTranscript` direct-tool-use branch and the `bash-write-safe-paths.ts` hardening.
+
+### Fixed
+
+- **Doc-consultation gate regression**: `isDocConsulted` required only ONE of context7/exa/web (OR); the Python source (`mcp_research_done`) requires BOTH context7 AND exa. Restored to `(context7 AND exa) OR a web fallback alone` — found independently by 3 separate audit teams. The web-alone fallback (WebSearch/WebFetch/fuse-browser) is a deliberate TS addition, not a Python behavior.
+- Design-agent lifecycle: `SubagentStop` was gated by the same `agentType.includes("design")` filter as `SubagentStart`, so a Stop event with a missing/different `agent_type` never cleared the `design-agent-active` flag — a stale flag then routed every subsequent top-level Write/Edit through the design-only `htmlCssOnlyGate`. Fixed by clearing the flag purely on `agent_id` match, and by never falling back to the stale flag for a call with no `agent_id`.
+- `brainstormGate` no longer requires brainstorming before an `Edit` (parity `require-apex-agents.py`: only `Write` creates new files).
+- `bin.ts` no longer imports a non-existent module (a batch-apply ordering issue during this session, caught before it reached a released version).
+- SOLID line-counting divergence: the react/nextjs/laravel/swift gates counted raw physical lines instead of excluding blank/comment lines like the Python source — could block a comment-heavy file under the 100-line limit that the source would have allowed. The generic core-guards ceiling (`evaluate.ts`, parity `enforce-file-size.py`) intentionally keeps the raw count — it is a different Python rule.
+- `bash-write-safe-paths.ts`: 3 hardenings — `isSafeWritePath`/`isSafeCommandTarget` now require a segment boundary (`target === safe || target.startsWith(safe + "/")`, was an unanchored `startsWith` a sibling directory like `~/.claude/logs2-x/` could match); `resolvePath` now only expands `~` alone or a `~/` prefix per POSIX tilde-prefix semantics (was over-expanding `~user`/`~2xyz`/`~+`); `hasSafeWriteTarget` now requires the safe path to appear as a quoted string literal or quoted sub-path (was an unanchored substring match a `node -e` call could satisfy via an inert comment).
+- `agentsRanFromTranscript`: now also credits a direct exploration/research `tool_use` (Glob/Grep, an explore Bash command, mcp__context7/mcp__exa, WebSearch/WebFetch) issued by any sub-agent within the same transcript, not just a nested `Task`/`Agent` invocation — parity `track-subagent-research.py`, which classifies any sub-agent's direct tool call into shared session state unfiltered by author. Reuses the existing `classifyExplore` classifier (previously only wired into the self-recorded track fallback).
+- Trivial-edit fast path (skips the APEX gates for a few tiny edits) no longer applies to `Write` — parity `enforce-apex-phases.ts`, which reserves it for `Edit` only (a `Write` always creates/replaces a file wholesale).
+- `doc-cache-gate.ts`'s Context7 branch required a non-existent `topic` input field (the real `mcp__context7__query-docs` schema is `{libraryId, query}` — confirmed against the primary upstash/context7 source and this harness's own `cache-doc.ts`/`mcp-key.ts`, both of which already key on `query`), making the redundant-doc-call gate a no-op for every real call. Fixed to check `query`.
+- `dryGate`: a single pre-existing duplicate symbol now returns a non-blocking `inform` (parity `detect_duplication.py`'s `allow_pass` for exactly 1 match) instead of being silently swallowed like 0 matches — only 2+ still `block`.
+- `effectiveLines` (framework SOLID size check on an `Edit`): the on-disk full-file line-count max was applied uniformly to react/nextjs/laravel/swift; only `validate-nextjs-solid.py` imports `get_full_file_content` in the Python source, so react/laravel/swift now judge the edited snippet alone, matching their real (less strict) Python behavior.
+- `freshnessGate`'s deny message lost the Python `AGENT_TTL_LABEL` (e.g. "2min TTL") during the initial port — restored via the existing `ttlLabel`/`DEFAULT_TTL_SEC` helpers, no new formatting logic.
+- `DOC_CACHE_TTL_SECONDS` (doc cache freshness, 7d): `inject-doc.ts` and `doc-cache-gate.ts` each defined their own local `TTL_SECONDS` for the same cache — extracted into a single export in `cache-base.ts`, imported by both, to remove the silent-drift risk that caused the `DEFAULT_TTL_SEC`/`DEFAULT_WINDOW_MS` regression above.
+- `solidReadGate`'s deny message lost the Python `formatRoutedDeny`'s TTL label, optional refs, and "Full skill:" pointer during the initial port — all 3 restored. Note: `routed.skillPath` is currently always empty in production (`solidReadGate` never threads a resolved skill dir through `ApexContext`) — tracked as a follow-up, not fixed here.
+- `evaluateFileSize`'s deny message was reduced to "File has N lines (max: M)." — the Python `enforce-file-size.py` includes the filename, a framework-resolved SOLID reference path, and a 3-step split plan. Restored via new optional `filePath`/`framework` params (backward-compatible defaults).
+- `respond.ts`: an `inform` prompt (e.g. `dryGate`'s single-duplicate note) collapsed into a blocking interactive `ask`/`permission:"ask"` in the real production hook pipeline (`gate()` → `handle-pre.ts` → `respond()`), because `respond()` only distinguished `block` from everything else — a prior sniper pass had validated the 3-kind behavior against `toClaudeResponse` (used only by the separate `guard()`/CLI path), not the function actually on the hook path. `respond()` now honors all 3 `PromptKind`s for every harness.
+- `security.ts`: deny/ask messages listed 4-7 possible causes in parentheses instead of naming which one actually matched — each `CRITICAL_PATTERNS`/`ASK_PATTERNS` entry now carries its own label (parity `security_rules.py`'s cumulated violation names).
+- `interface-separation.ts`: the destination text for TS/JS/Vue/Svelte, PHP and Swift now matches the current `claude-rules/rules/04-solid-dry-rules.md` ("SOLID Skill per Stack" table) — `modules/[feature]/src/interfaces/`, `app/Contracts/`, `Sources/Interfaces/` — instead of the older `enforce-interfaces.py` wording; Go/Python/Java/Kotlin aren't covered by that table and keep a reasonable default.
+- `bash-write.ts`: the 7 in-place-edit patterns and 2 ask-writer patterns were collapsed into 2 shared generic messages, never naming which motif (heredoc/sed/perl/awk/patch/tee/dd) matched — each now carries its own `desc`, split into `bash-write-patterns.ts` to stay under the SOLID file-size limit.
+- SOLID file-size framework resolution (`evaluate.ts`) used the same `detectFramework()` as the unrelated `require-solid-read` gate (filename/content heuristics), diverging from `enforce-file-size.py::get_solid_ref()` (a same-directory `next.config.*` check) — misresolved nested Next.js App Router files and `.vue`/`.svelte` files. New `resolveSolidRefFramework()` matches the Python algorithm exactly.
+- SOLID file-size scope (`evaluate.ts`) included `.css` via the broader `isCodeFile()`, contradicting the same decision already applied to `isApexScoped`; new `isFileSizeScoped()` excludes it, matching `enforce-file-size.py`'s `CODE_EXT`.
+- SOLID file-size deny message on a `Write` showed the *incoming* (new) line count instead of the pre-existing on-disk count when both are over the limit — `enforce-file-size.py` always displays the pre-edit count.
+- `solidReadGate` silently allowed when SOLID references were loaded but none scored for the edited file; `require-solid-read.py` still denies in that case, pointing at the framework's `SKILL.md`. Now blocks (the "no refs installed at all" case correctly stays allow, per `discoverRefs()`'s documented contract).
+- `freshnessGate` always named both `explore-codebase` and `research-expert` as missing, even when only one actually was; now names the precise missing agent(s) via a new `ApexContext.missingAgents` field.
+- `claude-md-context.ts::buildApexInstruction` templated the 3rd ANALYZE agent as `${projectType}-expert` (e.g. `generic-expert`, `laravel-expert` — neither is a real installed agent id). Replaced with `expert-agents.ts::getExpertAgent()`, which resolves the real `<plugin>:<agent>` id by scanning installed marketplace plugins (falls back to `general-purpose` when none match) — never a hardcoded table that can drift from what's actually installed.
+- `lifecycle-bridge.ts::postEditContext`: `trackSessionChanges || postEditTypescript` always short-circuited on the first (unconditionally truthy for any `.ts`/`.tsx` edit), making the eslint/prettier check unreachable dead code; both now run and their `additionalContext` is merged.
+
+### Changed
+
+- Design pipeline (`SubagentStart`/`SubagentStop`/`agent_id`-gated `designLifecycle`) is now explicitly scoped to `detectHarness().id === "claude-code"` rather than relying on those fields being merely absent on other harnesses.
+
 ## [0.1.43] - 2026-07-01
 
 ### Fixed

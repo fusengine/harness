@@ -10,6 +10,9 @@ import { homedir } from "node:os";
 import { fusengineCache } from "../../home-state";
 import { readText } from "../../../util/runtime-io";
 
+/** Doc cache freshness window, in seconds (7 days) — shared by inject-doc.ts (serves the cache) and doc-cache-gate.ts (denies a redundant re-query). */
+export const DOC_CACHE_TTL_SECONDS = 604_800;
+
 /** 16-char hex SHA-256 of `text` (project hash / doc topic key). */
 export function hashText16(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);

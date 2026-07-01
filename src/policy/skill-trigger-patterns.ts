@@ -11,12 +11,14 @@ import { REACT_TRIGGERS } from "./skill-patterns/react";
 import { NEXTJS_TRIGGERS } from "./skill-patterns/nextjs";
 import { LARAVEL_TRIGGERS } from "./skill-patterns/laravel";
 import { SWIFT_TRIGGERS } from "./skill-patterns/swift";
+import { TAILWIND_TRIGGERS } from "./skill-patterns/tailwind";
+import { SHADCN_TRIGGERS } from "./skill-patterns/shadcn-subskills";
 
 /**
  * Frameworks whose Python source omits `re.IGNORECASE`, so their regexes must
  * be compiled WITHOUT the `i` flag to stay faithful.
  */
-export const CASE_SENSITIVE_FRAMEWORKS: ReadonlySet<string> = new Set(["swift"]);
+export const CASE_SENSITIVE_FRAMEWORKS: ReadonlySet<string> = new Set(["swift", "tailwind"]);
 
 /** Map of required sub-skill name → triggering code patterns, keyed by framework. */
 export const SKILL_TRIGGERS: Readonly<
@@ -26,4 +28,6 @@ export const SKILL_TRIGGERS: Readonly<
   nextjs: NEXTJS_TRIGGERS,
   laravel: LARAVEL_TRIGGERS,
   swift: SWIFT_TRIGGERS,
+  tailwind: TAILWIND_TRIGGERS,
+  shadcn: SHADCN_TRIGGERS,
 };

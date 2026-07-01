@@ -1,5 +1,4 @@
 import { formatDocDeny, isDocConsulted, type AuthEntry } from "../freshness/doc-helpers";
-import { routeReferences } from "../refs/router";
 import type { RefMeta } from "../refs/types";
 import type { Prompt } from "../prompt/types";
 
@@ -21,6 +20,10 @@ export interface ApexContext {
   refsRead?: string[];
   /** Whether the required prior agents (explore + research) ran within the freshness window. */
   agentsFresh?: boolean;
+  /** Names of REQUIRED_AGENTS that have NOT run fresh (subset), for a precise freshnessGate message. Absent → generic wording. */
+  missingAgents?: string[];
+  /** Freshness window in ms, used only to label the block message with its TTL (e.g. "2min"). */
+  windowMs?: number;
   /** Whether brainstorming is required for this edit (creation intent on a new file). */
   brainstormRequired?: boolean;
   /** Whether the brainstorming agent ran within the window. */
@@ -30,7 +33,7 @@ export interface ApexContext {
 /** A single APEX gate: returns a blocking {@link Prompt}, or null to pass. */
 export type ApexGate = (ctx: ApexContext) => Prompt | null;
 
-/** Gate: any one documentation source (Context7, Exa, or web) must have been consulted this session. */
+/** Gate: BOTH Context7 AND Exa (or a web fallback alone) must have been consulted this session. */
 export const docConsultedGate: ApexGate = (ctx) =>
   isDocConsulted(ctx.authorizations, ctx.sessionId)
     ? null
@@ -38,35 +41,8 @@ export const docConsultedGate: ApexGate = (ctx) =>
         kind: "block",
         title: "APEX: documentation not consulted",
         reason: formatDocDeny(ctx.framework),
-        actions: ["Use ANY ONE of: mcp__context7__query-docs, mcp__exa__web_search_exa, WebSearch, or WebFetch"],
+        actions: ["Use BOTH mcp__context7__query-docs AND mcp__exa__web_search_exa, or a web fallback alone (WebSearch/WebFetch)"],
       };
-
-/** Gate: the routed SOLID references for this edit must have been read. */
-export const solidReadGate: ApexGate = (ctx) => {
-  if (!ctx.refs?.length) return null;
-  const routed = routeReferences(ctx.refs, ctx.filePath, ctx.content);
-  if (!routed) return null;
-  const read = new Set(ctx.refsRead ?? []);
-  const missing = routed.required.map((r) => r.meta.filePath).filter((p) => !read.has(p));
-  if (missing.length === 0) return null;
-  return {
-    kind: "block",
-    title: `APEX: read SOLID references for ${ctx.framework}`,
-    reason: `Read these before editing ${ctx.filePath}:`,
-    actions: missing,
-  };
-};
-
-/** Gate: the required prior agents (explore + research) must have run within the window. */
-export const freshnessGate: ApexGate = (ctx) =>
-  ctx.agentsFresh === false
-    ? {
-        kind: "block",
-        title: "APEX: explore + research required",
-        reason: `Run explore-codebase and research-expert (within the freshness window) before editing ${ctx.framework}.`,
-        actions: ["Launch the explore-codebase agent", "Launch the research-expert agent"],
-      }
-    : null;
 
 /** Gate: brainstorming must precede creating new files when flagged. */
 export const brainstormGate: ApexGate = (ctx) =>
@@ -78,6 +54,11 @@ export const brainstormGate: ApexGate = (ctx) =>
         actions: ["Launch the brainstorming agent"],
       }
     : null;
+
+// solidReadGate/freshnessGate live in ./apex-gates (kept out of this file for
+// the SOLID file-size ceiling — they import ApexContext/ApexGate from here).
+export { solidReadGate, freshnessGate } from "./apex-gates";
+import { solidReadGate, freshnessGate } from "./apex-gates";
 
 /** Default APEX gate chain (brainstorm, freshness, docs, SOLID refs). */
 export const APEX_GATES: ReadonlyArray<ApexGate> = [brainstormGate, freshnessGate, docConsultedGate, solidReadGate];

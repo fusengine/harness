@@ -1,5 +1,5 @@
 import { resolveMaxLines } from "../config/limits";
-import { countLines } from "./file-size";
+import { countFrameworkCodeLines } from "./file-size";
 
 /** Custom hook export (React): `export function/const use[A-Z]`. */
 const HOOK_RE: RegExp = /^export (function|const) use[A-Z]/m;
@@ -18,7 +18,7 @@ const SWIFT_TYPE_RE: RegExp = /^(class|struct) [^\n{]* \{/m;
 export function reactGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
   const max = resolveMaxLines();
-  const lines = fileLines ?? countLines(content);
+  const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split to hooks/, components/, or utils/.`);
   if (filePath.includes("/components/") && TS_DECL_RE.test(content))
     v.push("Interface/type in component. Move to src/interfaces/ or src/types/.");
@@ -31,7 +31,7 @@ export function reactGate(filePath: string, content: string, fileLines?: number)
 export function nextGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
   const max = /(page|layout|loading|error|not-found)\.(tsx|ts)$/.test(filePath) ? 150 : 100;
-  const lines = fileLines ?? countLines(content);
+  const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split to lib/, hooks/, or components/.`);
   if (/\/(app|components|modules)\//.test(filePath) && !filePath.includes("/interfaces/") && TS_DECL_RE.test(content))
     v.push("Interface/type in component. Move to modules/[feature]/src/interfaces/.");
@@ -46,7 +46,7 @@ export function nextGate(filePath: string, content: string, fileLines?: number):
 /** Laravel/PHP: line limit, interface outside `/Contracts/`, fat controller (>80). */
 export function laravelGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
-  const lines = fileLines ?? countLines(content);
+  const lines = fileLines ?? countFrameworkCodeLines(content);
   const max = resolveMaxLines();
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split using Services, Actions, or Traits.`);
   if (PHP_INTERFACE_RE.test(content) && !filePath.includes("/Contracts/"))
@@ -60,7 +60,7 @@ export function laravelGate(filePath: string, content: string, fileLines?: numbe
 export function swiftGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
   const max = /(View|Screen)\.swift$/.test(filePath) ? 150 : 100;
-  const lines = fileLines ?? countLines(content);
+  const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Extract to ViewModels, Services, or subviews.`);
   if (SWIFT_PROTOCOL_RE.test(content) && !filePath.includes("/Protocols/"))
     v.push("Protocol defined outside Protocols/ directory.");

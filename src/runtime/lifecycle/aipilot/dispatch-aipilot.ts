@@ -12,6 +12,9 @@ import { cacheSniperLessons } from "./cache-lessons";
 import { cacheTestResults } from "./cache-test";
 import { cacheAnalyticsSave } from "./analytics";
 import { syncTaskTracking } from "./sync-task";
+import { docCacheGate } from "./doc-cache-gate";
+import { checkSolidCompliance } from "./solid-compliance";
+import { checkSolidFromTranscript } from "./solid-transcript";
 import { contextResponse } from "../../../adapters/claude";
 
 /** The agent_type a SubagentStart/Stop payload reports. */
@@ -66,16 +69,16 @@ async function onSubagentStart(payload: Record<string, unknown>, cwd: string, no
   return combineContext(apex, lessons, typeSpecific);
 }
 
-/** SubagentStop routing: transcript-driven cache writers (side-effects). */
+/** SubagentStop routing: transcript-driven cache writers, then the universal SOLID check. */
 async function onSubagentStop(payload: Record<string, unknown>, cwd: string): Promise<string> {
   const agent = agentTypeOf(payload);
   const transcript = transcriptOf(payload);
-  if (agent.includes("research-expert")) { await cacheDocFromTranscript(transcript, cwd); return ""; }
+  if (agent.includes("research-expert")) await cacheDocFromTranscript(transcript, cwd);
   if (agent.includes("sniper")) {
     await cacheSniperLessons(transcript, cwd);
     await cacheTestResults(transcript, cwd);
   }
-  return "";
+  return checkSolidFromTranscript(transcript);
 }
 
 /**
@@ -86,10 +89,11 @@ export async function dispatchAipilot(event: string, payload: Record<string, unk
   if (event === "SubagentStart") return onSubagentStart(payload, cwd, now);
   if (event === "SubagentStop") return onSubagentStop(payload, cwd);
   if (event === "SessionEnd") { await cacheAnalyticsSave(undefined, now); return ""; }
+  if (event === "PreToolUse") return docCacheGate(payload, cwd, now);
   return null;
 }
 
-/** PostToolUse (TaskCreate/TaskUpdate) sync for the ai-pilot scope. */
+/** PostToolUse (Write/Edit SOLID check, else TaskCreate/TaskUpdate sync) for the ai-pilot scope. */
 export async function aipilotPostToolUse(payload: Record<string, unknown>, cwd: string): Promise<string> {
-  return syncTaskTracking(payload, cwd);
+  return checkSolidCompliance(payload) || (await syncTaskTracking(payload, cwd));
 }

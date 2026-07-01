@@ -5,6 +5,7 @@
  * which the Claude Code platform controls, unlike the self-recorded track.
  */
 import { readText } from "../util/runtime-io";
+import { classifyExplore } from "./explore-tools";
 
 /** Raw shape of one JSONL line in a Claude Code transcript. */
 interface TranscriptLine {
@@ -16,14 +17,10 @@ interface TranscriptLine {
 /** A tool_use content block inside a transcript message. */
 interface ToolUseBlock {
   type: string;
-  /** Tool name, e.g. "Task", "Read", "Edit". */
+  /** Tool name, e.g. "Task", "Read", "Edit", "Glob", "Grep", "mcp__context7__query-docs". */
   name?: string;
-  input?: {
-    /** Primary agent-identity field in Task invocations. */
-    subagent_type?: string;
-    /** Alternate field name seen in some Claude transcript variants. */
-    name?: string;
-  };
+  /** Raw tool input — shape varies per tool; narrowed at each call-site. */
+  input?: Record<string, unknown>;
 }
 
 /** Parse a raw `timestamp` field to epoch ms; `undefined` when absent or invalid. */
@@ -36,9 +33,13 @@ function parseTs(raw: string | number | undefined): number | undefined {
 
 /**
  * Return `true` ONLY when, for EVERY name in `names`, the Claude Code
- * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task` or
- * `Agent` tool whose `subagent_type` (or `name`) input field matches — after
- * stripping any plugin prefix — with the entry timestamp within `windowMs` of `now`.
+ * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task`/
+ * `Agent` tool whose `subagent_type` (or `name`) matches — after stripping any
+ * plugin prefix — OR a direct exploration/research tool_use (Glob/Grep, an
+ * explore Bash command, mcp__context7/mcp__exa, WebSearch/WebFetch) classified
+ * via {@link classifyExplore} into that name, issued by ANY sub-agent or the
+ * lead within this same transcript — with the entry timestamp within
+ * `windowMs` of `now`.
  *
  * **Timestamp note:** when a transcript entry carries no `timestamp` field it
  * is counted as within-window (we cannot prove staleness). This is
@@ -81,14 +82,23 @@ export function agentsRanFromTranscript(
     const content = entry.message?.content;
     if (!Array.isArray(content)) continue;
     for (const block of content as ToolUseBlock[]) {
-      if (block?.type !== "tool_use" || (block.name !== "Task" && block.name !== "Agent")) continue;
-      const raw = block.input?.subagent_type ?? block.input?.name;
-      // Strip any plugin prefix (`fuse-ai-pilot:research-expert` → `research-expert`)
-      // before matching the bare REQUIRED_AGENTS names.
-      const agent = typeof raw === "string" ? raw.split(":").pop() ?? raw : undefined;
-      if (agent !== undefined && (names as string[]).includes(agent)) {
-        found.add(agent);
+      if (block?.type !== "tool_use") continue;
+      if (block.name === "Task" || block.name === "Agent") {
+        const raw = block.input?.subagent_type ?? block.input?.name;
+        // Strip any plugin prefix (`fuse-ai-pilot:research-expert` → `research-expert`)
+        // before matching the bare REQUIRED_AGENTS names.
+        const agent = typeof raw === "string" ? raw.split(":").pop() ?? raw : undefined;
+        if (agent !== undefined && (names as string[]).includes(agent)) found.add(agent);
+        continue;
       }
+      // Direct exploration/research tool_use — credited to the matching phase
+      // regardless of which sub-agent (or the lead) issued it: the transcript
+      // carries no author field distinguishing sidechains, so — mirroring the
+      // pre-existing self-recorded-track behavior in `runtime/activity.ts` —
+      // ANY Glob/Grep/mcp__context7/mcp__exa/WebSearch/WebFetch/explore-Bash
+      // tool_use in this session's transcript counts as freshness evidence.
+      const hit = classifyExplore(block.name ?? "", block.input);
+      if (hit && (names as string[]).includes(hit.phase)) found.add(hit.phase);
     }
     if (found.size === names.length) return true;
   }
