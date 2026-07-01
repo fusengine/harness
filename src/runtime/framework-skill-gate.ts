@@ -2,8 +2,24 @@ import { frameworkSolidGate } from "../policy/framework-solid";
 import { skillTriggerGate } from "../policy/skill-triggers";
 import { requiredArchSkill } from "../policy/detect-project";
 import { countFrameworkCodeLines } from "../policy/file-size";
+import { isExcludedJsPath, isExcludedSwiftPath } from "../policy/framework-solid-exclude";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
+
+/** PHP paths the Laravel skill check skips — broader than the SOLID vendor-only exclude (parity check-laravel-skill.py `/(vendor|storage|bootstrap/cache)/`). */
+const PHP_SKILL_EXCLUDE_RE: RegExp = /\/(vendor|storage|bootstrap\/cache)\//;
+
+/**
+ * Whether the sub-skill gate should skip this path — parity with the early return
+ * in check-*-skill.py (build/vendor artifacts never require a sub-skill).
+ * @param framework - the detected framework ("laravel" | "swift" | JS otherwise).
+ * @param filePath - the file being written.
+ */
+function skillGateExcluded(framework: string, filePath: string): boolean {
+  if (framework === "laravel") return PHP_SKILL_EXCLUDE_RE.test(filePath);
+  if (framework === "swift") return isExcludedSwiftPath(filePath);
+  return isExcludedJsPath(filePath);
+}
 
 /**
  * Effective line count for the SOLID size check. On an Edit, `content` is only
@@ -54,6 +70,10 @@ export function frameworkSkillGate(
   const content = input.content ?? "";
   const solid = frameworkSolidGate(input.filePath, content, effectiveLines(input.tool, input.framework, content, existingCodeLines));
   if (solid) return solid;
+  // Skill-gate path exclusions (parity check-*-skill.py early return): a build/
+  // vendor artifact never triggers the sub-skill requirement. Applied only to the
+  // skill check, not frameworkSolidGate (whose PHP exclude is vendor-only).
+  if (skillGateExcluded(input.framework, input.filePath)) return null;
   const forced = input.cwd ? requiredArchSkill(input.cwd) : null;
   return skillTriggerGate(input.framework, content, refsRead, forced, input.cwd, input.filePath);
 }

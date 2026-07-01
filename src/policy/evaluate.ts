@@ -1,6 +1,6 @@
 import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
-import { matchPatterns, GIT_BLOCKED, GIT_ASK } from "./patterns";
+import { matchPatterns, GIT_BLOCKED, GIT_ASK, RALPH_SAFE, isRalphMode } from "./patterns";
 import { runGuards } from "./guards";
 import type { PolicyContext, PolicyResult } from "./interfaces/types";
 
@@ -14,7 +14,12 @@ export type { PolicyContext, PolicyResult } from "./interfaces/types";
 export function evaluate(ctx: PolicyContext): PolicyResult {
   const guard = runGuards(ctx);
   if (guard) return { decision: "deny", message: guard.reason, prompt: guard };
-  if (ctx.command && matchPatterns(ctx.command, GIT_BLOCKED)) {
+  // Ralph mode (opt-in via RALPH_MODE) exempts the SAFE git commands from the git
+  // block/ask gates for autonomous runs — parity git-guard.py:48-51. Destructive
+  // commands are NOT in RALPH_SAFE, so force-push / reset --hard stay blocked.
+  const cmd = ctx.command;
+  const ralphSafe = !!cmd && isRalphMode() && RALPH_SAFE.some((s) => cmd.startsWith(s));
+  if (!ralphSafe && ctx.command && matchPatterns(ctx.command, GIT_BLOCKED)) {
     const reason = `Destructive git command: ${ctx.command}`;
     return {
       decision: "deny",
@@ -27,7 +32,7 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
       },
     };
   }
-  if (ctx.command && matchPatterns(ctx.command, GIT_ASK)) {
+  if (!ralphSafe && ctx.command && matchPatterns(ctx.command, GIT_ASK)) {
     return {
       decision: "deny",
       message: `Git operation requires confirmation: ${ctx.command}`,

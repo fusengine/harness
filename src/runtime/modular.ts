@@ -40,11 +40,21 @@ function nextModular(filePath: string, content: string, cwd: string): Prompt | n
 
 /** Laravel FuseCore architecture: `app/` domain ban + module.json + cross-module `use` rules. */
 function fusecore(filePath: string, content: string, cwd: string): Prompt | null {
-  for (const b of PHP_BLOCKED_IN_APP) if (filePath.includes(b)) return block(`BLOCKED: FuseCore — domain code in '${b}' must move to FuseCore/{Module}/App/.`);
+  for (const b of PHP_BLOCKED_IN_APP) {
+    if (filePath.includes(b)) {
+      // Parity validate-fusecore.py:52-55 — name the precise target sub-path per
+      // entry (blocked.replace("/app/","/FuseCore/{Module}/App/")), not a generic dir.
+      const from = b.replace(/^\/|\/$/g, "");
+      const to = b.replaceAll("/app/", "/FuseCore/{Module}/App/").replace(/^\/|\/$/g, "");
+      return block(`BLOCKED: FuseCore project. Code in '${from}' FORBIDDEN. Move to '${to}'.`);
+    }
+  }
   const mod = filePath.match(/\/FuseCore\/([A-Za-z]+)\//);
   if (!mod) return null;
   const name = mod[1] ?? "";
-  if (!existsSync(join(cwd, "FuseCore", name, "module.json"))) return block(`BLOCKED: FuseCore module '${name}' is missing module.json — create it first.`);
+  const mj = join(cwd, "FuseCore", name, "module.json");
+  // Parity validate-fusecore.py: name the full path to create ("Create {mj} first.").
+  if (!existsSync(mj)) return block(`BLOCKED: Module '${name}' missing module.json. Create ${mj} first.`);
   for (const m of content.matchAll(/use\s+FuseCore\\(\w+)\\/g)) {
     const imported = m[1] ?? "";
     if (name === "Core") {

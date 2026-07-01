@@ -116,6 +116,8 @@ Ten portable guards + the APEX gate chain, all evaluated before a tool runs:
 | APEX freshness | `explore-codebase` + `research-expert` not run within the window |
 | APEX doc-consulted | no doc source (Context7 / Exa / fuse-browser / WebSearch / WebFetch) consulted this session |
 | APEX solid-read | required SOLID refs (auto-discovered, or `FUSE_HARNESS_REFS`) not read |
+| framework sub-skill | framework / shadcn / Tailwind code whose required skill (`skills/<name>/`) wasn't read this session |
+| Gemini MCP (opt-in) | hand-written Tailwind UI without a `mcp__gemini-design__*` call — only when `FUSE_ENFORCE_GEMINI_MCP` is set |
 | brainstorm | creating a new file without brainstorming (when flagged) |
 | MCP verbosity / cache | caps exa `numResults`; serves a fresh cached MCP/WebFetch result |
 
@@ -131,6 +133,8 @@ through per window without the full APEX gates.
 | `FUSE_HARNESS_MARKETPLACES` | Comma-list of marketplace names whose `solid-*` skill refs are auto-discovered when `FUSE_HARNESS_REFS` is unset (default `fusengine-plugins`; an absent marketplace contributes nothing). Standalone `.claude`/`.codex`/`.cursor`/`.agents` skills are always scanned. |
 | `FUSE_ENFORCE_TTL_SEC` | APEX freshness window in seconds. |
 | `FUSE_LESSONS_THROTTLE_MIN` | Lessons-injection throttle (memory module). |
+| `FUSE_ENFORCE_GEMINI_MCP` | **Opt-in (default off).** `1`/`true` blocks hand-written Tailwind UI (`.tsx/.jsx/.vue/.svelte`, ≥3 utility classes) until a `mcp__gemini-design__*` call is made this session. Read fresh per call. |
+| `RALPH_MODE` | **Opt-in (default off).** `1`/`true` enables autonomous "Ralph" mode: exempts the safe git commands (`add`/`commit`/`checkout -b`/`status`/`diff`/`log`) from the confirmation ASK and auto-approves project installs. Destructive git (force-push, `reset --hard`) and system installs still gate. |
 
 ## Library usage
 

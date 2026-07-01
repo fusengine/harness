@@ -8,5 +8,4 @@ export * from "./memory";
 export * from "./cache";
 export * from "./freshness";
 export * from "./refs";
-export * from "./state";
 export * from "./statusline";

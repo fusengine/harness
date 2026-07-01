@@ -9,7 +9,7 @@ import { collectDesignEvidence } from "../policy/design/skill-evidence";
 import { findDesignSystem, recordPost } from "./design-helpers";
 import {
   htmlCssOnlyGate, stateFileGate, screenshotScrollGate, validateDesignSystem,
-  geminiEnabled, preScreenshotWriteGate,
+  geminiEnabled,
 } from "../policy/design/gates";
 import { designSystemWriteGate, geminiCreateGate, browserNavigateGate } from "../policy/design/gates-pipeline";
 
@@ -56,7 +56,11 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   }
   if (event.tool === "Write" || event.tool === "Edit") {
     const fp = event.filePath ?? "";
-    const base = stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? preScreenshotWriteGate(fp, state) ?? designSystemWriteGate(fp, state);
+    // Parity: only design-system.md is screenshot-quota-gated (designSystemWriteGate,
+    // ports the live pipeline_checks.check_design_system_write). The old
+    // preScreenshotWriteGate ported check-browser-browsing.py, which is DEAD in the
+    // plugin (not wired in any hooks.json) and wrongly blocked plain .html/.css writes.
+    const base = stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? designSystemWriteGate(fp, state);
     if (base) return base;
     if (geminiEnabled() && state.geminiCalls === 0 && /\.(html|css)$/.test(fp)) {
       return { kind: "block", title: "Design pipeline", reason: "BLOCKED: generate the frontend via create_frontend before hand-writing HTML/CSS.", actions: ["Call mcp__gemini-design__create_frontend first"] };
@@ -71,7 +75,13 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
     if (!geminiEnabled()) return null;
     const block = geminiCreateGate(state);
     if (block) return block;
-    const missing = validateDesignSystem(findDesignSystem(cwd));
+    const ds = findDesignSystem(cwd);
+    // Parity validate-design-system.py DENY_NOT_FOUND: a MISSING file gets its own
+    // recovery message, distinct from the "too generic" message for a present-but-thin one.
+    if (ds === "") {
+      return { kind: "block", title: "Design pipeline", reason: "BLOCKED: design-system.md not found. RECOVERY: 1) Read the identity templates 2) Read design-inspiration.md 3) Browse 4 reference sites 4) Write design-system.md, then retry create_frontend.", actions: ["Create design-system.md via the pipeline, then retry create_frontend"] };
+    }
+    const missing = validateDesignSystem(ds);
     if (missing.length) {
       return { kind: "block", title: "Design pipeline", reason: `BLOCKED: design-system.md too generic. Missing: ${missing.join(", ")}.`, actions: ["Fix design-system.md, then retry create_frontend"] };
     }

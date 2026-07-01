@@ -68,6 +68,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
     isReplaceAll: event.input.replace_all === true,
     agentType: event.agentType,
+    agentId: typeof payload.agent_id === "string" ? payload.agent_id : undefined,
     windowMs: opts.windowMs,
     now: opts.now,
     trackFile: file,

@@ -76,6 +76,17 @@ export function skillTriggerGate(
   cwd?: string,
   filePath?: string,
 ): Prompt | null {
+  // Phase 1.5 parity (check-laravel-skill.py:57-62): a forced FuseCore skill is
+  // denied on its own, BEFORE domain sub-skills — never merged into their message.
+  if (forcedSkill === "fusecore" && !refsRead.some((r) => r.includes("skills/fusecore/"))) {
+    return {
+      kind: "block",
+      title: "FuseCore skill not consulted",
+      reason:
+        "BLOCKED: FuseCore project detected. Read the FuseCore skill before writing code in FuseCore modules.",
+      actions: [`Read ${resolveSkillPath("fusecore")}`],
+    };
+  }
   let required = detectRequiredSkills(framework, content);
   if (framework !== "tailwind" && filePath && usesTailwindUtilities(filePath, content)) {
     required = [...required, ...detectRequiredSkills("tailwind", content)];

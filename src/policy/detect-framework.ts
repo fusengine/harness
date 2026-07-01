@@ -5,7 +5,7 @@
  */
 export function detectFramework(filePath: string, content: string): string {
   if (/\.(tsx?|jsx?|vue|svelte)$/.test(filePath) || /from ['"]react|useState|className=/.test(content)) {
-    if (/(page|layout|loading|error|route)\.(ts|tsx)$/.test(filePath) || /use client|use server/.test(content)) {
+    if (/(page|layout|loading|error|route|middleware)\.(ts|tsx)$/.test(filePath) || /use client|use server|NextRequest|NextResponse|from ['"]next|getServerSideProps|getStaticProps/.test(content)) {
       return "nextjs";
     }
     return "react";

@@ -44,9 +44,10 @@ export async function apexScopedGate(input: GateInput, track: SessionTrack, wind
     agentsFresh: freshnessFor([...REQUIRED_AGENTS]),
     missingAgents: REQUIRED_AGENTS.filter((name) => !freshnessFor([name])),
     windowMs: window,
-    // Parity require-apex-agents.py: only Write creates new files, so Edit is
-    // always exempt from the brainstorm requirement, regardless of the flag.
-    brainstormRequired: input.tool === "Edit" ? false : track.brainstormRequired,
+    // Parity require-apex-agents.py:41 — Edit never creates a file (skip brainstorm),
+    // and a subagent (agent_id present) inherits the lead's brainstorm decision, so
+    // only a lead Write is ever brainstorm-gated.
+    brainstormRequired: input.tool === "Edit" || input.agentId ? false : track.brainstormRequired,
     brainstormFresh: freshnessFor(["brainstorming"], Number.MAX_SAFE_INTEGER),
   };
   try {

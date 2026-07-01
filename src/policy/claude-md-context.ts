@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { resolveMaxLines } from "../config/limits";
-import type { ProjectType } from "./detect-project";
+import { DEV_KEYWORDS, type ProjectType } from "./detect-project";
 import { getExpertAgent } from "./expert-agents";
 
 /** Dev-verb regex (FR/EN) that triggers the APEX preamble (case-insensitive). */
@@ -76,7 +76,7 @@ export function buildClaudeMdContext(prompt: string, cwd: string): string | null
   } catch {
     return null;
   }
-  if (!DEV_VERBS.test(prompt)) return `# CLAUDE.md\n${claudeContent}`;
+  if (!DEV_VERBS.test(prompt) && !DEV_KEYWORDS.test(prompt)) return `# CLAUDE.md\n${claudeContent}`;
   const apex = buildApexInstruction(detectClaudeMdProjectType(cwd), resolveMaxLines());
   return `${apex}\n\n# CLAUDE.md\n${claudeContent}`;
 }

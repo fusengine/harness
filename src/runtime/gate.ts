@@ -7,6 +7,8 @@ import { preCommitGate } from "./precommit";
 import { modularGate } from "./modular";
 import { frameworkSkillGate } from "./framework-skill-gate";
 import { isShadcnWrite, shadcnSkillGate } from "../policy/shadcn-skill-gate";
+import { isTailwindWrite, tailwindSkillGate } from "../policy/tailwind-skill-gate";
+import { geminiMcpGate } from "../policy/gemini-mcp-gate";
 import { apexScopedGate } from "./gate-apex";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
@@ -68,6 +70,23 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     });
     if (shadcnBlock) return shadcnBlock;
   }
+
+  // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1):
+  // a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read,
+  // independent of framework — runs alongside the framework gate like the plugin.
+  if (isTailwindWrite(input.tool, filePath, input.content ?? "")) {
+    const twBlock = tailwindSkillGate(input.tool, filePath, input.content ?? "", track.refsRead);
+    if (twBlock) return twBlock;
+  }
+
+  // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless
+  // FUSE_ENFORCE_GEMINI_MCP is set, then it blocks hand-written Tailwind UI code
+  // until a mcp__gemini-design__* call is made this session.
+  const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", {
+    authorizations: track.authorizations,
+    sessionId: input.sessionId,
+  });
+  if (geminiBlock) return geminiBlock;
 
   // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py
   // parity): non-code and exempt paths skip straight to the DRY check below.
