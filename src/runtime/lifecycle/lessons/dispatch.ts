@@ -6,22 +6,26 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { contextResponse } from "../../../adapters/claude";
+import { attachSystemMessage, contextResponse } from "../../../adapters/claude";
 import { addRoot, readRoots } from "../../../memory/registry";
 import { nowStamp, readState, setStateField, throttleMs } from "../../../memory/state";
 import { isCodeFile, projectRoot, projectRootOrNull } from "../../../util/project-root";
+import { atomicWrite } from "../../../util/json-io";
+import { curateLessons } from "../aipilot/curate-lessons";
 import { lessonsFileFor, lessonsStateFileFor } from "./state";
 
-/** Inject `<root>/MEMORY/LESSON.md` as additionalContext for `event`. */
-function injectMemory(cwd: string, event: string): string {
-  const file = lessonsFileFor(projectRoot(cwd));
+/** Inject `MEMORY/LESSON.md` for `event`, after mechanical curation (a strict dedup rewrites the file in place; any report surfaces to the user via systemMessage). */
+function injectMemory(cwd: string, event: string, now: number): string {
+  const root = projectRoot(cwd);
+  const file = lessonsFileFor(root);
   if (!existsSync(file)) return "";
   let content = "";
   try { content = readFileSync(file, "utf-8").trim(); } catch { return ""; }
   if (!content) return "";
-  const ctx = `Project lessons — never reproduce these:\n${content}\n` +
-    `You may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
-  return contextResponse(event, ctx);
+  const { content: curated, report } = curateLessons(content, now, root);
+  if (curated !== content) try { atomicWrite(file, curated); content = curated; } catch { /* keep original on write failure */ }
+  const ctx = `Project lessons — never reproduce these:\n${content}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
+  return report ? attachSystemMessage(contextResponse(event, ctx), `LESSON.md curation:\n${report}`) : contextResponse(event, ctx);
 }
 
 /** Select roots with unsaved code edits past the throttle, bumping their state. */
@@ -82,7 +86,7 @@ export function dispatchLessons(event: string, payload: Record<string, unknown>,
   switch (event) {
     case "SessionStart":
     case "SubagentStart":
-      return injectMemory(cwd, event);
+      return injectMemory(cwd, event, now);
     case "Stop":
       return remindWrite(now);
     case "PostToolUse":

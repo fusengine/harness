@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { contextResponse } from "../../adapters/claude";
 import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } from "../home-state";
+import { attributeFiles, filesWrittenByAgent } from "./agent-files";
 
 /** The `changes` block written by `track-changes.ts` into unified session state. */
 interface Changes {
@@ -46,9 +47,19 @@ export function trackAgentMemory(data: Record<string, unknown>, home: string = h
   const changes = state.changes as Changes | undefined;
   const count = changes?.cumulativeCodeFiles ?? 0;
   if (count > 0) {
-    const files = (changes?.modifiedFiles ?? []).join(", ");
-    saveSessionState(sessionId, { ...state, changes: { ...changes, cumulativeCodeFiles: 0 } }, home);
-    return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${count} code file(s): ${files}. Run sniper agent now.`);
+    // Attribute only the files THIS agent actually wrote, parsed from its own
+    // transcript (SubagentStop `agent_transcript_path`, CLI v2.0.42+). When the
+    // field is absent or the transcript is unreadable, `filesWrittenByAgent`
+    // returns null → fall back to the session-wide list (no regression).
+    const written = filesWrittenByAgent(typeof data.agent_transcript_path === "string" ? data.agent_transcript_path : undefined);
+    const owned = written === null ? (changes?.modifiedFiles ?? []) : attributeFiles(changes?.modifiedFiles ?? [], written);
+    // Only reset the session counter when this agent owns changes — so an agent
+    // that touched none of the tracked files never clears them for the real
+    // author, and never gets told to validate another teammate's work.
+    if (owned.length > 0) {
+      saveSessionState(sessionId, { ...state, changes: { ...changes, cumulativeCodeFiles: 0 } }, home);
+      return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${owned.length} code file(s): ${owned.join(", ")}. Run sniper agent now.`);
+    }
   }
   return JSON.stringify({ message: `Agent ${agentType} completed (no code changes)` });
 }
