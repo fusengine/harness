@@ -2,6 +2,18 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.49] - 02-07-2026
+
+### Added
+
+- Per-framework skill authorization (Check 1, parity `enforce-apex-phases.ts`): `doc_consulted` stamped per framework and re-validated against `FUSE_ENFORCE_TTL_SEC` on every edit; a deny writes a persistent `target` cross-credited on EVERY later consultation (parity `track-doc-consultation.py` — no TTL, no single-shot clear, kills the deny→consult→re-deny loop). Trivial-edit budget (5th small Edit in the window requires full APEX; `replace_all` never trivial). `PROTECTED_PATHS` denied early in `gate()` on ALL extensions with the byte-for-byte Python message.
+- Session-scoped agent evidence (parity `track-subagent-research.py`): research/explore tool calls are persisted into the signed `SessionTrack` keyed by `session_id` — sub-agent and workflow-agent research now satisfies the freshness gate; the lead-transcript scan is demoted to fallback.
+- Doc consultations credited to the framework named in the QUERY (`track_doc_helpers.detect_framework` keyword map, 9 verbatim regexes) instead of always `generic`.
+- `Prompt.userMessage` channel (parity `hook_output.allow_pass`/`post_pass`): user-visible pass notices per harness — claude/codex `systemMessage`, gemini `systemMessage`, cursor `user_message` (snake_case, camelCase silently ignored — cursor forum #141516/#142589), cline/hermes documented drop. Design-pipeline and solid-detect notices restored.
+- Hermes adapter: `~/.hermes` home, `HERMES_SESSION_ID` detection, `{decision:"block",reason}`/`{context}` protocol (Claude-style output accepted natively by Hermes), wired in `respond()` + build exports.
+- `fuse-browser` network tools added to `RESEARCH_TOOLS` — the deny message already promised them as an accepted fallback but the freshness table never credited them.
+- Check-1 deny sources resolved dynamically (`skill-source.ts`, 10-entry map + context7 fallback): a deny never promises a nonexistent SKILL.md path.
+
 ## [0.1.48] - 02-07-2026
 
 ### Fixed
