@@ -2,6 +2,19 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.50] - 03-07-2026
+
+### Added
+
+- Decision-time lessons: a `MEMORY/LESSON.md` bullet may end with a `[TRIGGERS tool:… path:… error:… keyword:…]` line; the single most-specific matching lesson is injected as `additionalContext` at the exact PreToolUse about to repeat a known mistake — allow-path only (never masks a deny/ask), cooldown-guarded (30min via the shared `oncePerWindow`), backward compatible (untagged bullets keep the SessionStart block).
+- Lesson curation on read: strict near-duplicate merge (the removed twin's `[TRIGGERS]` line is carried over), >50-bullet cap and >90-day stale paths reported to the user via `systemMessage`; `LESSON.md` is rewritten only on real merges.
+- Context-injection dedup guard: `oncePerWindow` (state-backed sidecar) suppresses only a same-turn double-fire of an identical CLAUDE.md block; the invariant "CLAUDE.md injected on EVERY message" is CI-guarded (`claudeMdKey` shared between prod and tests).
+
+### Fixed
+
+- SubagentStop attribution: the sniper reminder now lists only the files the stopping agent actually wrote (parsed from its own `agent_transcript_path`, null-safe fallback to the session-wide list) and the cumulative counter survives non-authors — reproduced 3× live, including a research-only agent ordered to validate 14 foreign files.
+- SOLID: `handle-pre` allow-path extracted to `pre-allow.ts` (87/40 lines).
+
 ## [0.1.49] - 02-07-2026
 
 ### Added
