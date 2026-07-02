@@ -5,10 +5,10 @@ import type { NormalizedEvent } from "./normalize";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
 import { designGate } from "./design";
-import { designPassNotice } from "../policy/design/gates";
 import { taskContext } from "./inject-context";
 import { securityAdvisory } from "./lifecycle/security/check-skill";
 import { validateSolidGate } from "./lifecycle";
+import { allowOutcome } from "./pre-allow";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -80,11 +80,8 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
   });
   if (prompt) return { stdout: respond(id, prompt), exit: 0 };
-  // Python-parity `allow_pass`: user-visible pass notice once every gate allowed.
-  const notice = designPassNotice({
-    agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
-    tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "",
-    url: typeof event.input.url === "string" ? event.input.url : "", phase: "pre",
-  }, mcpDir);
-  return { stdout: notice ? respond(id, notice) : "", exit: 0 };
+  // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
+  // decision-time lesson). A deny/ask already returned above, so nothing it
+  // emits can block nor override a decision.
+  return allowOutcome(id, event, payload, mcpDir, opts.cwd);
 }

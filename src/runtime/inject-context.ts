@@ -1,17 +1,40 @@
 import { contextResponse } from "../adapters/claude";
 import { buildClaudeMdContext } from "../policy/claude-md-context";
 import { buildApexTaskInjection } from "../policy/apex-task-context";
+import { hashText } from "../util/json-io";
+import { oncePerWindow, DEDUP_WINDOW_MS } from "./inject-dedup";
+
+/**
+ * Build the {@link oncePerWindow} key for the CLAUDE.md preamble gate. The
+ * prompt hash keeps two distinct legitimate turns from colliding — even non-dev
+ * prompts, whose block is prompt-independent (just CLAUDE.md) and would
+ * otherwise hash-collide within the window — while the content hash still lets a
+ * same-turn double-fire of an identical block be suppressed. Single source of
+ * truth so the owner invariant test guards the real production key.
+ * @param prompt - The raw user prompt.
+ * @param ctx - The rendered CLAUDE.md (+ optional APEX) block.
+ * @returns The namespaced dedup key.
+ */
+export function claudeMdKey(prompt: string, ctx: string): string {
+  return `claude-md:${hashText(prompt)}:${hashText(ctx)}`;
+}
 
 /**
  * UserPromptSubmit context injection: render the CLAUDE.md (+ optional APEX)
  * preamble as a Claude `additionalContext` response, or "" when nothing to emit.
+ * Guarded by {@link oncePerWindow} via {@link claudeMdKey}: only a
+ * near-simultaneous double-fire of the SAME turn (identical prompt AND identical
+ * block, within {@link DEDUP_WINDOW_MS}) is suppressed. The invariant "CLAUDE.md
+ * is emitted on EVERY message" is thus preserved.
  * @param prompt - The raw user prompt.
  * @param cwd - Project root (for project-type detection).
  * @returns The native hook stdout (possibly empty).
  */
 export function promptSubmitContext(prompt: string, cwd: string): string {
   const ctx = buildClaudeMdContext(prompt, cwd);
-  return ctx ? contextResponse("UserPromptSubmit", ctx) : "";
+  if (!ctx) return "";
+  if (!oncePerWindow(claudeMdKey(prompt, ctx), DEDUP_WINDOW_MS)) return "";
+  return contextResponse("UserPromptSubmit", ctx);
 }
 
 /**
