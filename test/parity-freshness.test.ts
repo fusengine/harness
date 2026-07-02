@@ -25,8 +25,9 @@ test("activityFor: direct exploration credited as explore-codebase", () => {
 });
 
 test("activityFor: web credits doc + research-expert; MCP cache read credits research", () => {
+  // doc activities now stamp `ts: event.now`; query "x" has no framework keyword → file-detected fallback.
   expect(activityFor(ev("WebSearch", { query: "x" }))).toEqual([
-    { kind: "doc", framework: "react", sessionId: "s1", source: "websearch" },
+    { kind: "doc", framework: "react", sessionId: "s1", source: "websearch", ts: 1000 },
     { kind: "agent", name: "research-expert", ts: 1000 },
   ]);
   expect(activityFor(ev("Read", { file_path: "/x/context/mcp/exa-search-abc.md" }, 10))).toEqual([{ kind: "agent", name: "research-expert", ts: 1000, quality: "sufficient" }]);

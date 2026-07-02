@@ -15,7 +15,7 @@ const ENV_SIGNALS: ReadonlyArray<readonly [string, HarnessId]> = [
   ["GEMINI_CLI", "gemini-cli"], ["OPENCODE", "opencode"],
   ["WINDSURF_AGENT", "windsurf"], ["CODEIUM_AGENT", "windsurf"],
   ["COPILOT_AGENT", "copilot"], ["AIDER", "aider"], ["KIRO", "kiro"],
-  ["GOOSE", "goose"], ["AMP", "amp"],
+  ["GOOSE", "goose"], ["AMP", "amp"], ["HERMES_SESSION_ID", "hermes"],
 ];
 
 /** `AGENT=<name>` / `AI_AGENT=<name>` standard value -> harness id. */
@@ -23,11 +23,12 @@ const STD_NAMES: Record<string, HarnessId> = {
   goose: "goose", amp: "amp", claude: "claude-code", "claude-code": "claude-code",
   cursor: "cursor", codex: "codex", cline: "cline", aider: "aider",
   opencode: "opencode", gemini: "gemini-cli", copilot: "copilot", kiro: "kiro",
+  hermes: "hermes",
 };
 
 /** Harnesses exposing a native hook system (vs CLI-only integration). */
 const HOOK_CAPABLE: ReadonlySet<HarnessId> = new Set([
-  "claude-code", "codex", "cursor", "cline", "gemini-cli", "opencode",
+  "claude-code", "codex", "cursor", "cline", "gemini-cli", "opencode", "hermes",
 ]);
 
 /** Integration mode for a harness id. */

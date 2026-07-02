@@ -71,8 +71,19 @@ export const brainstormGate: ApexGate = (ctx) =>
 export { solidReadGate, freshnessGate } from "./apex-gates";
 import { solidReadGate, freshnessGate } from "./apex-gates";
 
-/** Default APEX gate chain (brainstorm, freshness, docs, SOLID refs). */
-export const APEX_GATES: ReadonlyArray<ApexGate> = [brainstormGate, freshnessGate, docConsultedGate, solidReadGate];
+/** Gates that run BEFORE Check 1 (harness-specific brainstorm + agent freshness, pre-dating enforce-apex-phases). */
+export const PRE_AUTH_GATES: ReadonlyArray<ApexGate> = [brainstormGate, freshnessGate];
+
+/** Gates that run AFTER Check 1: Check 2 (doc consulted once per session) then the SOLID refs. */
+export const POST_AUTH_GATES: ReadonlyArray<ApexGate> = [docConsultedGate, solidReadGate];
+
+/**
+ * Default APEX gate chain (brainstorm, freshness, docs, SOLID refs). Check 1
+ * (`apexAuthorizationGate`, policy/apex-authorization.ts) is wired BETWEEN the
+ * PRE and POST sub-chains by the runtime (gate-apex.ts), which owns its
+ * target-write side effect — parity enforce-apex-phases.ts Check1 -> Check2.
+ */
+export const APEX_GATES: ReadonlyArray<ApexGate> = [...PRE_AUTH_GATES, ...POST_AUTH_GATES];
 
 /**
  * Run the APEX gates (chain-of-responsibility): the first failing gate's prompt

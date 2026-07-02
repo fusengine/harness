@@ -5,6 +5,7 @@ import type { NormalizedEvent } from "./normalize";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
 import { designGate } from "./design";
+import { designPassNotice } from "../policy/design/gates";
 import { taskContext } from "./inject-context";
 import { securityAdvisory } from "./lifecycle/security/check-skill";
 import { validateSolidGate } from "./lifecycle";
@@ -78,5 +79,12 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     trackFile: file,
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
   });
-  return prompt ? { stdout: respond(id, prompt), exit: 0 } : { stdout: "", exit: 0 };
+  if (prompt) return { stdout: respond(id, prompt), exit: 0 };
+  // Python-parity `allow_pass`: user-visible pass notice once every gate allowed.
+  const notice = designPassNotice({
+    agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
+    tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "",
+    url: typeof event.input.url === "string" ? event.input.url : "", phase: "pre",
+  }, mcpDir);
+  return { stdout: notice ? respond(id, notice) : "", exit: 0 };
 }

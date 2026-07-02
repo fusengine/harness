@@ -12,6 +12,8 @@ export interface AuthEntry {
   session?: string;
   doc_sessions?: string[];
   read_paths?: string[];
+  /** ISO stamp of the latest doc/skill consultation for this framework (Check-1 TTL, parity enforce-apex-phases.ts). */
+  doc_consulted?: string;
 }
 
 /** Resolve the sessions array from an auth entry (legacy fallback). */

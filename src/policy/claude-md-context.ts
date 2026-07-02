@@ -48,7 +48,7 @@ export function buildApexInstruction(projectType: ProjectType, maxLines: number)
   const expertAgent = getExpertAgent(projectType);
   return (
     `INSTRUCTION: This is a development task. Use APEX methodology:\n\n` +
-    `**TRACKING FILE**: [project]/.claude/apex/task.json (auto-created on first Write/Edit)\n\n` +
+    `**TRACKING FILE**: [project]/.claude/apex/task.json (created by the /apex command)\n\n` +
     `1. **ANALYZE** (MANDATORY - 3 AGENTS IN PARALLEL):\n` +
     `   - explore-codebase + research-expert + ${expertAgent} (framework expertise)\n` +
     `   - Project type detected: ${projectType}\n\n` +

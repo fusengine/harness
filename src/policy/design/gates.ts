@@ -1,10 +1,17 @@
+import { basename } from "node:path";
 import type { Prompt } from "../../prompt/types";
-import type { DesignState } from "./state";
+import { loadDesignState, type DesignState } from "./state";
+import { activeDesignAgent } from "./flag";
+import { isUiWrite } from "./skill-gate";
+import { SKILL_TRIGGERS } from "./skill-triggers";
 
 export const ALLOWED_WRITE: RegExp = /\.(html|css|md|json)$/;
 export const EXEMPT_DIRS: readonly string[] = ["node_modules/", "dist/", "build/", ".claude/"];
 const FORBIDDEN_FONTS: readonly string[] = ["Inter", "Roboto", "Arial", "Open Sans"];
 const OKLCH_RE = /oklch\(\s*[\d.]+%?\s+0\.0*[1-9]/;
+const NAV = "mcp__fuse-browser__browser_navigate";
+const SHOT = "mcp__fuse-browser__browser_screenshot";
+const GEMINI = "mcp__gemini-design__create_frontend";
 
 export const deny = (reason: string): Prompt => ({
   kind: "block", title: "Design pipeline", reason,
@@ -52,4 +59,37 @@ export function screenshotScrollGate(state: DesignState): Prompt | null {
 export function geminiEnabled(): boolean {
   const v = process.env.FUSE_DESIGN_GEMINI;
   return v === "1" || v === "true";
+}
+
+/** Inputs for {@link designPassNotice} — primitives only, so policy stays runtime-free. */
+export interface PassNoticeInput { agentId: string; tool: string; filePath: string; content: string; url: string; phase: "pre" | "post" }
+
+/**
+ * Python-parity pass notices (`hook_output.allow_pass`/`post_pass`): the
+ * user-visible `script: detail` lines the old plugins printed on EVERY passing
+ * design hook. Call AFTER the gates allowed the event; returns an `inform`
+ * Prompt carrying only `userMessage` (for the human, never agent context), or
+ * null when nothing applies. The check-design-skill line fires for ANY agent
+ * on a UI write; the rest only inside the active design-agent context.
+ */
+export function designPassNotice(i: PassNoticeInput, cacheDir: string): Prompt | null {
+  const isWrite = i.tool === "Write" || i.tool === "Edit";
+  const fp = i.filePath;
+  const lines: string[] = [];
+  if (i.phase === "pre" && isUiWrite(i.tool, fp, i.content)) {
+    const domains = SKILL_TRIGGERS.filter((t) => t.patterns.some((re) => re.test(i.content))).map((t) => t.skill).join(", ");
+    lines.push(`check-design-skill: pass (domain: ${domains || "base"})`);
+  }
+  const state = i.agentId && activeDesignAgent(cacheDir) === i.agentId ? loadDesignState(cacheDir, i.agentId) : null;
+  if (state && i.phase === "pre") {
+    if (isWrite && fp && !EXEMPT_DIRS.some((d) => fp.includes(d)) && ALLOWED_WRITE.test(fp)) lines.push(`enforce-html-css-only: allowed: ${basename(fp)}`);
+    if (i.tool === NAV) lines.push(`check-inspiration-read: pass (${i.url})`);
+    if (i.tool === GEMINI && geminiEnabled()) lines.push("validate-design-system: design-system.md ok");
+    if (isWrite || i.tool === NAV || i.tool === SHOT || i.tool === GEMINI) lines.push(`pipeline-gate: phase ${state.currentPhase} ok`);
+  }
+  if (state && i.phase === "post" && isWrite) {
+    if (basename(fp) === "design-system.md") lines.push("validate-design: design-system.md → phase 3");
+    else if (/\.(tsx|jsx|css)$/.test(fp)) lines.push("validate-design: design ok");
+  }
+  return lines.length ? { kind: "inform", title: "Design pipeline", reason: "", userMessage: lines.join("\n") } : null;
 }

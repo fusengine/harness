@@ -8,6 +8,9 @@ import { postEditContext } from "./lifecycle-bridge";
 import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { aipilotPostToolUse, checkFileSize, validateTailwind } from "./lifecycle";
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
+import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-evidence-record";
+import { designPassNotice } from "../policy/design/gates";
+import { attachSystemMessage } from "../adapters/claude";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
 
@@ -25,6 +28,10 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   const designWarn = designGate(payload, event, mcpDir, opts.cwd);
   const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
   for (const activity of activities) await recordActivity(file, activity);
+  // Session-scoped evidence (parity track-subagent-research.py): sub-agent hooks
+  // carry the LEAD's session_id — Task/Agent launches excluded (credited above).
+  const evidence = classifyAgentEvidence(event.tool, event.input, response);
+  if (evidence) await recordAgentEvidence(file, evidence, opts.now, typeof payload.agent_id === "string" ? payload.agent_id : undefined);
   postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
   if (seoDeny) return { stdout: seoDeny, exit: 0 };
@@ -41,5 +48,18 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
     if (out) return { stdout: out, exit: 0 };
   }
   const extra = await postEditContext(opts.scope ?? "core", event, opts.now);
-  return { stdout: designWarn ? respond(id, designWarn) : extra, exit: 0 };
+  // Python-parity `post_pass`: user-visible pass notice, merged into whatever else fires
+  // (deny paths above returned already — a deny stays byte-identical).
+  const notice = designPassNotice({
+    agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
+    tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "", url: "", phase: "post",
+  }, mcpDir);
+  if (designWarn) return { stdout: respond(id, notice?.userMessage ? { ...designWarn, userMessage: notice.userMessage } : designWarn), exit: 0 };
+  if (!notice?.userMessage) return { stdout: extra, exit: 0 };
+  if (!extra) return { stdout: respond(id, notice), exit: 0 };
+  // `extra` is already-rendered Claude-shaped stdout (postEditContext): claude/codex get the
+  // notice attached onto it; other harnesses cannot parse `extra` anyway, so the notice —
+  // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra).
+  if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, notice.userMessage), exit: 0 };
+  return { stdout: respond(id, notice) || extra, exit: 0 };
 }
