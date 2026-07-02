@@ -1,6 +1,7 @@
 import type { Activity } from "./record";
 import type { AgentQuality } from "../tracking/session-state";
 import { classifyExplore } from "../freshness/explore-tools";
+import { docFramework } from "../freshness/query-framework";
 
 /** A live tool-use, already normalized to `tool` + `input` by the adapter. */
 export interface ToolEvent {
@@ -64,10 +65,10 @@ export function activityFor(event: ToolEvent): Activity[] {
   const out: Activity[] = [];
   // Doc consultation is recorded ALONGSIDE the research-phase credit (Python runs
   // track-doc-consultation + track-subagent-research as two independent hooks):
-  // context7/exa/WebSearch/WebFetch credit BOTH doc and research-expert; fuse-browser
-  // (the Exa fallback) credits doc only (it is not in RESEARCH_TOOLS).
+  // context7/exa/WebSearch/WebFetch AND fuse-browser (browser_fetch/crawl/serp_batch,
+  // in RESEARCH_TOOLS since explore-tools.ts:38) all credit BOTH doc and research-expert.
   const docSource = docSourceOf(event.tool);
-  if (docSource) out.push({ kind: "doc", framework: event.framework, sessionId: event.sessionId, source: docSource });
+  if (docSource) out.push({ kind: "doc", framework: docFramework(event.input, event.framework), sessionId: event.sessionId, source: docSource, ts: event.now });
 
   if (event.tool === "Task" || event.tool === "Agent") {
     const name = String(event.input?.subagent_type ?? event.input?.name ?? "").split(":").pop() ?? "";

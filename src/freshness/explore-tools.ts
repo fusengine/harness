@@ -19,7 +19,14 @@ export interface ExploreHit {
 /** Native exploration tools (parity `apex_constants.EXPLORE_TOOLS`). */
 const EXPLORE_TOOLS = new Set(["Glob", "Grep"]);
 
-/** Research tools — MCP docs + web (parity `apex_constants.RESEARCH_TOOLS`). */
+/**
+ * Research tools — MCP docs + web (parity `apex_constants.RESEARCH_TOOLS`).
+ * The fuse-browser fast-path entries are a deliberate TS addition: CLAUDE.md
+ * mandates fuse-browser FIRST for web research, and `docSourceOf` (activity.ts)
+ * already credits it for doc consultation — without them here, an agent
+ * following the rules would never satisfy the freshness gate (same
+ * cross-consumer inconsistency class as the solidReadGate lesson).
+ */
 const RESEARCH_TOOLS = new Set([
   "mcp__context7__query-docs",
   "mcp__context7__resolve-library-id",
@@ -28,6 +35,10 @@ const RESEARCH_TOOLS = new Set([
   "mcp__exa__deep_researcher_start",
   "WebSearch",
   "WebFetch",
+  "mcp__fuse-browser__browser_fetch",
+  "mcp__fuse-browser__browser_fetch_batch",
+  "mcp__fuse-browser__browser_crawl",
+  "mcp__fuse-browser__browser_serp_batch",
 ]);
 
 /** Bash executables that count as exploration (parity `EXPLORE_BASH_CMDS`). */

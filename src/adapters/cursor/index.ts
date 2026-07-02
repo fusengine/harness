@@ -17,7 +17,7 @@ export function beforeShellExecution(payload: CursorShellPayload): CursorRespons
   const r = evaluate({ tool: "Bash", command: payload.command });
   if (r.decision === "allow" || !r.prompt) return { permission: "allow" };
   const msg = formatPrompt(r.prompt);
-  return { permission: toPermission(r.prompt.kind), continue: false, userMessage: msg, agentMessage: msg };
+  return { permission: toPermission(r.prompt.kind), continue: false, user_message: msg, agent_message: msg };
 }
 
 /** Observe a file edit (Cursor cannot block here). Returns the verdict for logging. */

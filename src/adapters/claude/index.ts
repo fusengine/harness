@@ -34,12 +34,9 @@ export function denyResponse(event: string, reason: string): string {
 }
 
 /**
- * A PostToolUse (and Stop/UserPromptSubmit) `block` response. These events
- * ignore `hookSpecificOutput.permissionDecision` (a PreToolUse-only field) and
- * only honor the top-level `decision`/`reason` keys, which feed the reason back
- * to Claude as automated feedback.
- * @param reason - The block feedback shown to Claude.
- * @returns The native `{decision:"block",reason}` response string.
+ * A PostToolUse (and Stop/UserPromptSubmit) `block` response: those events
+ * ignore `permissionDecision` (PreToolUse-only) and only honor the top-level
+ * `decision`/`reason` keys, which feed `reason` back to Claude.
  */
 export function blockResponse(reason: string): string {
   return JSON.stringify({ decision: "block", reason });
@@ -55,19 +52,30 @@ export function systemMessage(text: string): string {
   return JSON.stringify({ systemMessage: text });
 }
 
+/** An `inform` response with a user-visible notice (Python `allow_pass`/`post_pass` parity): a pure pass reuses {@link systemMessage} alone; with agent-facing `context` both channels merge in one JSON. */
+export function informResponse(event: string, notice: string, context: string): string {
+  if (!context) return systemMessage(notice);
+  return JSON.stringify({ systemMessage: notice, hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+}
+
+/** Attach a user-visible `systemMessage` onto an already-rendered hook stdout JSON ({@link systemMessage} alone when empty/unparseable). */
+export function attachSystemMessage(stdout: string, notice: string): string {
+  try { return JSON.stringify({ ...(JSON.parse(stdout) as Record<string, unknown>), systemMessage: notice }); } catch { return systemMessage(notice); }
+}
+
 /**
  * Render a portable {@link Prompt} as a Claude Code hook response:
  * `block` → `permissionDecision: deny`, `ask` → `permissionDecision: ask`
- * (interactive confirm), `inform` → `additionalContext`.
+ * (interactive confirm), `inform` → `additionalContext` — plus the user-visible
+ * `systemMessage` channel when the prompt carries a `userMessage`.
  */
 export function toClaudeResponse(event: string, prompt: Prompt): string {
   const reason = formatPrompt(prompt);
   if (prompt.kind === "block") return denyResponse(event, reason);
   if (prompt.kind === "ask") {
-    return JSON.stringify({
-      hookSpecificOutput: { hookEventName: event, permissionDecision: "ask", permissionDecisionReason: reason },
-    });
+    return JSON.stringify({ hookSpecificOutput: { hookEventName: event, permissionDecision: "ask", permissionDecisionReason: reason } });
   }
+  if (prompt.userMessage) return informResponse(event, prompt.userMessage, prompt.reason ? reason : "");
   return contextResponse(event, reason);
 }
 

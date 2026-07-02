@@ -14,6 +14,7 @@ import type { HarnessId } from "../detect/harness";
 export const HOME_DIR: Partial<Record<HarnessId, string>> = {
   "claude-code": ".claude", codex: ".codex", cursor: ".cursor",
   cline: ".clinerules", "gemini-cli": ".gemini", opencode: ".opencode",
+  hermes: ".hermes",
 };
 
 /** Parse a `.env` file into a key→value map (`export KEY="v"` or `KEY=v`). */

@@ -2,7 +2,7 @@
 export type HarnessId =
   | "claude-code" | "codex" | "cursor" | "cline" | "gemini-cli"
   | "opencode" | "windsurf" | "copilot" | "aider" | "kiro"
-  | "goose" | "amp" | "unknown";
+  | "goose" | "amp" | "hermes" | "unknown";
 
 /** Integration mode: `hook` = native lifecycle hooks; `cli` = run as an external step. */
 export type HarnessMode = "hook" | "cli";

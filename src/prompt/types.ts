@@ -14,6 +14,12 @@ export interface Prompt {
   reason: string;
   /** Concrete next actions to proceed. */
   actions?: string[];
+  /**
+   * User-facing notice (Python `hook_output.allow_pass`/`post_pass` parity):
+   * shown to the HUMAN — Claude Code's `systemMessage` — never to the agent,
+   * unlike `reason`/additionalContext. Excluded from {@link formatPrompt}.
+   */
+  userMessage?: string;
 }
 
 /** Render a {@link Prompt} as a consistent, agent-readable memo block. */

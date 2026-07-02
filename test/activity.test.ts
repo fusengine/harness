@@ -9,23 +9,27 @@ test("harnessStateDir: neutral .harness dir", () => {
 });
 
 test("activityFor: MCP doc credits BOTH doc and research-expert (parity: two hooks)", () => {
+  // doc activities now stamp `ts: event.now` (activity.ts) so downstream TTLs anchor on the tool-call time.
   expect(activityFor(ev("mcp__context7__query-docs"))).toEqual([
-    { kind: "doc", framework: "react", sessionId: "s1", source: "context7" },
+    { kind: "doc", framework: "react", sessionId: "s1", source: "context7", ts: 1000 },
     { kind: "agent", name: "research-expert", ts: 1000 },
   ]);
   const exa = activityFor(ev("mcp_exa_web_search")).find((a) => a.kind === "doc");
   expect(exa && exa.kind === "doc" ? exa.source : null).toBe("exa");
 });
 
-test("activityFor: fuse-browser is the Exa fallback (doc only, not research)", () => {
+test("activityFor: fuse-browser fast-path credits doc AND research-expert (RESEARCH_TOOLS addition)", () => {
+  // fuse-browser fast-path is now in RESEARCH_TOOLS (explore-tools.ts:38): doc credit + research credit; doc stamps ts.
   expect(activityFor(ev("mcp__fuse-browser__browser_fetch", { url: "https://x" }))).toEqual([
-    { kind: "doc", framework: "react", sessionId: "s1", source: "fuse-browser" },
+    { kind: "doc", framework: "react", sessionId: "s1", source: "fuse-browser", ts: 1000 },
+    { kind: "agent", name: "research-expert", ts: 1000 },
   ]);
 });
 
 test("activityFor: WebSearch credits BOTH doc and research-expert", () => {
+  // doc activities now stamp `ts: event.now`; query "x" has no framework keyword → file-detected fallback.
   expect(activityFor(ev("WebSearch", { query: "x" }))).toEqual([
-    { kind: "doc", framework: "react", sessionId: "s1", source: "websearch" },
+    { kind: "doc", framework: "react", sessionId: "s1", source: "websearch", ts: 1000 },
     { kind: "agent", name: "research-expert", ts: 1000 },
   ]);
 });

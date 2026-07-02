@@ -1,4 +1,5 @@
 import type { AuthEntry } from "../freshness/doc-helpers";
+import { creditDocConsultation, type SessionTarget } from "../policy/apex-authorization";
 
 /** Quality of a recorded agent call (the freshness gate ignores insufficient ones). */
 export type AgentQuality = "sufficient" | "insufficient";
@@ -16,6 +17,8 @@ export interface SessionTrack {
    * refsRead consumers (skill-trigger/shadcn/tailwind/design) stay session-scoped.
    */
   refsReadAt?: Record<string, number>;
+  /** Framework awaiting doc credit after a Check-1 deny. PERSISTS — {@link recordDoc} cross-credits it on EVERY consultation, never clears it; only the next deny replaces it via {@link recordTarget} (parity track-doc-consultation.py:62). */
+  target?: SessionTarget;
   agents: { name: string; ts: number; quality?: AgentQuality }[];
   trivialEdits: number[];
   brainstormRequired?: boolean;
@@ -26,17 +29,29 @@ export function emptyTrack(): SessionTrack {
   return { authorizations: {}, refsRead: [], agents: [], trivialEdits: [] };
 }
 
-/** Record a doc consultation (Context7/Exa) for a framework in this session. Immutable. */
-export function recordDoc(track: SessionTrack, framework: string, sessionId: string, source: string): SessionTrack {
-  const prev = track.authorizations[framework] ?? {};
-  const sessions = new Set(prev.doc_sessions ?? []);
-  sessions.add(sessionId);
-  const sources = new Set(prev.sources ?? (prev.source ? [prev.source] : []));
-  sources.add(source);
-  return {
-    ...track,
-    authorizations: { ...track.authorizations, [framework]: { ...prev, doc_sessions: [...sessions], sources: [...sources] } },
-  };
+/**
+ * Record a doc consultation (Context7/Exa/web) for a framework in this session:
+ * the Check-2 credit (`doc_sessions` + `sources`) plus the Check-1 stamp
+ * (`sessions` + `doc_consulted` = ISO of `now`). PARITY track-doc-consultation.py
+ * :62-70 — a `target` left by a Check-1 deny (enforce-apex-phases.ts:80) is
+ * cross-credited on EVERY consultation, with NO TTL on `target.set_at`, and the
+ * target PERSISTS (only the next deny replaces it via {@link recordTarget});
+ * single-shot clearing or TTL-gating the target re-opened the deny loop when a
+ * consultation landed > TTL after the deny. Immutable.
+ */
+export function recordDoc(track: SessionTrack, framework: string, sessionId: string, source: string, now: number = Date.now()): SessionTrack {
+  const nowIso = new Date(now).toISOString();
+  const authorizations = { ...track.authorizations, [framework]: creditDocConsultation(track.authorizations[framework], sessionId, source, nowIso) };
+  const t = track.target;
+  if (t && t.framework !== framework) {
+    authorizations[t.framework] = creditDocConsultation(track.authorizations[t.framework], sessionId, source, nowIso);
+  }
+  return { ...track, authorizations };
+}
+
+/** Set the pending doc-credit target (written by the runtime on a Check-1 deny). Immutable. */
+export function recordTarget(track: SessionTrack, target: SessionTarget): SessionTrack {
+  return { ...track, target };
 }
 
 /**

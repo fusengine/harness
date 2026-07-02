@@ -1,4 +1,5 @@
 import { evaluate, type PolicyResult } from "../policy/evaluate";
+import { protectedPathGate } from "../policy/trivial-edits";
 import { existingLineCounts, isApexScoped } from "./gate-helpers";
 import { FAIL_CLOSED } from "../policy/guards";
 import { loadTrack } from "../tracking/store";
@@ -40,6 +41,10 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   const precommit = preCommitGate(input.tool, input.command, input.cwd);
   if (precommit) return precommit;
 
+  // Hook-managed paths: absolute deny on ALL extensions, BEFORE the code-ext/exempt filters (parity enforce-apex-phases.ts:48-52 — isApexScoped never routes a non-code/exempt path, e.g. .claude/logs/00-apex/*.json, to the guard).
+  const protectedDeny = protectedPathGate(input.tool, input.filePath);
+  if (protectedDeny) return protectedDeny;
+
   const { raw: existingLines, code: existingCodeLines } = existingLineCounts(input.filePath);
   let quick: PolicyResult;
   try {
@@ -59,9 +64,7 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingCodeLines);
   if (solidOrSkill) return solidOrSkill;
 
-  // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently
-  // of `framework` since a components.json / .css write may detect as "generic",
-  // and mirrors the real plugin running its own PreToolUse hook alongside react's.
+  // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently of `framework` since a components.json / .css write may detect as "generic", and mirrors the real plugin running its own PreToolUse hook alongside react's.
   if (isShadcnWrite(input.tool, filePath)) {
     const shadcnBlock = shadcnSkillGate(input.tool, filePath, input.content ?? "", {
       refsRead: track.refsRead,
@@ -71,17 +74,13 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     if (shadcnBlock) return shadcnBlock;
   }
 
-  // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1):
-  // a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read,
-  // independent of framework — runs alongside the framework gate like the plugin.
+  // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1): a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read, independent of framework — alongside the framework gate like the plugin.
   if (isTailwindWrite(input.tool, filePath, input.content ?? "")) {
     const twBlock = tailwindSkillGate(input.tool, filePath, input.content ?? "", track.refsRead);
     if (twBlock) return twBlock;
   }
 
-  // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless
-  // FUSE_ENFORCE_GEMINI_MCP is set, then it blocks hand-written Tailwind UI code
-  // until a mcp__gemini-design__* call is made this session.
+  // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless FUSE_ENFORCE_GEMINI_MCP is set, then it blocks hand-written Tailwind UI code until a mcp__gemini-design__* call is made this session.
   const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", {
     authorizations: track.authorizations,
     sessionId: input.sessionId,
