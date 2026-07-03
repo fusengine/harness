@@ -3,6 +3,7 @@ import { injectRules } from "./inject-rules";
 import { solidDetectStart } from "./solid-detect";
 import { subagentCacheContext } from "./subagent-cache";
 import { trackAgentMemory } from "./agent-memory";
+import { harvestSubagentTrack } from "../../freshness/evidence-harvest-io";
 import { validateTeammateOutput } from "./teammate-idle";
 import { logToolFailure } from "./tool-failure";
 import { saveApexState } from "./pre-compact";
@@ -53,7 +54,13 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "Stop":
       return input.scope === "lessons" ? dispatchLessons("Stop", input.payload, input.cwd, input.now) : null;
     case "SubagentStop":
-      return input.scope === "aipilot" ? "" : trackAgentMemory(input.payload, undefined, input.now);
+      if (input.scope === "aipilot") return "";
+      // Retroactively harvest the finishing sub-agent's transcript into the session
+      // track BEFORE the reminder — so next turn's freshness gate sees research/
+      // explore evidence even when sidechain PostToolUse hooks never fired
+      // (#43612/#27655/#34692). SubagentStop is main-session-dispatched (reliable).
+      harvestSubagentTrack(input.payload, input.cwd, input.now);
+      return trackAgentMemory(input.payload, undefined, input.now);
     case "TeammateIdle":
       return validateTeammateOutput(input.payload);
     case "PostToolUseFailure":

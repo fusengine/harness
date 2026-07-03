@@ -1,5 +1,6 @@
 import type { AuthEntry } from "../freshness/doc-helpers";
 import { creditDocConsultation, type SessionTarget } from "../policy/apex-authorization";
+import type { Receipt } from "./receipts";
 
 /** Quality of a recorded agent call (the freshness gate ignores insufficient ones). */
 export type AgentQuality = "sufficient" | "insufficient";
@@ -22,8 +23,9 @@ export interface SessionTrack {
   agents: { name: string; ts: number; quality?: AgentQuality }[];
   trivialEdits: number[];
   brainstormRequired?: boolean;
+  /** Verification receipts (tsc/test) at PostToolUse; absent/empty reads as unverified in the TaskCompleted gate (backward compat, fail-closed). See {@link Receipt}. */
+  receipts?: Receipt[];
 }
-
 /** A fresh, empty track. */
 export function emptyTrack(): SessionTrack {
   return { authorizations: {}, refsRead: [], agents: [], trivialEdits: [] };
@@ -48,7 +50,6 @@ export function recordDoc(track: SessionTrack, framework: string, sessionId: str
   }
   return { ...track, authorizations };
 }
-
 /** Set the pending doc-credit target (written by the runtime on a Check-1 deny). Immutable. */
 export function recordTarget(track: SessionTrack, target: SessionTarget): SessionTrack {
   return { ...track, target };
@@ -67,31 +68,26 @@ export function recordRefRead(track: SessionTrack, path: string, now?: number): 
   if (now === undefined) return refsRead === track.refsRead ? track : { ...track, refsRead };
   return { ...track, refsRead, refsReadAt: { ...track.refsReadAt, [path]: now } };
 }
-
 /** Record an agent/tool call with a timestamp + optional quality. Immutable. */
 export function recordAgent(track: SessionTrack, name: string, ts: number, quality?: AgentQuality): SessionTrack {
   const entry = quality ? { name, ts, quality } : { name, ts };
   return { ...track, agents: [...track.agents, entry] };
 }
-
 /** True when ALL of `names` ran within `windowMs` with non-insufficient quality. */
 export function agentsFresh(track: SessionTrack, names: string[], windowMs: number, now: number): boolean {
   const cutoff = now - windowMs;
   return names.every((n) => track.agents.some((a) => a.name === n && a.ts > cutoff && a.quality !== "insufficient"));
 }
-
 /** Record a trivial edit timestamp (sliding window; old evicted). Immutable. */
 export function recordTrivialEdit(track: SessionTrack, ts: number, windowMs: number, now: number): SessionTrack {
   const cutoff = now - windowMs;
   return { ...track, trivialEdits: [...(track.trivialEdits ?? []).filter((t) => t > cutoff), ts] };
 }
-
 /** Count trivial edits within the sliding window. */
 export function trivialCount(track: SessionTrack, windowMs: number, now: number): number {
   const cutoff = now - windowMs;
   return (track.trivialEdits ?? []).filter((t) => t > cutoff).length;
 }
-
 /** Set the brainstorm-required flag (from creation-intent detection). Immutable. */
 export function recordBrainstormRequired(track: SessionTrack, required: boolean): SessionTrack {
   return { ...track, brainstormRequired: required };

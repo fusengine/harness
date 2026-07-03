@@ -11,6 +11,8 @@ import { isShadcnWrite, shadcnSkillGate } from "../policy/shadcn-skill-gate";
 import { isTailwindWrite, tailwindSkillGate } from "../policy/tailwind-skill-gate";
 import { geminiMcpGate } from "../policy/gemini-mcp-gate";
 import { apexScopedGate } from "./gate-apex";
+import { withDenyLoop } from "./deny-loop-store";
+import { dirname } from "node:path";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
 
@@ -20,10 +22,9 @@ export type { GateInput } from "./gate-input";
 export const REQUIRED_AGENTS: ReadonlyArray<string> = ["explore-codebase", "research-expert"];
 
 /**
- * Default freshness window for {@link REQUIRED_AGENTS}, in ms. Matches the
- * plugin's `FUSE_ENFORCE_TTL_SEC` default (120s). Only a fallback for direct
- * programmatic callers that omit `windowMs` (e.g. tests) — the real CLI path
- * always supplies `windowMs` from `resolveTtlSec()` (`src/config/ttl.ts`).
+ * Default freshness window (ms). Matches the plugin's `FUSE_ENFORCE_TTL_SEC`
+ * default (120s); only a fallback for callers that omit `windowMs` (e.g. tests) —
+ * the real CLI path always supplies it from `resolveTtlSec()` (`src/config/ttl.ts`).
  */
 export const DEFAULT_WINDOW_MS = 120_000;
 
@@ -31,20 +32,26 @@ export const DEFAULT_WINDOW_MS = 120_000;
 export const TRIVIAL_BUDGET = 4;
 
 /**
- * Full gate: the stateless guards (file-size, git, security...) first, then a
- * trivial-edit fast path, then the stateful APEX gates fed from the session
- * track. Returns the first blocking prompt, or null to allow.
+ * Full gate: {@link runGates} yields the first blocking prompt (or null); the
+ * anti-loop tail ({@link withDenyLoop}) rewrites an identical retried deny's
+ * message (decision unchanged). Sidecar dir = the track's dir (tests off `$HOME`).
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
+  const prompt = await runGates(input);
+  return withDenyLoop(prompt, input.tool, { filePath: input.filePath, content: input.content, command: input.command }, {
+    now: input.now, dir: dirname(input.trackFile), windowMs: input.windowMs ?? DEFAULT_WINDOW_MS,
+  });
+}
+
+/** Stateless guards, then the trivial fast path, then the stateful APEX gates. */
+async function runGates(input: GateInput): Promise<Prompt | null> {
   // Pre-commit lint hard-block runs FIRST: evaluate()'s GIT_ASK branch would
   // otherwise short-circuit a `git commit` before the linters get to veto it.
   const precommit = preCommitGate(input.tool, input.command, input.cwd);
   if (precommit) return precommit;
-
-  // Hook-managed paths: absolute deny on ALL extensions, BEFORE the code-ext/exempt filters (parity enforce-apex-phases.ts:48-52 — isApexScoped never routes a non-code/exempt path, e.g. .claude/logs/00-apex/*.json, to the guard).
+  // Hook-managed paths: absolute deny on ALL extensions, BEFORE the code-ext/exempt filters (parity enforce-apex-phases.ts:48-52 — isApexScoped never routes a non-code/exempt path to the guard).
   const protectedDeny = protectedPathGate(input.tool, input.filePath);
   if (protectedDeny) return protectedDeny;
-
   const { raw: existingLines, code: existingCodeLines } = existingLineCounts(input.filePath);
   let quick: PolicyResult;
   try {
@@ -53,18 +60,15 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     return FAIL_CLOSED;
   }
   if (quick.decision !== "allow" && quick.prompt) return quick.prompt;
-
   const modular = modularGate(input.tool, input.filePath, input.content, input.cwd);
   if (modular) return modular;
   if (!input.filePath) return null;
   const filePath = input.filePath;
   const window = input.windowMs ?? DEFAULT_WINDOW_MS;
   const track = await loadTrack(input.trackFile);
-
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingCodeLines);
   if (solidOrSkill) return solidOrSkill;
-
-  // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently of `framework` since a components.json / .css write may detect as "generic", and mirrors the real plugin running its own PreToolUse hook alongside react's.
+  // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently of `framework` since a components.json / .css write may detect as "generic", mirroring the real plugin's own PreToolUse hook alongside react's.
   if (isShadcnWrite(input.tool, filePath)) {
     const shadcnBlock = shadcnSkillGate(input.tool, filePath, input.content ?? "", {
       refsRead: track.refsRead,
@@ -73,27 +77,22 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
     });
     if (shadcnBlock) return shadcnBlock;
   }
-
-  // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1): a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read, independent of framework — alongside the framework gate like the plugin.
+  // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1): a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read, independent of framework.
   if (isTailwindWrite(input.tool, filePath, input.content ?? "")) {
     const twBlock = tailwindSkillGate(input.tool, filePath, input.content ?? "", track.refsRead);
     if (twBlock) return twBlock;
   }
-
-  // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless FUSE_ENFORCE_GEMINI_MCP is set, then it blocks hand-written Tailwind UI code until a mcp__gemini-design__* call is made this session.
+  // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless FUSE_ENFORCE_GEMINI_MCP is set, then blocks hand-written Tailwind UI until a mcp__gemini-design__* call is made this session.
   const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", {
     authorizations: track.authorizations,
     sessionId: input.sessionId,
   });
   if (geminiBlock) return geminiBlock;
-
-  // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py
-  // parity): non-code and exempt paths skip straight to the DRY check below.
+  // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py parity): non-code and exempt paths skip straight to the DRY check below.
   if (isApexScoped(input.filePath)) {
     const apex = await apexScopedGate(input, track, window);
     if (apex) return apex;
   }
-
   // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.
   return dryGate(input.tool, input.filePath, input.content, input.cwd);
 }
