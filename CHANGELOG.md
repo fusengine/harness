@@ -2,6 +2,14 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.51] - 03-07-2026
+
+### Added
+
+- Verification receipts: `tsc`/`bun test` runs are captured as receipts in the signed SessionTrack (PostToolUse Bash parse); TaskCompleted now REFUSES a "done" (`{"continue":false,"stopReason"}` — the only documented refusal shape for this event) when code files changed without a fresh passing receipt; SubagentStop appends an advisory "NO VERIFICATION RECEIPT" note to the attributed reminder. Kills the declared-done-but-broken pattern (3 live occurrences this week).
+- Deny-loop breaker: every gate deny is hashed (stable, key-order-free) into a state sidecar; an identical retried call gets a rewritten "[REPEAT] … STOP" message with a mandated research-expert action — the decision itself is never changed, allows are never touched, hashes expire with the freshness window.
+- SubagentStop evidence harvest: the finishing sub-agent's own transcript (`agent_transcript_path`) is parsed and its research/explore calls + `.md` ref reads are backfilled into the session track BEFORE the reminder — the freshness gate now sees sidechain evidence even when sidechain PostToolUse hooks never fire (platform issues #43612/#27655/#34692). Transcript parser factored into `agent-transcript.ts`, shared with the v0.1.50 attribution.
+
 ## [0.1.50] - 03-07-2026
 
 ### Added
