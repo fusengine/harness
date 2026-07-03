@@ -9,6 +9,7 @@ import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { aipilotPostToolUse, checkFileSize, validateTailwind } from "./lifecycle";
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-evidence-record";
+import { captureReceipt } from "../tracking/receipts";
 import { designPassNotice } from "../policy/design/gates";
 import { attachSystemMessage } from "../adapters/claude";
 import type { PreContext } from "./handle-pre";
@@ -32,6 +33,14 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // carry the LEAD's session_id — Task/Agent launches excluded (credited above).
   const evidence = classifyAgentEvidence(event.tool, event.input, response);
   if (evidence) await recordAgentEvidence(file, evidence, opts.now, typeof payload.agent_id === "string" ? payload.agent_id : undefined);
+  // Verification receipts: a Bash `tsc`/`bun test` run is parsed (exit code +
+  // pass/fail counts) into a signed receipt the TaskCompleted gate later demands.
+  if (event.tool === "Bash" && event.command) {
+    const r = (payload.tool_result ?? response) as { exit_code?: unknown; stdout?: unknown; stderr?: unknown } | undefined;
+    const out = `${typeof r?.stdout === "string" ? r.stdout : ""}\n${typeof r?.stderr === "string" ? r.stderr : ""}`;
+    const exit = Number(r?.exit_code ?? 0);
+    await captureReceipt(file, event.command, out, Number.isFinite(exit) ? exit : 0, opts.now);
+  }
   postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
   if (seoDeny) return { stdout: seoDeny, exit: 0 };

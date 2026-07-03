@@ -4,8 +4,13 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { saveSessionState } from "../src/runtime/home-state";
 import { validateTaskSolid } from "../src/runtime/lifecycle/task-completed";
+import { trackFile } from "../src/runtime/paths";
+import { saveTrack } from "../src/tracking/store";
+import { recordReceipt } from "../src/tracking/receipts";
+import { emptyTrack } from "../src/tracking/session-state";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-task-"));
+const T = 1_000_000_000_000;
 
 test("validateTaskSolid: flags a modified code file over the line ceiling", () => {
   const home = root();
@@ -19,11 +24,28 @@ test("validateTaskSolid: flags a modified code file over the line ceiling", () =
   expect(ctx).toContain("huge.ts: 150 lines (max 100)");
 });
 
-test("validateTaskSolid: returns empty when files comply or none tracked", () => {
+test("validateTaskSolid: compliant files but NO receipt → refusal (continue:false + message)", () => {
   const home = root();
+  const stateDir = root();
   const small = join(root(), "ok.ts");
   writeFileSync(small, "export const x = 1;\n");
   saveSessionState("s2", { changes: { modifiedFiles: [small] } }, home);
-  expect(validateTaskSolid({ session_id: "s2", task_id: "t", task_subject: "s" }, home)).toBe("");
+  const parsed = JSON.parse(validateTaskSolid({ session_id: "s2", task_id: "t", task_subject: "s" }, home, T, stateDir)) as { continue: boolean; stopReason: string };
+  expect(parsed.continue).toBe(false);
+  expect(parsed.stopReason).toContain("VERIFICATION RECEIPT REQUIRED");
+});
+
+test("validateTaskSolid: compliant files WITH a fresh passing receipt → empty (completion passes)", async () => {
+  const home = root();
+  const stateDir = root();
+  const small = join(root(), "ok.ts");
+  writeFileSync(small, "export const x = 1;\n");
+  saveSessionState("s2b", { changes: { modifiedFiles: [small] } }, home);
+  await saveTrack(trackFile("s2b", stateDir), recordReceipt(emptyTrack(), { kind: "test", exitCode: 0, pass: 3, fail: 0, ts: T - 1000 }));
+  expect(validateTaskSolid({ session_id: "s2b", task_id: "t", task_subject: "s" }, home, T, stateDir)).toBe("");
+});
+
+test("validateTaskSolid: a session with no tracked files returns empty", () => {
+  const home = root();
   expect(validateTaskSolid({ session_id: "s3" }, home)).toBe("");
 });
