@@ -1,0 +1,40 @@
+{
+  "name": "session-track-isolation",
+  "doc": "Freshness evidence is scoped PER SESSION: the track file is trackFile(session_id, ...) = `track-<sid>.json` (paths.ts:55-58). Evidence harvested under session A never unblocks a Write under session B. Session A earns explore+research (SubagentStop harvest) and its Write advances to the doc gate; session B's Write, with an EMPTY track, still blocks on explore+research. Different file paths per session keep the project-scoped deny-loop sidecar (see 03 — keyed on tool+input, NOT session) from cross-firing and muddying the messages.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Session A: harvest explore + research into track-sessA.json (SubagentStop carries session_id=sessA, evidence-harvest-io.ts:40-41).",
+      "event": {
+        "hook_event_name": "SubagentStop",
+        "session_id": "sessA",
+        "agent_type": "research-expert",
+        "agent_transcript_path": "$FIXTURES/transcripts/explore-research.jsonl"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "completed" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Session A Write → freshness satisfied, advances to the doc gate (contains 'documentation'). Proves A's track carries evidence.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sessA",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/alpha.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "documentation" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Session B Write (different session_id, different file) → track-sessB.json is empty → freshnessGate STILL blocks on explore+research. A's evidence did NOT leak across sessions.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sessB",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/beta.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "explore" } }
+    }
+  ]
+}

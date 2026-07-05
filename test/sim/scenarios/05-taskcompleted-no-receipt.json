@@ -1,0 +1,41 @@
+{
+  "name": "taskcompleted-no-receipt",
+  "doc": "Verification-receipt gate at TaskCompleted (task-completed.ts:40-48 receiptGate). A PostToolUse Write records the modified code file into the per-session state (track-changes.ts:34-41, under homedir()). On TaskCompleted, code files changed + NO fresh passing tsc/test receipt → the documented refusal `{continue:false, stopReason:\"VERIFICATION RECEIPT REQUIRED...\"}` (TaskCompleted does NOT honor decision:block, task-completed.ts:36-47). Requires HOME+cwd stable across the two spawns so both the session-state (modifiedFiles) and the track (receipts) line up. Unit parity: test/task-completed.test.ts:27-36.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "PostToolUse Write of a code file → trackSessionChanges appends src/ok.ts to modifiedFiles and emits the SNIPER reminder (proving the record happened). postEditContext core path, lifecycle-bridge.ts:53.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc05a",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/ok.ts", "content": "export const x = 1;\n" },
+        "tool_response": "ok"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "SNIPER VALIDATION REQUIRED" } }
+    },
+    {
+      "scope": "core",
+      "doc": "TaskCompleted with a tracked code file but no receipt → continue:false. src/ok.ts does not exist on disk, so collectViolations skips it (existsSync guard, task-completed.ts:60) — no false SOLID violation — and the receipt gate fires (codeFiles filters by extension only, task-completed.ts:27-28).",
+      "event": {
+        "hook_event_name": "TaskCompleted",
+        "session_id": "sc05a",
+        "task_id": "t-1",
+        "task_subject": "Port module"
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "continue", "equals": false } }
+    },
+    {
+      "scope": "core",
+      "doc": "Same TaskCompleted again (idempotent read) — assert the stopReason wording. task-completed.ts:44-47.",
+      "event": {
+        "hook_event_name": "TaskCompleted",
+        "session_id": "sc05a",
+        "task_id": "t-1",
+        "task_subject": "Port module"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "VERIFICATION RECEIPT REQUIRED" } }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "git-guard",
+  "doc": "Git command policing (evaluate.ts:22-45, patterns.ts). A plain `git push` requires confirmation (ask); a `--force` push is a destructive hard-block. bashWriteGuard lets `git ` through as a SAFE_PREFIX (no redirect), so evaluate's git gates decide.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`git push origin main` matches GIT_ASK (patterns.ts:15) but NOT GIT_BLOCKED → ask prompt → permissionDecision 'ask' (respond.ts:44-50). The anti-loop never touches an ask (deny-loop-store.ts:80).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc11",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin main" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "ask" } }
+    },
+    {
+      "scope": "core",
+      "doc": "`git push --force` matches GIT_BLOCKED `/git push.*--force/` (patterns.ts:9) → deny \"Destructive git command\".",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc11",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin main --force" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    }
+  ]
+}

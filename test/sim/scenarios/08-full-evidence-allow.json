@@ -1,0 +1,75 @@
+{
+  "name": "full-evidence-allow",
+  "doc": "The complete PreToolUse gate chain driven to a FULL ALLOW (the closing arc of test/handle.test.ts:29-43). Freshness is earned via the SubagentStop harvest (07's mechanism, forced 'sufficient' with no response-length dependency — robust), then doc consultation is credited by two PostToolUse MCP calls (Context7 + Exa; docSourceOf → recordDoc, activity.ts:44-52 / session-state.ts:44 — no length requirement). With freshness + doc satisfied and solidReadGate off (empty refs dir), the same Write finally passes every gate → empty stdout. isDocConsulted is session-scoped (satisfied by any Context7+Exa this session, proven by handle.test where generic-framework MCP posts unblock a react Write).",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "No evidence → freshnessGate block.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc08",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/comp.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "explore" } }
+    },
+    {
+      "scope": "core",
+      "doc": "SubagentStop harvest → explore + research credited (forced sufficient).",
+      "event": {
+        "hook_event_name": "SubagentStop",
+        "session_id": "sc08",
+        "agent_type": "research-expert",
+        "agent_transcript_path": "$FIXTURES/transcripts/explore-research.jsonl"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "completed" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Write again → freshness passes, now blocked on doc consultation (contains 'documentation'). Identical to step 1 → anti-loop adds [REPEAT]; substring still holds.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc08",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/comp.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "documentation" } }
+    },
+    {
+      "scope": "core",
+      "doc": "PostToolUse Context7 doc call → recordDoc credits 'context7'. No response length needed for a doc credit.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc08",
+        "tool_name": "mcp__context7__query-docs",
+        "tool_input": {},
+        "tool_response": "docs"
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "PostToolUse Exa doc call → recordDoc credits 'exa'. Both Context7 AND Exa now satisfy isDocConsulted (apex.ts:48-49).",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc08",
+        "tool_name": "mcp__exa__web_search_exa",
+        "tool_input": { "query": "q" },
+        "tool_response": "results"
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "Every gate passes (freshness via harvest + doc via MCP; solidReadGate off) → allow, empty stdout. Mirrors handle.test.ts:42.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc08",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/comp.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

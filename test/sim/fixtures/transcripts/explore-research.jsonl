@@ -1,0 +1,2 @@
+{"message":{"content":[{"type":"tool_use","name":"Glob","input":{"pattern":"**/*.ts"}}]}}
+{"message":{"content":[{"type":"tool_use","name":"mcp__exa__web_search_exa","input":{"query":"react hooks best practices"}}]}}
