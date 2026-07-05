@@ -2,6 +2,18 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.53] - 05-07-2026
+
+### Added
+
+- Reconciliation snapshot at core SessionStart: git state (branch, recent commits, WIP counters), running harness version with drift warning, persistent `.claude/BOARD.md` rehydration and the one-shot gate summary — offline-only collectors, each isolated fail-safe, concatenated onto the existing injected context (the CLAUDE.md invariant is never violated, even on unparseable stdout).
+- One-shot gate metric: every gate outcome lands in a 7-day pruned sidecar (`one-shot.json`, deny-loop-store pattern); a deny and its later fix link through a content-free op key so the deny→allow transition is visible; `oneShotSummary(cwd)` derives the state dir with the exact `defaultStateDir(cwd)` the writer uses (single shared path deriver — a wired-but-dead seam caught during the batch).
+- Simulator: optional per-scenario `setup` files (validated, `$TMP`-contained) so E2E scenarios can materialize project roots; scenarios 13 (multi-session Stop scoping — fails on the pre-fix code) and 14 (snapshot) run in both src and dist CI modes.
+
+### Fixed
+
+- Lessons Stop reminder cross-session leak (production bug): with 2-3 concurrent sessions the reminder listed ANOTHER session's project and consumed its throttle, sending lessons to the wrong LESSON.md. Reminders are now keyed per `(session_id, root)` in a pruned home-cache registry; the legacy path (no session id, old state format) is preserved and test-covered.
+
 ## [0.1.52] - 05-07-2026
 
 ### Added
