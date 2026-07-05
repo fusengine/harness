@@ -2,6 +2,17 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.55] - 05-07-2026
+
+### Fixed
+
+- Per-event dedup of counters and reminders (found by a live subagent test on deployed v0.1.54): ~11 deployed plugins each invoke the binary on the SAME tool event, so the deny-loop counter jumped +11 per real attempt ("Identical attempt #9" on an agent's FIRST try), the one-shot metric was inflated 11x and the sniper reminder was injected ~15x per edit. Counters are now keyed `(op-hash + session_id)` over a 2s burst window (`burst-window.ts`); sibling fan-out processes get the prior verdict VERBATIM (one consistent count) and different sessions never dedup each other; the reminder is emitted once per (file + session + window) via the shared `oncePerWindow` sidecar.
+- Readable lesson compression: the distilled one-line rule is now the longest segment after an arrow with a 40-char minimum (fallback: the full rule's first sentence) — no more truncated fragments.
+
+### Added
+
+- Simulator: per-step `delayMs` (validated at load, 4s bound — `bun test` kills a test at 5s) so scenarios can distinguish a genuine agent retry from a hook fan-out burst; scenario 03 rewritten (a spaced retry escalates to `#2`), scenario 16 proves the burst collapse end-to-end in src and dist CI modes; `load.ts` split (SRP) into `load.ts` + `validate.ts`.
+
 ## [0.1.54] - 05-07-2026
 
 ### Added
