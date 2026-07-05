@@ -1,0 +1,20 @@
+{
+  "name": "lessons-inject-compression",
+  "doc": "SessionStart (scope lessons) injects MEMORY/LESSON.md through the real CLI with Stage-2 compression: the newest RECENT_FULL (10) bullets pass verbatim, every older bullet collapses to the rule after its last '→'. $TMP carries a package.json marker so projectRootOrNull resolves to $TMP, and a 16-bullet LESSON.md so bullets 11–16 (indices 10–15) are compressed; the assertion targets the 16th (oldest). The single regex proves the whole contract end-to-end: the newest bullet's verbatim marker NEWESTVERBATIM is present (lookahead), the oldest bullet's narrative OLDNARRATIVE is ABSENT (negative lookahead — it was distilled away), and its distilled rule OLDRULE is present. Unit parity: test/lesson-compact.test.ts.",
+  "setup": [
+    { "path": "$TMP/package.json", "content": "{}" },
+    { "path": "$TMP/MEMORY/LESSON.md", "content": "# LESSON.md — Lessons\n<!-- format doc -->\n\n- [2026-06-16 10:00] NEWESTVERBATIM recit recent garde entier alpha beta → regle recente zero\n- [2026-06-15 10:00] filler distinct zorglub01 bidule01 machin01 → regle numero un\n- [2026-06-14 10:00] filler distinct zorglub02 bidule02 machin02 → regle numero deux\n- [2026-06-13 10:00] filler distinct zorglub03 bidule03 machin03 → regle numero trois\n- [2026-06-12 10:00] filler distinct zorglub04 bidule04 machin04 → regle numero quatre\n- [2026-06-11 10:00] filler distinct zorglub05 bidule05 machin05 → regle numero cinq\n- [2026-06-10 10:00] filler distinct zorglub06 bidule06 machin06 → regle numero six\n- [2026-06-09 10:00] filler distinct zorglub07 bidule07 machin07 → regle numero sept\n- [2026-06-08 10:00] filler distinct zorglub08 bidule08 machin08 → regle numero huit\n- [2026-06-07 10:00] filler distinct zorglub09 bidule09 machin09 → regle numero neuf\n- [2026-06-06 10:00] filler distinct zorglub10 bidule10 machin10 → regle numero dix\n- [2026-06-05 10:00] filler distinct zorglub11 bidule11 machin11 → regle numero onze\n- [2026-06-04 10:00] filler distinct zorglub12 bidule12 machin12 → regle numero douze\n- [2026-06-03 10:00] filler distinct zorglub13 bidule13 machin13 → regle numero treize\n- [2026-06-02 10:00] filler distinct zorglub14 bidule14 machin14 → regle numero quatorze\n- [2026-06-01 10:00] OLDNARRATIVE vieux recit verbeux doit disparaitre de l injection → OLDRULE distillee actionnable\n" }
+  ],
+  "steps": [
+    {
+      "scope": "lessons",
+      "doc": "SessionStart → stdout carries the compressed block: newest verbatim, oldest reduced to its rule (narrative dropped).",
+      "event": {
+        "hook_event_name": "SessionStart",
+        "session_id": "sc15",
+        "source": "startup"
+      },
+      "expect": { "exit": 0, "stdout": { "regex": "^(?![\\s\\S]*OLDNARRATIVE)(?=[\\s\\S]*NEWESTVERBATIM)[\\s\\S]*OLDRULE distillee" } }
+    }
+  ]
+}

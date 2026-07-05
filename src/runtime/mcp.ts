@@ -38,8 +38,8 @@ function cacheHitText(web: boolean, hit: CacheHit): string {
   const kb = Math.floor(hit.body.length / 1024) + 1;
   const hours = Math.floor(hit.ageMs / 3_600_000);
   return web
-    ? `CACHE HIT WebFetch (~${kb}KB economise, cached il y a ${hours}h):\n\n${hit.body}\n\nPour forcer un nouveau fetch, modifie l'URL ou la query.`
-    : `CACHE HIT (~${kb}KB economise, cached il y a ${hours}h): ${hit.body}\n\nReformule pour forcer un re-call.`;
+    ? `CACHE HIT WebFetch (~${kb}KB saved, cached ${hours}h ago):\n\n${hit.body}\n\nModify the URL or query to force a fresh fetch.`
+    : `CACHE HIT (~${kb}KB saved, cached ${hours}h ago): ${hit.body}\n\nRephrase to force a re-call.`;
 }
 
 /** A pre-event MCP interception: the native response + any doc source it satisfied. */

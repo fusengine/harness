@@ -12,6 +12,11 @@ export function lessonsFileFor(root: string): string {
   return join(root, "MEMORY", "LESSON.md");
 }
 
+/** Absolute `<root>/MEMORY/LESSON-archive.md` — cold storage for capped-out bullets. */
+export function lessonsArchiveFileFor(root: string): string {
+  return join(root, "MEMORY", "LESSON-archive.md");
+}
+
 /** Absolute `<root>/MEMORY/state.json` — machine-local throttle counter. */
 export function lessonsStateFileFor(root: string): string {
   return join(root, "MEMORY", "state.json");

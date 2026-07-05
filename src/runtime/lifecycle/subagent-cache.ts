@@ -30,10 +30,10 @@ function trunc(text: unknown, limit: number): string {
 /** Render fresh cache entries as the markdown injection block. */
 function render(entries: Record<string, unknown>[]): string {
   const lines = [
-    "# MCP Cache disponible cette session",
-    "Avant de lancer mcp__context7/exa, verifie si deja cached.",
-    "Lis le fichier .md via Read pour recuperer le resultat.",
-    "APEX: Read sur cache MCP compte comme research-expert satisfait.",
+    "# MCP cache available this session",
+    "Before calling mcp__context7/exa, check if the result is already cached.",
+    "Read the .md file via Read to retrieve the result.",
+    "APEX: reading the MCP cache via Read satisfies the research-expert step.",
     "",
     "| Tool | Query | File |",
     "| --- | --- | --- |",

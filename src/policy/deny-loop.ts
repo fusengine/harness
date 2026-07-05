@@ -63,7 +63,7 @@ export function denyLoopCheck(hash: string, priorDenies: Record<string, DenyEntr
  * @returns A block prompt with `[REPEAT]` title, STOP-prefixed reason, forced research action.
  */
 export function enrichRepeatDeny(prompt: Prompt, count: number): Prompt {
-  const stop = `Tentative identique n°${count} déjà refusée pour la même raison. STOP: ne retente pas ce même appel. `;
+  const stop = `Identical attempt #${count} already denied for the same reason. STOP: do not retry this same call. `;
   const action = "Launch fuse-ai-pilot:research-expert to find a DIFFERENT approach";
   return {
     ...prompt,

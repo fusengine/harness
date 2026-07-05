@@ -27,7 +27,7 @@ test("denyLoopCheck: first is #1 not a repeat; an in-window prior makes #2 a rep
 test("enrichRepeatDeny: [REPEAT] title, STOP-prefixed reason, forced research action, no mutation", () => {
   const out = enrichRepeatDeny(block, 3);
   expect(out.title).toBe("[REPEAT] SOLID file-size limit");
-  expect(out.reason).toContain("Tentative identique n°3");
+  expect(out.reason).toContain("Identical attempt #3");
   expect(out.reason).toContain("too big");
   expect(out.actions?.[0]).toContain("research-expert");
   expect(out.actions).toContain("Split");

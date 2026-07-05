@@ -12,10 +12,35 @@ import { attachSystemMessage, contextResponse } from "../../../adapters/claude";
 import { projectRoot } from "../../../util/project-root";
 import { atomicWrite } from "../../../util/json-io";
 import { curateLessons } from "../aipilot/curate-lessons";
-import { lessonsFileFor } from "./state";
+import { compressInjection } from "../aipilot/lesson-inject";
+import { lessonsArchiveFileFor, lessonsFileFor } from "./state";
 import { markWrite, remindWrite } from "./reminder";
 
-/** Inject `MEMORY/LESSON.md` for `event`, after mechanical curation (a strict dedup rewrites the file in place; any report surfaces to the user via systemMessage). */
+/**
+ * Persist a curation ATOMICALLY and ARCHIVE-FIRST for zero-loss: prepend the
+ * moved bullets to LESSON-archive.md, THEN rewrite LESSON.md. On ANY write error
+ * the original file is left untouched (returns `original`) so a bullet is never
+ * lost — a rare archive-then-trim-fail leaves a duplicate (never a loss), which
+ * the next dedup pass reconciles.
+ */
+function persistCuration(file: string, root: string, curated: string, archive: string, original: string): string {
+  try {
+    if (archive) {
+      const af = lessonsArchiveFileFor(root);
+      const prev = existsSync(af) ? readFileSync(af, "utf-8") : "";
+      atomicWrite(af, prev ? `${archive}\n${prev}` : archive);
+    }
+    atomicWrite(file, curated);
+    return curated;
+  } catch { return original; }
+}
+
+/**
+ * Inject `MEMORY/LESSON.md` for `event`. Mechanical curation (dedup + cap→archive)
+ * rewrites the FILE; the injected BLOCK is then COMPRESSED (newest bullets whole,
+ * older ones distilled to their rule) so a growing file never inflates the
+ * SessionStart/SubagentStart context. Any curation report surfaces via systemMessage.
+ */
 function injectMemory(cwd: string, event: string, now: number): string {
   const root = projectRoot(cwd);
   const file = lessonsFileFor(root);
@@ -23,9 +48,9 @@ function injectMemory(cwd: string, event: string, now: number): string {
   let content = "";
   try { content = readFileSync(file, "utf-8").trim(); } catch { return ""; }
   if (!content) return "";
-  const { content: curated, report } = curateLessons(content, now, root);
-  if (curated !== content) try { atomicWrite(file, curated); content = curated; } catch { /* keep original on write failure */ }
-  const ctx = `Project lessons — never reproduce these:\n${content}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
+  const { content: curated, archive, report } = curateLessons(content, now, root);
+  if (curated !== content) content = persistCuration(file, root, curated, archive, content);
+  const ctx = `Project lessons — never reproduce these:\n${compressInjection(content)}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
   return report ? attachSystemMessage(contextResponse(event, ctx), `LESSON.md curation:\n${report}`) : contextResponse(event, ctx);
 }
 
