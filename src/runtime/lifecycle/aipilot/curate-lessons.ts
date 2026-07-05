@@ -24,7 +24,7 @@ function staleReport(blocks: Block[], now: number, root: string): string[] {
   });
 }
 
-/** Strict-dedup: keep the newest of each near-identical pair (TRIGGERS carried over). Returns kept blocks + fusion report lines. */
+/** Strict-dedup: keep the newest of each near-identical pair (TRIGGERS carried over). Returns kept blocks + merge report lines. */
 function dedup(blocks: Block[]): { kept: Block[]; fused: string[] } {
   const kept: Block[] = [];
   const fused: string[] = [];
@@ -34,7 +34,7 @@ function dedup(blocks: Block[]): { kept: Block[]; fused: string[] } {
     const [win, drop] = (b.ts > hit.ts || Number.isNaN(hit.ts)) ? [b, hit] : [hit, b];
     if (win !== hit) kept[kept.indexOf(hit)] = win;
     if (!win.raw.some((l) => TRIG.test(l.trim()))) { const t = drop.raw.find((l) => TRIG.test(l.trim())); if (t) win.raw.push(t); }
-    fused.push(`fusion: kept ${(win.raw[0] ?? "").slice(0, 60)} · dropped ${(drop.raw[0] ?? "").slice(0, 60)}`);
+    fused.push(`merged: kept ${(win.raw[0] ?? "").slice(0, 60)} · dropped ${(drop.raw[0] ?? "").slice(0, 60)}`);
   }
   return { kept, fused };
 }

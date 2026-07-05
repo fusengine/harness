@@ -9,7 +9,7 @@ import { curateLessons } from "../src/runtime/lifecycle/aipilot/curate-lessons";
 const NOW = Date.UTC(2026, 6, 3); // 2026-07-03, matches the recent bullets below
 const ABSENT_ROOT = "/nonexistent-curate-root-xyz"; // makes every cited path missing
 
-test("strict dedup: near-identical bullets collapse to the most recent, fusion reported", () => {
+test("strict dedup: near-identical bullets collapse to the most recent, merge reported", () => {
   const input =
     "# LESSON.md\n\n" +
     "- [2026-06-02 11:00] sniper idle sans livrer le rapport attendu au lead final\n" +
@@ -17,7 +17,7 @@ test("strict dedup: near-identical bullets collapse to the most recent, fusion r
   const { content, report } = curateLessons(input, NOW, ABSENT_ROOT);
   expect(content).toContain("2026-06-02 11:00");
   expect(content).not.toContain("2026-06-01 10:00");
-  expect(report).toContain("fusion");
+  expect(report).toContain("merged");
 });
 
 test("TRIGGERS preserved: the kept (newest) block re-emits its continuation line verbatim", () => {
