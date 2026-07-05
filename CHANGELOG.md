@@ -2,6 +2,16 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.54] - 05-07-2026
+
+### Added
+
+- Two-stage LESSON.md compactor: beyond the 50-bullet cap the oldest bullets are MOVED (never deleted) to `MEMORY/LESSON-archive.md` (archive-first, atomic, fail-safe); `[TRIGGERS]` bullets stay until >90d so the decision-time index keeps working. The SessionStart/SubagentStart injection is compressed mechanically — the 10 most recent bullets go in full, every older one is reduced to its dated actionable rule — a measured **73.5% token reduction** (103.6kB → 27.5kB) on a real 121-bullet file, while the file itself keeps full bullets. Project isolation (each session receives only its own project's LESSON.md) is now test-locked; sim scenario 15 covers the compressed injection in src and dist CI modes.
+
+### Fixed
+
+- English-only emitted strings: the deny-loop `[REPEAT]` message, curation/merge/archive reports, MCP cache-hit text and the subagent cache injection block had shipped in French (leaked from French-language teammate briefs and the original Python port). All harness-emitted strings are now English; French-detection regexes (prompt classification, lesson tokenization) are intentionally kept.
+
 ## [0.1.53] - 05-07-2026
 
 ### Added
