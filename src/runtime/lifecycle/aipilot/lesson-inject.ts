@@ -20,6 +20,14 @@ export const RECENT_FULL = 10;
 /** Max chars of a distilled rule — keeps every compressed bullet to one line. */
 export const RULE_CAP = 200;
 
+/**
+ * Min readable length of a distilled rule. The old "text after the LAST →" rule
+ * produced illegible stubs when a bullet ended on a short trailing arrow segment
+ * (e.g. `- [2026-07-02 00:02] lecture).`, 30 chars). Below this we fall back to
+ * the whole rule's first sentence rather than ship a meaningless fragment.
+ */
+export const MIN_RULE = 40;
+
 /** The `[YYYY-MM-DD HH:MM]` (or date-only) stamp of a bullet, "" if absent. */
 function stamp(block: Block): string {
   const m = (block.raw[0] ?? "").match(/\[(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)\]/);
@@ -37,11 +45,29 @@ function firstSentence(s: string): string {
   return (s.split(/(?<=\.)\s/)[0] ?? s).trim();
 }
 
-/** Collapse one older bullet to `- [date] <rule>`: first sentence after last "→", capped. */
+/**
+ * Distil the actionable rule from a bullet body. With no "→" the whole bullet is
+ * the rule → its first sentence. Otherwise the rule is everything after the FIRST
+ * "→"; among its arrow-delimited segments (trimmed, empty dropped) take the first
+ * sentence of the LONGEST — the information-dense clause, not whichever short
+ * aside the author appended last. When that clause is under {@link MIN_RULE}
+ * chars, fall back to the first sentence of the WHOLE rule part (never the
+ * narrative), so a short trailing segment never yields an illegible stub yet a
+ * legitimately terse rule is still shown intact.
+ */
+function distillRule(text: string): string {
+  const arrow = text.indexOf("→");
+  if (arrow < 0) return firstSentence(text);
+  const rulePart = text.slice(arrow + 1);
+  const segments = rulePart.split("→").map((s) => s.trim()).filter(Boolean);
+  const longest = segments.reduce((a, b) => (b.length > a.length ? b : a), "");
+  const rule = firstSentence(longest);
+  return rule.length >= MIN_RULE ? rule : firstSentence(rulePart);
+}
+
+/** Collapse one older bullet to `- [date] <rule>`: {@link distillRule}, capped. */
 function compressBullet(block: Block): string {
-  const text = bodyText(block);
-  const arrow = text.lastIndexOf("→");
-  let rule = firstSentence((arrow >= 0 ? text.slice(arrow + 1) : text).trim());
+  let rule = distillRule(bodyText(block));
   if (rule.length > RULE_CAP) rule = `${rule.slice(0, RULE_CAP - 1).trimEnd()}…`;
   const date = stamp(block);
   return `- ${date ? `[${date}] ` : ""}${rule}`;

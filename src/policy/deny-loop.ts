@@ -18,7 +18,7 @@ import type { Prompt } from "../prompt/types";
 export interface DenyEntry { count: number; lastTs: number; }
 
 /** Loop-check outcome: does the input repeat an in-window deny, and its running count. */
-export interface DenyLoopResult { isRepeat: boolean; count: number; hash: string; }
+export interface DenyLoopResult { isRepeat: boolean; count: number; hash: string; deduped?: boolean; }
 
 /** Stable JSON: keys sorted at every depth so `{a,b}` and `{b,a}` hash identically. */
 function stableStringify(v: unknown): string {
@@ -42,15 +42,26 @@ export function denyHash(tool: string, input: Record<string, unknown>): string {
 /**
  * Pure loop check: given the already-pruned in-window map, compute the running
  * count for `hash` and whether it repeats (count > 1). No IO — the caller persists.
- * @param hash - {@link denyHash} of the current call.
+ *
+ * When `dedupMs` is set (>0) and an identical prior deny landed within that
+ * window, the current call is a sibling hook echoing the SAME event (see
+ * {@link module:burst-window}): it returns the prior verdict VERBATIM with
+ * `deduped:true` and does NOT bump the count, so all N fan-out processes agree
+ * on one number instead of counting to N. Absent `dedupMs` (mono-process
+ * callers / unit tests) the historical increment-every-time behaviour holds.
+ * @param hash - {@link denyHash}-derived map key of the current call.
  * @param priorDenies - The `{ hash -> DenyEntry }` map, pruned to `now`/`windowMs`.
- * @param opts - Clock + window.
- * @returns `{ isRepeat, count, hash }`.
+ * @param opts - Clock + window, plus an optional burst-dedup window.
+ * @returns `{ isRepeat, count, hash, deduped? }`.
  */
-export function denyLoopCheck(hash: string, priorDenies: Record<string, DenyEntry>, opts: { now: number; windowMs: number }): DenyLoopResult {
+export function denyLoopCheck(hash: string, priorDenies: Record<string, DenyEntry>, opts: { now: number; windowMs: number; dedupMs?: number }): DenyLoopResult {
   const prev = priorDenies[hash];
   const fresh = prev && typeof prev.lastTs === "number" && opts.now - prev.lastTs < opts.windowMs;
-  const count = (fresh ? prev.count : 0) + 1;
+  if (!fresh) return { isRepeat: false, count: 1, hash };
+  if ((opts.dedupMs ?? 0) > 0 && opts.now - prev.lastTs < (opts.dedupMs ?? 0)) {
+    return { isRepeat: prev.count > 1, count: prev.count, hash, deduped: true };
+  }
+  const count = prev.count + 1;
   return { isRepeat: count > 1, count, hash };
 }
 

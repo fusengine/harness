@@ -64,6 +64,9 @@ export async function runScenario(path: string): Promise<void> {
   materializeSetup(scenario.setup ?? [], tmp, vars);
   for (const [i, rawStep] of scenario.steps.entries()) {
     const step = substitute(rawStep, vars);
+    // Real wall-clock gap so a time-window guard in the binary (burst dedup)
+    // reads this step as a genuine retry, not a same-event sibling hook.
+    if (step.delayMs && step.delayMs > 0) await Bun.sleep(step.delayMs);
     const res = runHook(step.scope, step.event, tmp, env);
     const failure = checkStep(step, res);
     if (failure) {

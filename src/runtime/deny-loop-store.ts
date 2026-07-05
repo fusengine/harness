@@ -18,13 +18,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { atomicWrite } from "../util/json-io";
 import { denyHash, denyLoopCheck, enrichRepeatDeny, type DenyEntry, type DenyLoopResult } from "../policy/deny-loop";
+import { BURST_DEDUP_MS } from "./burst-window";
 import type { Prompt } from "../prompt/types";
 
 /** Sidecar basename under the per-project state dir. */
 const SIDECAR = "deny-loop.json";
 
-/** Injected clock + state dir + expiry window (no env var; the gate supplies all three). */
-export interface DenyLoopOpts { now: number; dir: string; windowMs: number; }
+/**
+ * Injected clock + state dir + expiry window (no env var; the gate supplies all
+ * three). `sessionId` — when present — scopes the map key AND arms the burst
+ * dedup ({@link module:burst-window}) so the ~11 sibling plugin hooks of ONE
+ * event count once, not once each; two sessions never share a counter. Omitted
+ * by mono-process callers/tests → historical per-hash, no-dedup behaviour.
+ */
+export interface DenyLoopOpts { now: number; dir: string; windowMs: number; sessionId?: string; }
 
 /** Load the `{ hash -> DenyEntry }` map, or `{}` when missing/corrupt. */
 function loadMap(path: string): Record<string, DenyEntry> {
@@ -57,12 +64,16 @@ function prune(map: Record<string, DenyEntry>, now: number, windowMs: number): R
  */
 export function recordDeny(tool: string, input: Record<string, unknown>, opts: DenyLoopOpts): DenyLoopResult {
   const hash = denyHash(tool, input);
+  const sid = opts.sessionId?.trim();
+  const key = sid ? `${hash}::${sid}` : hash;
   const path = join(opts.dir, SIDECAR);
   const map = prune(loadMap(path), opts.now, opts.windowMs);
-  const res = denyLoopCheck(hash, map, opts);
-  map[hash] = { count: res.count, lastTs: opts.now };
-  try { atomicWrite(path, JSON.stringify(map)); } catch { /* fail-open: never fabricate a repeat */ }
-  return res;
+  const res = denyLoopCheck(key, map, { now: opts.now, windowMs: opts.windowMs, dedupMs: sid ? BURST_DEDUP_MS : 0 });
+  if (!res.deduped) {
+    map[key] = { count: res.count, lastTs: opts.now };
+    try { atomicWrite(path, JSON.stringify(map)); } catch { /* fail-open: never fabricate a repeat */ }
+  }
+  return { ...res, hash };
 }
 
 /**

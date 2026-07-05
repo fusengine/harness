@@ -60,7 +60,8 @@ test("withDenyLoop: a repeated block is enriched; the first is not", () => {
 });
 
 // Integration through gate(): the sidecar lands in dirname(trackFile), so reusing
-// the same track file across calls shares the deny map.
+// the same track file across calls shares the deny map. (Burst dedup coverage
+// lives in burst-dedup.test.ts.)
 const oversized = (trackFile: string): GateInput => ({
   sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts",
   content: "x\n".repeat(150), now: 5000, trackFile, windowMs: 10000,
@@ -70,7 +71,9 @@ test("gate: 1st deny is normal; an identical retry becomes [REPEAT] with a resea
   const f = join(dir(), "t.json");
   const first = await gate(oversized(f));
   expect(first?.title).toBe("SOLID file-size limit");
-  const second = await gate({ ...oversized(f), now: 6000 });
+  // Spaced BEYOND the burst window (oversized carries sessionId "s1", arming the
+  // fan-out dedup): now 5000 → 8000 is a genuine retry, so it escalates.
+  const second = await gate({ ...oversized(f), now: 8000 });
   expect(second?.title).toBe("[REPEAT] SOLID file-size limit");
   expect(second?.actions?.[0]).toContain("research-expert");
 });

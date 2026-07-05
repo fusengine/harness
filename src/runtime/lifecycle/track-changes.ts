@@ -1,7 +1,9 @@
 import { basename } from "node:path";
 import { homedir } from "node:os";
 import { contextResponse } from "../../adapters/claude";
-import { loadSessionState, sanitizeSessionId, saveSessionState } from "../home-state";
+import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } from "../home-state";
+import { oncePerWindow } from "../inject-dedup";
+import { BURST_DEDUP_MS } from "../burst-window";
 
 /** Code-file extensions tracked for sniper (mirrors track-session-changes.py). */
 const CODE_EXT = /\.(ts|tsx|js|jsx|py|go|rs|java|php|cpp|c|rb|swift|kt|vue|svelte|astro)$/;
@@ -39,6 +41,10 @@ export function trackSessionChanges(sessionIdRaw: unknown, filePath: string, hom
     lastCheck: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
   } satisfies Changes;
   saveSessionState(sid, state, home);
+  // Emit the mandatory reminder ONCE per (file+session) burst: the ~11 sibling
+  // plugin hooks of one PostToolUse event would otherwise inject it ~11× (token
+  // noise). A real re-edit past the window reminds again. See burst-window.
+  if (!oncePerWindow(`sniper:${sid}:${filePath}`, BURST_DEDUP_MS, { now, dir: sessionsDir(home) })) return "";
   const fname = basename(filePath);
   return contextResponse(
     "PostToolUse",

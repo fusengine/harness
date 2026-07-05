@@ -19,6 +19,7 @@ import { atomicWrite } from "../util/json-io";
 import { denyHash } from "../policy/deny-loop";
 import { defaultStateDir } from "../runtime/paths";
 import { applyAllow, applyDeny, EMPTY, formatSummary, pruneState, type OneShotState } from "./one-shot-store";
+import { burstFirst } from "./one-shot-dedup";
 import type { Prompt } from "../prompt/types";
 
 /** Sidecar basename under the per-project state dir. */
@@ -27,8 +28,13 @@ const SIDECAR = "one-shot.json";
 /** Retention window: 7 days. Aggregates and pending denies older than this are pruned. */
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Injected clock + state dir (no env var; the gate supplies both). */
-export interface OneShotOpts { now: number; dir: string; }
+/**
+ * Injected clock + state dir (no env var; the gate supplies both). `sessionId` —
+ * when present — arms the burst dedup ({@link module:one-shot-dedup}) so the ~11
+ * sibling plugin hooks of ONE event count once, not once each. Omitted by
+ * mono-process callers/tests → un-deduped historical behaviour.
+ */
+export interface OneShotOpts { now: number; dir: string; sessionId?: string; }
 
 /** Identifying tool input (content-free); `content` only decides gateability. */
 export interface OneShotInput { filePath?: string; content?: string; command?: string; }
@@ -58,9 +64,10 @@ function loadState(path: string): OneShotState {
 export function recordOneShot(prompt: Prompt | null, input: OneShotInput, opts: OneShotOpts): void {
   try {
     if (prompt && prompt.kind !== "block") return;
+    const op = denyHash("op", { filePath: input.filePath, command: input.command });
+    if (!burstFirst(op, prompt ? `deny:${prompt.title}` : "allow", opts)) return;
     const path = join(opts.dir, SIDECAR);
     let s = pruneState(loadState(path), opts.now, WINDOW_MS);
-    const op = denyHash("op", { filePath: input.filePath, command: input.command });
     s = prompt
       ? applyDeny(s, prompt.title, op, opts.now)
       : applyAllow(s, op, opts.now, input.content != null || input.command != null);

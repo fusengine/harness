@@ -38,6 +38,16 @@ test("compressInjection: a bullet without → falls back to its first sentence",
   expect(last).not.toContain("deux phrase ignoree");
 });
 
+test("compressInjection: a bullet whose LAST → segment is a tiny aside keeps the longest rule, not the stub", () => {
+  const older = Array.from({ length: RECENT_FULL }, (_v, i) => `- [2026-06-${String(i + 1).padStart(2, "0")} 09:00] filler bullet ${i}`);
+  const patho = "- [2026-07-02 00:02] narrative context blah blah → always re-check git status before staging a shared batch commit → (cf. lecture).";
+  const out = compressInjection("# LESSON.md\n\n" + [...older, patho].join("\n") + "\n");
+  const last = out.split("\n").at(-1) ?? "";
+  expect(last).toContain("always re-check git status before staging a shared batch commit"); // the dense clause, not the last arrow
+  expect(last).not.toContain("(cf. lecture)."); // the old "text after LAST →" stub is gone
+  expect(last.length).toBeGreaterThanOrEqual(40);
+});
+
 test("compressInjection: massive shrink on a large file (>70%)", () => {
   const input = bullets(120);
   const before = `Project lessons:\n${input}`.length;
