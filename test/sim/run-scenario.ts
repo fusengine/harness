@@ -4,16 +4,34 @@
  * test (`simulator.test.ts`) imports {@link runScenario} and iterates the JSON
  * files under `scenarios/`.
  */
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { loadScenario, substitute } from "./load";
 import { runHook, spawnEnv } from "./exec";
 import { matchExit, matchStdout } from "./match";
-import type { Step, SpawnResult } from "./types";
+import type { SetupFile, Step, SpawnResult } from "./types";
 
 /** Absolute path to `test/sim/fixtures`, resolved from this file. */
 const FIXTURES: string = join(import.meta.dir, "fixtures");
+
+/**
+ * Materialize each declared setup file under `$TMP` before any step runs, so the
+ * spawned binary finds the on-disk state it needs (e.g. `.git`/`package.json`
+ * project markers that `projectRootOrNull` walks up to). Each path is token-
+ * substituted and containment-checked: it MUST resolve inside `tmp`, so a typo'd
+ * scenario can never write outside the per-run sandbox.
+ * @throws Error when a resolved path escapes `tmp`.
+ */
+function materializeSetup(setup: SetupFile[], tmp: string, vars: Record<string, string>): void {
+  for (const raw of setup) {
+    const f = substitute(raw, vars);
+    const abs = resolve(f.path);
+    if (abs !== tmp && !abs.startsWith(tmp + sep)) throw new Error(`setup path escapes $TMP: ${f.path}`);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, f.content);
+  }
+}
 
 /** Check a step's result; return a failure string or `null` on pass. */
 function checkStep(step: Step, res: SpawnResult): string | null {
@@ -43,6 +61,7 @@ export async function runScenario(path: string): Promise<void> {
   const tmp = mkdtempSync(join(tmpdir(), "fh-sim-"));
   const vars = { TMP: tmp, FIXTURES };
   const env = spawnEnv(FIXTURES, tmp, substitute(scenario.env, vars));
+  materializeSetup(scenario.setup ?? [], tmp, vars);
   for (const [i, rawStep] of scenario.steps.entries()) {
     const step = substitute(rawStep, vars);
     const res = runHook(step.scope, step.event, tmp, env);

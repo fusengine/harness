@@ -12,6 +12,7 @@ import { validateRulesLoaded } from "./instructions-loaded";
 import { validateTaskSolid } from "./task-completed";
 import { cartoSessionStart } from "./cartographer/session-start";
 import { dispatchLessons } from "./lessons/dispatch";
+import { withSnapshot } from "./snapshot";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
 export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss";
@@ -31,7 +32,10 @@ function sessionStart(input: LifecycleInput): string {
   if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd);
   if (input.scope === "carto") return cartoSessionStart(input.cwd, input.now);
   if (input.scope === "lessons") return dispatchLessons("SessionStart", input.payload, input.cwd, input.now);
-  return sessionStartCore(input.cwd, undefined, input.now);
+  const core = sessionStartCore(input.cwd, undefined, input.now);
+  // core scope only: concatenate the reconciliation snapshot onto the existing
+  // additionalContext (CLAUDE.md + dev-context) — never replaces it, fail-safe.
+  return input.scope === "core" ? withSnapshot(core, input.cwd, import.meta.url) : core;
 }
 
 /**

@@ -30,12 +30,22 @@ export interface Step {
   expect: StepExpect;
 }
 
-/** A full scenario file: a name, an optional env overlay, and ordered steps. */
+/** A file materialized under `$TMP` before any step runs (e.g. a project marker). */
+export interface SetupFile {
+  /** Absolute path (use the `$TMP` token); must resolve inside `$TMP`, parents auto-created. */
+  path: string;
+  /** File contents written verbatim (tokens substituted). */
+  content: string;
+}
+
+/** A full scenario file: a name, an optional env overlay, setup files, and ordered steps. */
 export interface Scenario {
   /** Human-readable scenario name (surfaced in failure messages). */
   name: string;
   /** Optional env overlay merged over the deterministic minimal spawn env. */
   env?: Record<string, string>;
+  /** Files to create under `$TMP` before steps run — e.g. `.git`/`package.json` roots. */
+  setup?: SetupFile[];
   /** Ordered steps sharing one `$TMP` (session state persists across them). */
   steps: Step[];
 }

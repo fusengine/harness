@@ -1,0 +1,16 @@
+{
+  "name": "sessionstart-snapshot",
+  "doc": "SessionStart (core scope) injects the reconciliation snapshot as additionalContext, concatenated onto the existing CLAUDE.md/dev-context injection (dispatch.ts sessionStart → withSnapshot). $TMP is not a git repo so the Git section is omitted, but the Version collector always renders the running harness version (snapshot/version.ts collectVersion), so the block is present. Proves the wiring end-to-end through the real CLI: renderSnapshot → attachSnapshot → contextResponse. Unit parity: test/snapshot.test.ts.",
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "SessionStart → stdout carries the snapshot heading + the always-present harness version line inside additionalContext.",
+      "event": {
+        "hook_event_name": "SessionStart",
+        "session_id": "sc14",
+        "source": "startup"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Reconciliation snapshot" } }
+    }
+  ]
+}
