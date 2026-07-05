@@ -1,0 +1,44 @@
+{
+  "name": "lessons-stop-session-scope",
+  "doc": "Multi-session isolation for the fuse-lessons Stop reminder (the production bug: 2-3 concurrent Claude sessions on different projects, one session's Stop lists the WRONG project's LESSON.md and steals the reminder). Steps share HOME=$TMP, so the home-rooted session-roots registry ($HOME/.fuse-harness/cache/lessons/session-roots.json) is shared exactly as it is across real concurrent sessions. Two projects under $TMP each carry a package.json marker so projectRootOrNull resolves to distinct roots. Session s1 code-edits project A; session s2 code-edits project B (PostToolUse, scope lessons → post-tracking.ts markWrite, keyed by payload.session_id). Stop s2 must list ONLY project B (regex forbids 'projA', requires 'projB/MEMORY/LESSON.md'); Stop s1 must then STILL list project A — proving s2's Stop neither showed nor consumed s1's pending reminder. On the pre-fix global-registry code, Stop s2 would list AND throttle both roots, so Stop s1 would come back empty: the scoping regression is caught by step 4.",
+  "setup": [
+    { "path": "$TMP/projA/package.json", "content": "{}" },
+    { "path": "$TMP/projB/package.json", "content": "{}" }
+  ],
+  "steps": [
+    {
+      "scope": "lessons",
+      "doc": "Session s1 edits a code file in project A → marks (s1, projA).editedAt. PostToolUse mark is side-effect only.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "s1",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/projA/src/a.ts" }
+      },
+      "expect": { "exit": 0 }
+    },
+    {
+      "scope": "lessons",
+      "doc": "Session s2 edits a code file in project B → marks (s2, projB).editedAt, in the SAME shared registry.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "s2",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/projB/src/b.ts" }
+      },
+      "expect": { "exit": 0 }
+    },
+    {
+      "scope": "lessons",
+      "doc": "Stop s2 → reminder lists ONLY project B; project A must NOT appear (no misdirection).",
+      "event": { "hook_event_name": "Stop", "session_id": "s2" },
+      "expect": { "exit": 0, "stdout": { "regex": "^(?!.*projA).*projB/MEMORY/LESSON\\.md" } }
+    },
+    {
+      "scope": "lessons",
+      "doc": "Stop s1 → still lists project A. Pre-fix (global registry) this would be empty because s2's Stop already consumed/throttled projA.",
+      "event": { "hook_event_name": "Stop", "session_id": "s1" },
+      "expect": { "exit": 0, "stdout": { "contains": "projA/MEMORY/LESSON.md" } }
+    }
+  ]
+}

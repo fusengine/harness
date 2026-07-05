@@ -12,6 +12,7 @@ import { isTailwindWrite, tailwindSkillGate } from "../policy/tailwind-skill-gat
 import { geminiMcpGate } from "../policy/gemini-mcp-gate";
 import { apexScopedGate } from "./gate-apex";
 import { withDenyLoop } from "./deny-loop-store";
+import { recordOneShot } from "../tracking/one-shot";
 import { dirname } from "node:path";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
@@ -32,15 +33,16 @@ export const DEFAULT_WINDOW_MS = 120_000;
 export const TRIVIAL_BUDGET = 4;
 
 /**
- * Full gate: {@link runGates} yields the first blocking prompt (or null); the
- * anti-loop tail ({@link withDenyLoop}) rewrites an identical retried deny's
- * message (decision unchanged). Sidecar dir = the track's dir (tests off `$HOME`).
+ * Full gate: {@link runGates} yields the first blocking prompt (or null); the tail
+ * records the one-shot metric ({@link recordOneShot}, observation-only) then lets
+ * {@link withDenyLoop} rewrite an identical retried deny (decision unchanged).
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
   const prompt = await runGates(input);
-  return withDenyLoop(prompt, input.tool, { filePath: input.filePath, content: input.content, command: input.command }, {
-    now: input.now, dir: dirname(input.trackFile), windowMs: input.windowMs ?? DEFAULT_WINDOW_MS,
-  });
+  const op = { filePath: input.filePath, content: input.content, command: input.command };
+  const dir = dirname(input.trackFile);
+  recordOneShot(prompt, op, { now: input.now, dir });
+  return withDenyLoop(prompt, input.tool, op, { now: input.now, dir, windowMs: input.windowMs ?? DEFAULT_WINDOW_MS });
 }
 
 /** Stateless guards, then the trivial fast path, then the stateful APEX gates. */

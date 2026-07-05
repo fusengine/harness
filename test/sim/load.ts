@@ -16,14 +16,8 @@ function asObject(v: unknown, ctx: string): Record<string, unknown> {
 /**
  * Validate a step's optional `stdout` matcher — exactly one recognised form,
  * checked by key presence in precedence order (`empty` > `contains` > `regex` >
- * `jsonPath`). Without this, a malformed matcher is cast blindly and later throws
- * an opaque `undefined.split` deep in {@link matchStdout}'s jsonPath branch; here
- * it fails fast, located and named.
- *
- * @param v   - Raw `expect.stdout` value from the scenario JSON.
- * @param ctx - Locating prefix for the thrown error.
- * @returns A validated {@link StepExpect.stdout}, or `undefined` when absent.
- * @throws Error when present but matching none of the four forms.
+ * `jsonPath`). Fails fast (located, named) instead of casting a malformed matcher
+ * blindly into an opaque `undefined.split` deep in {@link matchStdout}'s jsonPath branch.
  */
 function validateStdout(v: unknown, ctx: string): StepExpect["stdout"] {
   if (v === undefined) return undefined;
@@ -49,6 +43,17 @@ function validateStep(v: unknown, ctx: string): Step {
   return { scope: o.scope, event: asObject(o.event, `${ctx}.event`), expect: validateExpect(o.expect, ctx) };
 }
 
+/** Validate the optional `setup` array (each entry: string `path` + string `content`). */
+function validateSetup(v: unknown, ctx: string): Scenario["setup"] {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v)) throw new Error(`${ctx}: "setup" must be an array`);
+  return v.map((f, i) => {
+    const o = asObject(f, `${ctx} setup[${i}]`);
+    if (typeof o.path !== "string" || typeof o.content !== "string") throw new Error(`${ctx} setup[${i}] needs string path + content`);
+    return { path: o.path, content: o.content };
+  });
+}
+
 /** Validate a parsed scenario against {@link Scenario}. Throws on any schema breach. */
 export function validateScenario(data: unknown, path: string): Scenario {
   const o = asObject(data, `scenario ${path}`);
@@ -56,7 +61,7 @@ export function validateScenario(data: unknown, path: string): Scenario {
   if (!Array.isArray(o.steps) || o.steps.length === 0) throw new Error(`scenario ${path}: "steps" must be a non-empty array`);
   const steps = o.steps.map((s, i) => validateStep(s, `scenario ${path} step ${i + 1}`));
   const env = o.env === undefined ? undefined : (asObject(o.env, `scenario ${path} env`) as Record<string, string>);
-  return { name: o.name, env, steps };
+  return { name: o.name, env, setup: validateSetup(o.setup, `scenario ${path}`), steps };
 }
 
 /** Read and structurally validate a scenario JSON file. Throws on bad JSON or schema. */
