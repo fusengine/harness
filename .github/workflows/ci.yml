@@ -21,3 +21,7 @@ jobs:
         run: bun test
       - name: Typecheck
         run: bunx tsc --noEmit
+      - name: Build
+        run: bun run build
+      - name: Simulator (built binary)
+        run: SIM_BIN=dist/cli/bin.mjs bun test test/sim/

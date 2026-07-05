@@ -1,0 +1,40 @@
+{
+  "name": "deny-loop-repeat",
+  "doc": "Mechanical anti-loop (NEVER propose the same fix twice). Two IDENTICAL denied tool-calls in the same project state dir: the 2nd (and 3rd) get the message rewritten with a `[REPEAT]` title, a `STOP:` prefix and a forced research-expert action, while the DECISION stays block. Uses a tiny `git reset --hard` deny (evaluate GIT_BLOCKED, patterns.ts:9 → block \"Destructive git command\", evaluate.ts:22-34) as the stable identical block so the payload is small; ANY block is wrapped by withDenyLoop (gate.ts:41, deny-loop-store.ts:79-83). The sidecar deny-loop.json lives in dirname(trackFile) = the per-project state dir, persisting across the separate binary spawns (needs HOME+cwd stable). denyHash keys on tool+normalized input (deny-loop.ts:38), NOT session_id — see 09-session-track-isolation for what IS session-scoped.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "First deny is NORMAL (count 1, isRepeat false, deny-loop.ts:50-55). Reason = `[BLOCKED] Destructive git command`.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc03",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Destructive git command" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Identical retry → count 2, isRepeat true → enrichRepeatDeny (deny-loop.ts:65-74): title prefixed `[REPEAT]`.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc03",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "[REPEAT]" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Still identical → count 3, still repeat; assert the STOP prefix (deny-loop.ts:66 `STOP: ne retente pas ce même appel`).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc03",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "STOP" } }
+    }
+  ]
+}

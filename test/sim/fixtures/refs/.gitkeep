@@ -1,0 +1,7 @@
+# Empty SOLID refs dir.
+#
+# The simulator spawns the binary with FUSE_HARNESS_REFS=$FIXTURES/refs.
+# Kept intentionally EMPTY (no *.md): loadRefs() returns [] so solidReadGate
+# stays OFF (`if (!ctx.refs?.length) return null`, src/policy/apex-gates.ts:24),
+# isolating every scenario from the "read SOLID references" gate. A scenario that
+# needs refs loaded would drop a *.md fixture here instead.

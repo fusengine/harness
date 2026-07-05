@@ -1,0 +1,18 @@
+{
+  "name": "allow-read-noncode",
+  "doc": "The clean allow-path. A PreToolUse Read of a NON-code file passes every gate → empty stdout, exit 0 (pre-allow.ts allowOutcome:39 returns \"\" when no pass-notice/lesson fires; empty lessons + no design agent in $TMP). IMPORTANT: the target is a .md, not a code file — a Read of a *code* file would still hit apexScopedGate/freshnessGate (gate.ts:92 runs apexScopedGate for ANY tool when isApexScoped(filePath), and freshnessGate is tool-agnostic, apex-gates.ts:68-69). In production the core hook only wires Write|Edit so a Read never reaches this; the simulator sends the raw event, so we use a non-code path to stay unambiguously allowed.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Read README.md: isFileSizeScoped=false (file-size-scope.ts:12 excludes .md) and isApexScoped=false (gate-helpers.ts:23 CODE_EXT excludes .md) → evaluate allow → gate() null → allowOutcome empty.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc02",
+        "tool_name": "Read",
+        "tool_input": { "file_path": "$TMP/README.md" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "name": "evidence-harvest-unblocks-freshness",
+  "doc": "The v0.1.51 retroactive-harvest parcours (core scope). A code Write is first blocked by the freshness gate (no explore/research evidence). A SubagentStop carrying agent_transcript_path harvests the finishing sub-agent's OWN transcript into the session track (evidence-harvest-io.ts:37 harvestSubagentTrack → evidence-harvest.ts, dispatched at dispatch.ts:62 BEFORE the reminder). The transcript's Glob + exa tool_uses classify as explore-codebase + research-expert (explore-tools.ts:82-83), forced `sufficient` on harvest (evidence-harvest.ts:39). The SAME Write then advances PAST freshnessGate — and stops at the NEXT gate, Check-1 doc consultation (\"APEX: <fw> documentation required\", gate-apex.ts:70-75, apexauth-evidence.test.ts:81-88). The block MOVING from explore→documentation is the proof the harvest credited freshness. NOTE: harvest credits AGENTS only, never doc consultation (recordDoc), so a full allow additionally needs the doc gate satisfied — see 08 for that. The transcript fixture has NO timestamps on purpose: harvest stamps evidence at the SubagentStop's own now (evidence-harvest.ts:35 fallbackNow), keeping it fresh for the next step. aipilot scope would SKIP the harvest (dispatch.ts:56-57 returns \"\") — this must run in core.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Fresh session, no evidence → freshnessGate blocks (apex-gates.ts:68-77 \"APEX: explore + research required\"). react .ts (detect-framework.ts:6) with plain content reaches apexScopedGate (proven by test/handle.test.ts:34).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc07",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "explore" } }
+    },
+    {
+      "scope": "core",
+      "doc": "SubagentStop with agent_transcript_path → harvest records explore + research into trackFile(sc07). agent_type=research-expert is in SKIP_AGENTS so trackAgentMemory returns {message:\"Agent research-expert completed\"} (agent-memory.ts:48) — but the harvest ran FIRST regardless.",
+      "event": {
+        "hook_event_name": "SubagentStop",
+        "session_id": "sc07",
+        "agent_type": "research-expert",
+        "agent_transcript_path": "$FIXTURES/transcripts/explore-research.jsonl"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "completed" } }
+    },
+    {
+      "scope": "core",
+      "doc": "The SAME Write now clears freshnessGate (harvested evidence) and hits Check-1 doc consultation → \"APEX: react documentation required\" (title contains 'documentation'). This Write repeats step 1's identical payload, so the anti-loop also prefixes [REPEAT] — harmless, the title substring 'documentation' still holds (deny-loop.ts:70 keeps the title).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc07",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "documentation" } }
+    }
+  ]
+}

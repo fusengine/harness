@@ -1,0 +1,42 @@
+{
+  "name": "taskcompleted-with-receipt",
+  "doc": "The passing variant of the receipt gate. Same modified code file, but a PostToolUse Bash `bun test` (exit 0, 0 fail) is captured as a fresh passing receipt (handle-post.ts:38-42 captureReceipt → tracking/receipts.ts:95-100), so TaskCompleted returns \"\" (completion allowed). Unit parity: test/task-completed.test.ts:38-46. The receipt lives in trackFile(sid, defaultStateDir(cwd)) and the TaskCompleted gate reads the SAME path (task-completed.ts:43) — HOME+cwd must be stable across the three spawns.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "PostToolUse Write → modifiedFiles (SNIPER reminder proves it).",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc05b",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/ok.ts", "content": "export const x = 1;\n" },
+        "tool_response": "ok"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "SNIPER VALIDATION REQUIRED" } }
+    },
+    {
+      "scope": "core",
+      "doc": "PostToolUse Bash `bun test` with a passing tool_result → classifyReceipt kind=test, exit 0, pass 3 fail 0 (receipts.ts:54-61 TEST_RE + parseCounts) → captured as a passing receipt. The Bash post path emits nothing itself (empty stdout).",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc05b",
+        "tool_name": "Bash",
+        "tool_input": { "command": "bun test" },
+        "tool_result": { "exit_code": 0, "stdout": "3 pass, 0 fail", "stderr": "" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "TaskCompleted now finds a fresh passing receipt (window = TTL×5, task-completed.ts:42) → receiptGate returns null → validateTaskSolid returns \"\" → completion passes.",
+      "event": {
+        "hook_event_name": "TaskCompleted",
+        "session_id": "sc05b",
+        "task_id": "t-2",
+        "task_subject": "Port module"
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}
