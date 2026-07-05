@@ -1,58 +1,13 @@
 /**
  * @module test/sim/load
- * Scenario loading, structural validation, and placeholder substitution. Pure —
- * no spawn, no filesystem beyond reading the scenario file — so it is unit-testable
- * in isolation from the binary under test.
+ * Scenario loading and placeholder substitution. Pure — no spawn, no filesystem
+ * beyond reading the scenario file — so it is unit-testable in isolation from the
+ * binary under test. Field-level validators live in ./validate (SRP split):
+ * load.ts orchestrates file->Scenario, ./validate owns the per-field rules.
  */
 import { readFileSync } from "node:fs";
-import type { Scenario, Step, StepExpect } from "./types";
-
-/** Assert `v` is a plain object, else throw a located error. */
-function asObject(v: unknown, ctx: string): Record<string, unknown> {
-  if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error(`${ctx} must be an object`);
-  return v as Record<string, unknown>;
-}
-
-/**
- * Validate a step's optional `stdout` matcher — exactly one recognised form,
- * checked by key presence in precedence order (`empty` > `contains` > `regex` >
- * `jsonPath`). Fails fast (located, named) instead of casting a malformed matcher
- * blindly into an opaque `undefined.split` deep in {@link matchStdout}'s jsonPath branch.
- */
-function validateStdout(v: unknown, ctx: string): StepExpect["stdout"] {
-  if (v === undefined) return undefined;
-  const o = asObject(v, `${ctx} expect.stdout`);
-  if (o.empty === true) return { empty: true };
-  if (typeof o.contains === "string") return { contains: o.contains };
-  if (typeof o.regex === "string") return { regex: o.regex };
-  if (typeof o.jsonPath === "string") return { jsonPath: o.jsonPath, equals: o.equals };
-  throw new Error(`${ctx} expect.stdout must have one of: empty:true, contains, regex, or jsonPath`);
-}
-
-/** Validate one step's `expect` block (asserts only the fields present). */
-function validateExpect(v: unknown, ctx: string): StepExpect {
-  const o = asObject(v, `${ctx} expect`);
-  if (o.exit !== undefined && typeof o.exit !== "number") throw new Error(`${ctx} expect.exit must be a number`);
-  return { exit: o.exit as number | undefined, stdout: validateStdout(o.stdout, ctx) };
-}
-
-/** Validate one step (scope string, event object, expect block). */
-function validateStep(v: unknown, ctx: string): Step {
-  const o = asObject(v, ctx);
-  if (typeof o.scope !== "string") throw new Error(`${ctx}.scope must be a string`);
-  return { scope: o.scope, event: asObject(o.event, `${ctx}.event`), expect: validateExpect(o.expect, ctx) };
-}
-
-/** Validate the optional `setup` array (each entry: string `path` + string `content`). */
-function validateSetup(v: unknown, ctx: string): Scenario["setup"] {
-  if (v === undefined) return undefined;
-  if (!Array.isArray(v)) throw new Error(`${ctx}: "setup" must be an array`);
-  return v.map((f, i) => {
-    const o = asObject(f, `${ctx} setup[${i}]`);
-    if (typeof o.path !== "string" || typeof o.content !== "string") throw new Error(`${ctx} setup[${i}] needs string path + content`);
-    return { path: o.path, content: o.content };
-  });
-}
+import type { Scenario } from "./types";
+import { asObject, validateSetup, validateStep } from "./validate";
 
 /** Validate a parsed scenario against {@link Scenario}. Throws on any schema breach. */
 export function validateScenario(data: unknown, path: string): Scenario {

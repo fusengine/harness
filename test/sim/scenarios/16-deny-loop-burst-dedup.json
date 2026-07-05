@@ -1,0 +1,41 @@
+{
+  "name": "deny-loop-burst-dedup",
+  "doc": "Fan-out burst dedup end-to-end (v0.1.55). Every deployed plugin registers its own PreToolUse hook, so ONE tool event spawns ~11 sibling binaries that each recordDeny the SAME (hash+session_id) within milliseconds — pre-fix this inflated the counter by ~11 ([REPEAT] '#9' on the FIRST real try). This scenario proves the collapse THROUGH the real binary: step 1 = first deny (count 1); step 2 fired IMMEDIATELY (no delay) simulates a sibling hook of the same event — folded into #1 by BURST_DEDUP_MS (src/runtime/burst-window.ts, deny-loop-store.ts recordDeny), so it stays a normal deny, NOT a [REPEAT]; step 3, spaced past the window (delayMs 2100), is the FIRST genuine retry → count 2, NOT 3. Asserting `Identical attempt #2` on step 3 is the discriminator: without the dedup step 2 would have bumped to 2 and step 3 to 3 (`#3`). Sidecar deny-loop.json persists across spawns in dirname(trackFile) (HOME+cwd stable).",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "First deny: count 1, normal message.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc16",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Destructive git command" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Sibling hook of the SAME event, fired immediately (<2s) → folded into #1, still a NORMAL deny (no [REPEAT] title). This is the ×11 amplification being collapsed to ×1.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc16",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Destructive git command" } }
+    },
+    {
+      "scope": "core",
+      "doc": "First GENUINE retry, spaced past the burst window → count 2 (NOT 3, which is exactly what proves step 2 did not re-increment). enrichRepeatDeny → `Identical attempt #2`.",
+      "delayMs": 2100,
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc16",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git reset --hard HEAD~1" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Identical attempt #2" } }
+    }
+  ]
+}

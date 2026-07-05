@@ -28,6 +28,12 @@ export interface Step {
   event: Record<string, unknown>;
   /** Assertions checked against the spawn result. */
   expect: StepExpect;
+  /**
+   * Optional real wall-clock delay (ms) BEFORE this step spawns. Used to space
+   * two otherwise-identical steps beyond a time-window guard in the binary
+   * (e.g. the burst dedup) so they read as GENUINE retries, not a fan-out burst.
+   */
+  delayMs?: number;
 }
 
 /** A file materialized under `$TMP` before any step runs (e.g. a project marker). */

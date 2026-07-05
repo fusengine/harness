@@ -41,8 +41,8 @@ export async function gate(input: GateInput): Promise<Prompt | null> {
   const prompt = await runGates(input);
   const op = { filePath: input.filePath, content: input.content, command: input.command };
   const dir = dirname(input.trackFile);
-  recordOneShot(prompt, op, { now: input.now, dir });
-  return withDenyLoop(prompt, input.tool, op, { now: input.now, dir, windowMs: input.windowMs ?? DEFAULT_WINDOW_MS });
+  recordOneShot(prompt, op, { now: input.now, dir, sessionId: input.sessionId });
+  return withDenyLoop(prompt, input.tool, op, { now: input.now, dir, windowMs: input.windowMs ?? DEFAULT_WINDOW_MS, sessionId: input.sessionId });
 }
 
 /** Stateless guards, then the trivial fast path, then the stateful APEX gates. */
