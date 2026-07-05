@@ -2,6 +2,13 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.52] - 05-07-2026
+
+### Added
+
+- Hook simulator (`test/sim/`): a 12-scenario corpus of full hook-event sequences (payload on stdin → expected verdict on stdout) replayed against the REAL binary — `bun src/cli/bin.ts` locally and `node dist/cli/bin.mjs` (`SIM_BIN`) in CI after a build. Each scenario runs in a fresh `$TMP` (HOME=cwd) with a scrubbed env, shared across its steps so on-disk session state persists: block → comply → pass, deny-loop `[REPEAT]`, TaskCompleted receipt refusal, SubagentStop evidence harvest, session isolation, git ask/deny, SKILL.md tolerance and solid-scope routing are all exercised end-to-end. Kills the "ported but never wired" and "works from src, broken in dist" classes — the dist mode caught a real relative-path spawn bug before this ever merged.
+- CI: `Build` + `SIM_BIN=dist/cli/bin.mjs bun test test/sim/` steps; `bun run sim` script. Guards: a present-but-empty scenario dir fails red (no silent green), malformed stdout matchers are rejected at load with a located error.
+
 ## [0.1.51] - 03-07-2026
 
 ### Added
