@@ -1,6 +1,7 @@
 /**
  * Tests for curateLessons: strict-dedup (newest kept, TRIGGERS preserved),
- * STALE report on a vanished cited path, and the byte-identical no-op invariant.
+ * STALE report on a vanished cited path, the byte-identical no-op invariant, and
+ * the Stage-1 cap→archive split (zero-loss + TRIGGERS staleness protection).
  */
 import { test, expect } from "bun:test";
 import { curateLessons } from "../src/runtime/lifecycle/aipilot/curate-lessons";
@@ -43,9 +44,7 @@ test("TRIGGERS carry-over: when the kept (newest) twin lacks the tag, it is carr
 });
 
 test("STALE report: a >90d bullet whose only cited path is gone is flagged (not removed)", () => {
-  const input =
-    "# LESSON.md\n\n" +
-    "- [2020-01-01 00:00] ancienne leçon référant `src/gone/missing.ts` disparu\n";
+  const input = "# LESSON.md\n\n- [2020-01-01 00:00] ancienne leçon référant `src/gone/missing.ts` disparu\n";
   const { content, report } = curateLessons(input, NOW, ABSENT_ROOT);
   expect(report).toContain("[STALE?]");
   expect(report).toContain("src/gone/missing.ts");
@@ -60,4 +59,38 @@ test("no-op: distinct bullets leave content byte-identical and report empty", ()
   const { content, report } = curateLessons(input, NOW, ABSENT_ROOT);
   expect(content).toBe(input);
   expect(report).toBe("");
+});
+
+/** `n` distinct dated bullets, newest first (index 0 = newest ts). */
+function manyBullets(n: number): string {
+  const rows = Array.from({ length: n }, (_v, i) => {
+    const day = new Date(Date.UTC(2026, 5, 20) - i * 86400000).toISOString().slice(0, 10);
+    return `- [${day} 10:00] sujet numero ${i} alpha${i} beta${i} gamma${i} delta${i} epsilon${i}`;
+  });
+  return `# LESSON.md\n\n${rows.join("\n")}\n`;
+}
+/** Count `- ` bullets in a rendered block. */
+function count(md: string): number { return (md.match(/^- /gm) ?? []).length; }
+test("cap→archive: over CAP moves the oldest excess out, ZERO loss (keep + archive == total)", () => {
+  const { content, archive } = curateLessons(manyBullets(60), NOW, ABSENT_ROOT);
+  expect(count(content)).toBe(50); // capped at CAP
+  expect(count(content) + count(archive)).toBe(60); // nothing lost
+  expect(content).toContain("alpha0"); // newest kept
+  expect(content).not.toContain("alpha59"); // oldest moved out
+  expect(archive).toContain("alpha59"); // …to the archive block
+  for (const l of archive.split("\n").filter((x) => x.startsWith("- "))) expect(manyBullets(60)).toContain(l);
+});
+test("cap→archive: a young TRIGGERS bullet is protected past the cap; an old (>90d) one is archived", () => {
+  const rows: string[] = [];
+  for (let i = 0; i < 56; i++) {
+    const day = new Date(Date.UTC(2026, 5, 20) - i * 86400000).toISOString().slice(0, 10);
+    rows.push(`- [${day} 10:00] sujet numero ${i} alpha${i} beta${i} gamma${i} delta${i}`);
+    if (i === 55) rows.push("  [TRIGGERS keyword:protectme]"); // oldest-by-index but < 90d
+  }
+  const young = curateLessons(`# LESSON.md\n\n${rows.join("\n")}\n`, NOW, ABSENT_ROOT);
+  expect(young.content).toContain("[TRIGGERS keyword:protectme]"); // protected: stays in the file
+  expect(young.archive).not.toContain("protectme");
+  const old = "# LESSON.md\n\n" + manyBullets(55).split("\n").slice(2).join("\n") +
+    "- [2020-01-01 00:00] vieille regle triggeree oldkw unique\n  [TRIGGERS keyword:oldkw]\n";
+  expect(curateLessons(old, NOW, ABSENT_ROOT).archive).toContain("[TRIGGERS keyword:oldkw]"); // >90d IS archivable
 });
