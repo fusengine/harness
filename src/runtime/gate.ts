@@ -7,6 +7,7 @@ import { dryGate } from "./dry";
 import { preCommitGate } from "./precommit";
 import { modularGate } from "./modular";
 import { frameworkSkillGate } from "./framework-skill-gate";
+import { reconcileRefReadsFromTranscript } from "../freshness/ref-evidence";
 import { isShadcnWrite, shadcnSkillGate } from "../policy/shadcn-skill-gate";
 import { isTailwindWrite, tailwindSkillGate } from "../policy/tailwind-skill-gate";
 import { geminiMcpGate } from "../policy/gemini-mcp-gate";
@@ -66,17 +67,15 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   if (modular) return modular;
   if (!input.filePath) return null;
   const filePath = input.filePath;
-  const window = input.windowMs ?? DEFAULT_WINDOW_MS;
-  const track = await loadTrack(input.trackFile);
+  // Reconcile ref reads from the durable transcript BEFORE any refsRead consumer: the racy
+  // load→save track loses lone `refsRead` writes under the hook fan-out (see ref-evidence.ts) —
+  // why only the lead's solidReadGate never credited. Fixes framework/shadcn/tailwind + APEX at once.
+  const track = reconcileRefReadsFromTranscript(await loadTrack(input.trackFile), input.transcriptPath, input.now);
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingCodeLines);
   if (solidOrSkill) return solidOrSkill;
   // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently of `framework` since a components.json / .css write may detect as "generic", mirroring the real plugin's own PreToolUse hook alongside react's.
   if (isShadcnWrite(input.tool, filePath)) {
-    const shadcnBlock = shadcnSkillGate(input.tool, filePath, input.content ?? "", {
-      refsRead: track.refsRead,
-      authorizations: track.authorizations,
-      sessionId: input.sessionId,
-    });
+    const shadcnBlock = shadcnSkillGate(input.tool, filePath, input.content ?? "", { refsRead: track.refsRead, authorizations: track.authorizations, sessionId: input.sessionId });
     if (shadcnBlock) return shadcnBlock;
   }
   // Standalone Tailwind base-skill gate (ports check-tailwind-skill.py Phase 1): a .tsx/.jsx write with Tailwind classes needs a base Tailwind skill read, independent of framework.
@@ -85,14 +84,11 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
     if (twBlock) return twBlock;
   }
   // OPT-IN Gemini Design MCP gate (ports enforce-gemini-mcp.py) — a no-op unless FUSE_ENFORCE_GEMINI_MCP is set, then blocks hand-written Tailwind UI until a mcp__gemini-design__* call is made this session.
-  const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", {
-    authorizations: track.authorizations,
-    sessionId: input.sessionId,
-  });
+  const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", { authorizations: track.authorizations, sessionId: input.sessionId });
   if (geminiBlock) return geminiBlock;
   // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py parity): non-code and exempt paths skip straight to the DRY check below.
   if (isApexScoped(input.filePath)) {
-    const apex = await apexScopedGate(input, track, window);
+    const apex = await apexScopedGate(input, track, input.windowMs ?? DEFAULT_WINDOW_MS);
     if (apex) return apex;
   }
   // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.

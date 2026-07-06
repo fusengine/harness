@@ -48,6 +48,22 @@ test("compressInjection: a bullet whose LAST → segment is a tiny aside keeps t
   expect(last.length).toBeGreaterThanOrEqual(40);
 });
 
+test("compressInjection: a GLUED arrow in the narrative is not a delimiter (real 2026-07-01 16:32 bullet)", () => {
+  const older = Array.from({ length: RECENT_FULL }, (_v, i) => `- [2026-06-${String(i + 1).padStart(2, "0")} 09:00] filler bullet ${i}`);
+  const real = "- [2026-07-01 16:32] J'ai élargi DEFAULT_WINDOW_MS (120s→300s) pensant corriger — ce fix était INERTE car bin.ts renseigne TOUJOURS windowMs. → Quand plusieurs constantes défaut existent pour le même concept, tracer le VRAI point d'entrée production avant de conclure.";
+  const last = compressInjection("# LESSON.md\n\n" + [...older, real].join("\n") + "\n").split("\n").at(-1) ?? "";
+  expect(last).toContain("Quand plusieurs constantes"); // the rule after the SPACED arrow
+  expect(last).not.toContain("300s)"); // never chopped mid-token at the glued arrow
+});
+
+test("compressInjection: a SPACED arrow used as prose inside the rule is preserved, not chopped (real 2026-07-01 17:45 bullet)", () => {
+  const older = Array.from({ length: RECENT_FULL }, (_v, i) => `- [2026-06-${String(i + 1).padStart(2, "0")} 09:00] filler bullet ${i}`);
+  const real = "- [2026-07-01 17:45] J'ai porté la table AGENT_MAP verbatim sans vérifier. → Toute table qui mappe \"type de projet/framework\" → \"identifiant d'agent\" doit être vérifiée contre le registre RÉEL d'agents disponibles, jamais copiée telle quelle.";
+  const last = compressInjection("# LESSON.md\n\n" + [...older, real].join("\n") + "\n").split("\n").at(-1) ?? "";
+  expect(last).toContain("Toute table qui mappe"); // rule kept from its start, not chopped at the internal arrow
+  expect(last).toContain("→ \"identifiant d'agent\""); // the internal arrow survives as prose
+});
+
 test("compressInjection: massive shrink on a large file (>70%)", () => {
   const input = bullets(120);
   const before = `Project lessons:\n${input}`.length;

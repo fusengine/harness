@@ -46,22 +46,30 @@ function firstSentence(s: string): string {
 }
 
 /**
- * Distil the actionable rule from a bullet body. With no "→" the whole bullet is
- * the rule → its first sentence. Otherwise the rule is everything after the FIRST
- * "→"; among its arrow-delimited segments (trimmed, empty dropped) take the first
- * sentence of the LONGEST — the information-dense clause, not whichever short
- * aside the author appended last. When that clause is under {@link MIN_RULE}
- * chars, fall back to the first sentence of the WHOLE rule part (never the
- * narrative), so a short trailing segment never yields an illegible stub yet a
- * legitimately terse rule is still shown intact.
+ * The bullet's `narrative → rule` delimiter: a SPACED arrow only. A GLUED arrow
+ * between tokens (e.g. `120s→300s`, `s→3`) is prose the author wrote, never a
+ * delimiter — matching on `→` alone chopped rules mid-token (bug: `300s) pensant
+ * corriger…`). Also used to split rule-internal clauses.
+ */
+const RULE_ARROW = /\s+→\s+/;
+
+/**
+ * Distil the actionable rule from a bullet body. With no spaced arrow the whole
+ * bullet is the rule → its first sentence. Otherwise the rule is everything after
+ * the FIRST spaced arrow; its spaced-arrow-delimited segments are kept whole
+ * except for TRAILING short asides (< {@link MIN_RULE} chars, e.g. `→ (cf.
+ * lecture).`) which are dropped — so an arrow used as PROSE inside a rule (`maps
+ * X → Y doit…`) is preserved intact rather than chopped at the arrow. When the
+ * kept rule is still under {@link MIN_RULE} chars, fall back to the first sentence
+ * of the WHOLE rule part (never the narrative), avoiding an illegible stub.
  */
 function distillRule(text: string): string {
-  const arrow = text.indexOf("→");
-  if (arrow < 0) return firstSentence(text);
-  const rulePart = text.slice(arrow + 1);
-  const segments = rulePart.split("→").map((s) => s.trim()).filter(Boolean);
-  const longest = segments.reduce((a, b) => (b.length > a.length ? b : a), "");
-  const rule = firstSentence(longest);
+  const sep = text.search(RULE_ARROW);
+  if (sep < 0) return firstSentence(text);
+  const rulePart = text.slice(sep).replace(RULE_ARROW, "").trim();
+  const segments = rulePart.split(RULE_ARROW).map((s) => s.trim()).filter(Boolean);
+  while (segments.length > 1 && (segments[segments.length - 1]?.length ?? 0) < MIN_RULE) segments.pop();
+  const rule = firstSentence(segments.join(" → "));
   return rule.length >= MIN_RULE ? rule : firstSentence(rulePart);
 }
 
