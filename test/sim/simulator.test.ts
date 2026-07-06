@@ -47,11 +47,21 @@ test("validateScenario rejects a malformed stdout matcher", () => {
   expect(() => validateScenario(bad, "inline")).toThrow(/expect\.stdout must have one of/);
 });
 
+// Per-scenario timeout. A burst-dedup scenario (03, 16) spawns up to 3 real
+// binaries AND sleeps `delayMs` 2100 (> BURST_DEDUP_MS) to space a genuine
+// retry past the window: ~2.4s nominal in `dist` (node cold-start ~85ms each).
+// Under CI saturation a spawn can balloon 10× and brush bun's default 5s cliff,
+// killing a CORRECT run — a load-induced flake, not a logic defect (the dedup
+// gap keeps ~1.8s of headroom on the jitter-sensitive immediate-sibling side).
+// A generous ceiling removes the timeout vector without touching the 2000ms
+// window. Kept well under CI's own job budget so a true hang still fails.
+const SCENARIO_TIMEOUT_MS = 30_000;
+
 // Empty corpus (not yet on disk) → skipped block, never a red job.
 describe.skipIf(scenarios.length === 0)("hook simulator", () => {
   for (const path of scenarios) {
     const name = basename(path, ".json");
     // runScenario throws on any expectation mismatch → the test fails.
-    test(name, () => runScenario(path));
+    test(name, () => runScenario(path), SCENARIO_TIMEOUT_MS);
   }
 });

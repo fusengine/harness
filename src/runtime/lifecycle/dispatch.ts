@@ -4,8 +4,9 @@ import { solidDetectStart } from "./solid-detect";
 import { subagentCacheContext } from "./subagent-cache";
 import { trackAgentMemory } from "./agent-memory";
 import { harvestSubagentTrack } from "../../freshness/evidence-harvest-io";
-import { validateTeammateOutput } from "./teammate-idle";
-import { logToolFailure } from "./tool-failure";
+import { teammateIdleContext } from "./teammate-idle-check";
+import { failureLessonContext } from "./failure-lesson";
+import { postCompactContext } from "./post-compact";
 import { saveApexState } from "./pre-compact";
 import { cleanupSession } from "./session-end";
 import { validateRulesLoaded } from "./instructions-loaded";
@@ -66,10 +67,11 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       harvestSubagentTrack(input.payload, input.cwd, input.now);
       return trackAgentMemory(input.payload, undefined, input.now);
     case "TeammateIdle":
-      return validateTeammateOutput(input.payload);
+      return teammateIdleContext(input.payload, input.cwd, undefined, input.now);
     case "PostToolUseFailure":
-      logToolFailure(input.payload, undefined, input.now);
-      return "";
+      return failureLessonContext(input.payload, input.cwd, undefined, input.now);
+    case "PostCompact":
+      return input.scope === "core" ? postCompactContext(input.payload, input.cwd, import.meta.url, input.now) : "";
     case "PreCompact":
       return saveApexState(input.cwd, input.now);
     case "SessionEnd":

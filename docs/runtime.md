@@ -69,11 +69,43 @@ and the gate reads it on PRE:
 
 ## Storage & MCP
 
-- `projectLayout(root)` (`./config`) → the single source of truth: all state
-  lives under one neutral `<root>/.harness/` (`track/`, `cache/`, `memory/`).
-  `harnessStateDir(root)` returns `<root>/.harness`.
+State splits across two roots — don't assume everything is under one directory:
+
+- **Session track + gate sidecars — out-of-tree.** `defaultStateDir(cwd)` /
+  `trackFile(sessionId, dir)` (`./runtime/paths.ts`) resolve to
+  `~/.fuse-harness/state/<8-char-md5-of-project-path>/` — deliberately outside
+  the repo, so the protected-path guard never has to bless writes to its own
+  enforcement state. `handle.ts` derives the track file this way
+  (`trackFile(event.sessionId, defaultStateDir(opts.cwd))`), and the one-shot
+  metric sidecar (`one-shot.json`) lives alongside it in the same directory.
+- **MCP/WebFetch cache + curated lessons — in-tree.** `projectLayout(root)`
+  (`./config/layout.ts`) resolves `<root>/.harness/{cache,memory}`:
+  `cacheDir` for the MCP/WebFetch response cache, `memoryDir`/`lessonsFile` for
+  `MEMORY/LESSON.md`. `.harness/` is gitignored except `memory/LESSON.md`
+  (`STATE_GITIGNORE`), which is meant to be committed.
 - `mcpPreIntercept` returns `{ stdout, docSource? }`: it serves a fresh cached
   MCP/WebFetch result (deny + content) or caps verbosity (exa `numResults`/`tokensNum`,
   Context7 `tokens`). A served context7/exa hit reports `docSource`, so `handleHook`
   records the doc consultation (the cache counts as consulted). `mcpPostStore`
   caches the response. See `./cache`.
+
+## Multi-plugin fan-out (`./runtime/burst-window.ts`)
+
+Every deployed sibling plugin registers its own hook for the same Claude event,
+so one real tool call can spawn ~11 processes recording the same deny / one-shot
+entry / sniper reminder within milliseconds. `BURST_DEDUP_MS` (2000ms) treats a
+same-operation-hash record landing inside that window as the same event rather
+than a new one — this is a heuristic tuned to the observed fan-out latency, not
+a protocol guarantee. See `deny-loop.ts`'s `dedupMs` param and `one-shot.ts`'s
+`burstFirst` for the two consumers.
+
+## Sidechain evidence harvest (`SubagentStop`)
+
+Sub-agent `PostToolUse` hooks don't reliably fire on Claude Code (documented
+platform issues #43612/#27655/#34692). `SubagentStop` — which *is* reliably
+dispatched on the main session — parses the finishing sub-agent's own
+`agent_transcript_path` and backfills its research/explore calls and `.md` ref
+reads into the session track **before** the freshness gate runs next
+(`src/freshness/evidence-harvest-io.ts`, wired in `dispatch.ts`'s `SubagentStop`
+case). This is a per-checkpoint reconciliation, not a continuous fix for the
+underlying hook-reliability gap.

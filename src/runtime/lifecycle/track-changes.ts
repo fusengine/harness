@@ -1,9 +1,10 @@
 import { basename } from "node:path";
 import { homedir } from "node:os";
-import { contextResponse } from "../../adapters/claude";
+import { attachSystemMessage, contextResponse } from "../../adapters/claude";
 import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } from "../home-state";
 import { oncePerWindow } from "../inject-dedup";
 import { BURST_DEDUP_MS } from "../burst-window";
+import { sniperRequiredNotice } from "../notices";
 
 /** Code-file extensions tracked for sniper (mirrors track-session-changes.py). */
 const CODE_EXT = /\.(ts|tsx|js|jsx|py|go|rs|java|php|cpp|c|rb|swift|kt|vue|svelte|astro)$/;
@@ -46,8 +47,12 @@ export function trackSessionChanges(sessionIdRaw: unknown, filePath: string, hom
   // noise). A real re-edit past the window reminds again. See burst-window.
   if (!oncePerWindow(`sniper:${sid}:${filePath}`, BURST_DEDUP_MS, { now, dir: sessionsDir(home) })) return "";
   const fname = basename(filePath);
-  return contextResponse(
+  const stdout = contextResponse(
     "PostToolUse",
     `SNIPER VALIDATION REQUIRED: Code file '${fname}' was modified. You MUST now run the sniper agent (fuse-ai-pilot:sniper) to validate this modification before continuing. This is mandatory per CLAUDE.md rules.`,
   );
+  // User-visible companion to the additionalContext reminder above (which only
+  // reaches the agent, never the human) — rides the SAME oncePerWindow gate above,
+  // so the ×11 hook fan-out never duplicates it.
+  return attachSystemMessage(stdout, sniperRequiredNotice(fname));
 }

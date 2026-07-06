@@ -12,6 +12,7 @@ import { readJsonFile } from "../../../util/json-io";
 import { readText } from "../../../util/runtime-io";
 import { resolveMaxLines } from "../../../config/limits";
 import { contextResponse } from "../../../adapters/claude";
+import { capFragment } from "../../inject-budget";
 import type { ApexTaskFile } from "./types";
 
 type TaskMap = ApexTaskFile["tasks"];
@@ -85,5 +86,5 @@ ${agents}
 ### 6. When Done
 - TaskUpdate(taskId, status: completed) triggers auto-commit${cartographerContext()}`;
 
-  return contextResponse("SubagentStart", context);
+  return contextResponse("SubagentStart", capFragment("apex-subagent", context));
 }

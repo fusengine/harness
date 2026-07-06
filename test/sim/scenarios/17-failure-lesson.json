@@ -1,0 +1,22 @@
+{
+  "name": "failure-lesson",
+  "doc": "PostToolUseFailure (core scope) matches the failing tool's error message against the error: triggers of MEMORY/LESSON.md and injects the one matching lesson as additionalContext. $TMP carries a package.json marker so projectRoot resolves to $TMP, and a LESSON.md whose single bullet is armed with [TRIGGERS error:EACCES]. The failure error 'EACCES: permission denied' matches, so the lesson text FAILLESSON is injected. Unit parity: test/failure-lesson.test.ts.",
+  "setup": [
+    { "path": "$TMP/package.json", "content": "{}" },
+    { "path": "$TMP/MEMORY/LESSON.md", "content": "# LESSON.md\n\n- [2026-07-05 10:00] FAILLESSON comply with the gate message, never retry verbatim\n[TRIGGERS error:EACCES]\n" }
+  ],
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "PostToolUseFailure → stdout additionalContext carries the error-triggered lesson.",
+      "event": {
+        "hook_event_name": "PostToolUseFailure",
+        "session_id": "sc17",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "/x" },
+        "error": "EACCES: permission denied, open '/x'"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "FAILLESSON" } }
+    }
+  ]
+}

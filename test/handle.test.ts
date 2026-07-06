@@ -39,5 +39,9 @@ test("handleHook: full pre/post loop drives the gates", async () => {
 
   await handleHook("claude-code", post("s1", "mcp__context7__query-docs"), { now: 4600, cwd });
   await handleHook("claude-code", post("s1", "mcp__exa__web_search_exa"), { now: 4700, cwd });
-  expect((await handleHook("claude-code", edit, opts)).stdout).toBe("");
+  // Every gate now clears: the compliance notice fires ONCE, on this first passing Write
+  // (pre-allow.ts freshEvidenceNotice) — the user-visible confirmation for a gate that,
+  // until now, only ever spoke up when it blocked.
+  const out = JSON.parse((await handleHook("claude-code", edit, opts)).stdout) as { systemMessage?: string };
+  expect(out.systemMessage).toBe("✓ evidence fresh — explore+research");
 });

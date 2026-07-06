@@ -23,10 +23,10 @@ import { burstFirst } from "./one-shot-dedup";
 import type { Prompt } from "../prompt/types";
 
 /** Sidecar basename under the per-project state dir. */
-const SIDECAR = "one-shot.json";
+export const SIDECAR = "one-shot.json";
 
 /** Retention window: 7 days. Aggregates and pending denies older than this are pruned. */
-const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const WINDOW_MS: number = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Injected clock + state dir (no env var; the gate supplies both). `sessionId` —
@@ -40,7 +40,7 @@ export interface OneShotOpts { now: number; dir: string; sessionId?: string; }
 export interface OneShotInput { filePath?: string; content?: string; command?: string; }
 
 /** Load the state, or a fresh copy when missing/corrupt. */
-function loadState(path: string): OneShotState {
+export function loadState(path: string): OneShotState {
   try {
     if (!existsSync(path)) return { ...EMPTY };
     const d: unknown = JSON.parse(readFileSync(path, "utf8"));

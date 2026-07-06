@@ -14,6 +14,21 @@ harness-specific code.
 > the session track. Use `handleHook` for real enforcement; the thin adapter
 > exports are a fast stateless building block, not the complete gate.
 
+## Compatibility matrix
+
+**No harness enforces the full policy the same way.** This is the ceiling per
+adapter, not a formatting difference — read the "Known limit" column before
+assuming a gate that works on Claude Code also works elsewhere.
+
+| Harness | Adapter file | PreToolUse coverage | Lifecycle events | Known limit |
+|---|---|---|---|---|
+| **claude-code** | `adapters/claude/index.ts` | Full: `evaluate` + APEX gates via `handleHook` | 14 event types implemented in `runtime/lifecycle/dispatch.ts` (SessionStart, SessionEnd, SubagentStart/Stop, Stop, PreCompact, PostCompact, TaskCompleted, TeammateIdle, PostToolUseFailure, InstructionsLoaded, UserPromptSubmit, plus Pre/PostToolUse) | Only PreToolUse+PostToolUse are wired by `harness init` (`init/templates.ts:18-27`); the other 12 event types require the consumer's own `.claude/settings.json` to route them. |
+| **codex** | `adapters/codex/index.ts` (re-exports the Claude reader/response — Codex's `PreToolUse` wire shape matches Claude's, `codex/index.ts:1-8`) | `Bash \| apply_patch` matcher, PostToolUse (`init/templates.ts:29-38`) | none wired | The SOLID/file-size gate covers `apply_patch` at **0%** — it keys off `tool_input.file_path` (Write/Edit shape), which Codex's diff-carrying `apply_patch` never supplies (`codex/index.ts:6-8`). Codex also parses but does **not** honor `permissionDecision:"ask"` (deny-only, `codex/index.ts:6`). Do not add a Codex `PermissionRequest` path until `respond()` emits Codex's own wire shape (`codex/index.ts:10-13`). |
+| **cursor** | `adapters/cursor/index.ts` | `beforeShellExecution` can deny/ask (shell only, lines 16-21) | none | `afterFileEdit` is **observe-only** — "Cursor cannot block here" (lines 23-24); a file-edit violation is returned as `{violation}` for logging, never prevented. Platform limit, not a gap in this adapter. |
+| **gemini-cli** | `adapters/gemini/index.ts` | `BeforeTool` denies via `{decision:"deny",reason}` (lines 22-36) | none | Thin stateless adapter — no session track, no APEX gates reachable through it. |
+| **cline** | `adapters/cline/index.ts` | `PreToolUse` only; block → `{cancel:true}`, non-block → `contextModification` (lines 24-36) | none | Same as gemini-cli: stateless guard only, `PreToolUse` cannot modify tool parameters (per docs.cline.bot). |
+| **hermes** | `adapters/hermes/index.ts` | `pre_tool_call` proven: reuses the Claude stdin reader, blocks via `{decision:"block",reason}` (lines 12-36) | untested — no lifecycle dispatch wired for Hermes in this repo | `ask`/`inform` degrade to non-blocking `{context}` — Hermes "has no interactive ask state" (lines 27-28). |
+
 ## Claude Code — `@fusengine/harness/adapters/claude`
 
 | Export | Description |
@@ -21,13 +36,14 @@ harness-specific code.
 | `readClaudeInput()` | parse the Claude hook stdin payload |
 | `denyResponse(event, reason)` | `hookSpecificOutput` deny JSON |
 | `contextResponse(event, text)` | `additionalContext` injection JSON |
-| `fileSizeGuard(input)` | PoC: deny an oversized code Write, else null |
+| `systemMessage(text)` / `informResponse(event, notice, context)` | user-visible pass notices (`systemMessage` channel), independent of the blocking decision |
+| `guard(input)` | stateless-only: runs `evaluate()` and returns the native response, or null to allow |
 
 ```ts
-import { readClaudeInput, fileSizeGuard } from "@fusengine/harness/adapters/claude";
+import { readClaudeInput, guard } from "@fusengine/harness/adapters/claude";
 
-const deny = fileSizeGuard(await readClaudeInput());
-if (deny) { console.log(deny); process.exit(2); }   // exit(2) = block in Claude Code
+const out = guard(await readClaudeInput());
+if (out) { console.log(out); process.exit(0); }   // stdout carries the hookSpecificOutput deny/ask
 ```
 
 ## Adding a harness
