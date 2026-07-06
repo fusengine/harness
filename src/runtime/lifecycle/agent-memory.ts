@@ -1,5 +1,5 @@
-import { appendFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { contextResponse } from "../../adapters/claude";
 import { resolveTtlSec } from "../../config/ttl";
@@ -61,13 +61,21 @@ export function trackAgentMemory(data: Record<string, unknown>, home: string = h
     // author, and never gets told to validate another teammate's work.
     if (owned.length > 0) {
       saveSessionState(sessionId, { ...state, changes: { ...changes, cumulativeCodeFiles: 0 } }, home);
-      // Advisory (no hard block here — the TaskCompleted gate enforces): flag the
-      // missing proof when the agent owns code but posted no fresh passing receipt.
-      // Window = TTL×5, matching the TaskCompleted receipt gate.
-      const windowMs = resolveTtlSec(process.env) * 1000 * 5;
-      const noReceipt = freshReceiptFromFile(trackFile(sessionId, defaultStateDir(process.cwd())), windowMs, now) === null;
-      const note = noReceipt ? " NO VERIFICATION RECEIPT — run tsc + tests before reporting done." : "";
-      return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${owned.length} code file(s): ${owned.join(", ")}. Run sniper agent now.${note}`);
+      // Never demand sniper on a file the agent deleted before stopping (e.g. a
+      // scratch probe rm -rf'd): the tracked list records writes, never removals,
+      // so re-check the disk (a relative path resolves against the hook cwd) and
+      // keep only files still present. All gone → nothing to validate → "no changes".
+      const hookCwd = typeof data.cwd === "string" ? data.cwd : process.cwd();
+      const present = owned.filter((f) => existsSync(resolve(hookCwd, f)));
+      if (present.length > 0) {
+        // Advisory (no hard block here — the TaskCompleted gate enforces): flag the
+        // missing proof when the agent owns code but posted no fresh passing receipt.
+        // Window = TTL×5, matching the TaskCompleted receipt gate.
+        const windowMs = resolveTtlSec(process.env) * 1000 * 5;
+        const noReceipt = freshReceiptFromFile(trackFile(sessionId, defaultStateDir(process.cwd())), windowMs, now) === null;
+        const note = noReceipt ? " NO VERIFICATION RECEIPT — run tsc + tests before reporting done." : "";
+        return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${present.length} code file(s): ${present.join(", ")}. Run sniper agent now.${note}`);
+      }
     }
   }
   return JSON.stringify({ message: `Agent ${agentType} completed (no code changes)` });

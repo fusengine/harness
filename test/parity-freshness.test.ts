@@ -85,9 +85,12 @@ test("agentsRanFromTranscript: transcript with no explore/research tool_use → 
 test("lifecycle readers consume unified state .changes", () => {
   const home = mkdtempSync(join(tmpdir(), "fh-home-"));
   const sid = "sess1";
-  saveSessionState(sid, { changes: { cumulativeCodeFiles: 2, modifiedFiles: ["a.ts", "b.ts"] } }, home);
-  expect(validateTeammateOutput({ teammate_name: "tm", session_id: sid }, home)).toContain("modifying 2 code file(s): a.ts, b.ts");
-  expect(trackAgentMemory({ agent_type: "react-expert", session_id: sid }, home, 1000)).toContain("modified 2 code file(s): a.ts, b.ts");
+  const dir = mkdtempSync(join(tmpdir(), "fh-chg-"));
+  const a = join(dir, "a.ts"), b = join(dir, "b.ts");
+  writeFileSync(a, "x"); writeFileSync(b, "x"); // agent-memory now stats the disk before reporting
+  saveSessionState(sid, { changes: { cumulativeCodeFiles: 2, modifiedFiles: [a, b] } }, home);
+  expect(validateTeammateOutput({ teammate_name: "tm", session_id: sid }, home)).toContain(`modifying 2 code file(s): ${a}, ${b}`);
+  expect(trackAgentMemory({ agent_type: "react-expert", session_id: sid }, home, 1000)).toContain(`modified 2 code file(s): ${a}, ${b}`);
   // agent-memory resets the counter → a second stop sees no changes.
   expect(trackAgentMemory({ agent_type: "react-expert", session_id: sid }, home, 1000)).toContain("no code changes");
 });
