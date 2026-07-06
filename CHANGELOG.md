@@ -2,6 +2,21 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.58] - 06-07-2026
+
+### Added
+
+- Codex `apply_patch` is now gated (it was 0% — enforcement theatre on Codex's PRIMARY edit primitive): the patch text is parsed per file (`adapters/codex/apply-patch.ts`), each hunk runs the file gates (protected-path, file-size, DRY) and ONE violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`) — a compliant file can no longer smuggle an oversized one through. Codex `ask` prompts downgrade to an explicit deny (it fails open on unsupported shapes). Sim scenarios 22-23.
+- Multi-harness simulator: scenarios carry an optional `harness` field (validated against the real id list, defaults to `claude-code`) replayed via `hook <harness>`; new scenarios 19-23 exercise codex/cursor/hermes end-to-end, so the shared-guards invariant is mechanically CI-locked. Hermes live-test protocol documented (`docs/hermes-live-test.md`).
+- Global injection budget recap (one user-visible line per SessionStart/SubagentStart tallying all injected fragments) and a strictly-once sniper reminder (exclusive-create dedup + bounded purge, replaces the residual 2-3× fan-out duplicate).
+
+### Fixed
+
+- Teammate ref-read gap: the on-disk transcript flushes ~230s late (beyond the freshness TTL), so a teammate's just-read SOLID ref was invisible to the transcript reconcile while its live track write was lost to the fan-out race — teammates had to delegate their writes. `gate()` now also reconciles refs from an append-only journal (`ref-journal.ts`, `O_APPEND` — race-immune AND fresh), trimmed to a 128KB bound on the shared state dir.
+- Cursor `afterFileEdit` is now advisory-only: it returns `allow` + a `user_message` correction on a violation instead of a `deny` that has no proven upstream effect (the hook launched "informational only"; Cursor's deny-enforcement for file operations is confirmed broken upstream, forum.cursor.com/t/154377). `deny` stays reserved to the proven `beforeShellExecution` path.
+- bash-write false positive: `patch` matched as a bare word (blocking read-only commands merely naming a path, e.g. `jq . apply-patch.json`); now matched only as a command token.
+- Docs: README + adapters compatibility matrix updated to the real per-harness ceilings with upstream sources (Codex #27833, Cursor forum #154377).
+
 ## [0.1.57] - 06-07-2026
 
 ### Added
