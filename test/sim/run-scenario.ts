@@ -61,13 +61,16 @@ export async function runScenario(path: string): Promise<void> {
   const tmp = mkdtempSync(join(tmpdir(), "fh-sim-"));
   const vars = { TMP: tmp, FIXTURES };
   const env = spawnEnv(FIXTURES, tmp, substitute(scenario.env, vars));
+  // Harness id spawned as `hook <harness> <scope>`; defaults to claude-code so
+  // legacy scenarios (no `harness` key) spawn byte-identically to before.
+  const harness = scenario.harness ?? "claude-code";
   materializeSetup(scenario.setup ?? [], tmp, vars);
   for (const [i, rawStep] of scenario.steps.entries()) {
     const step = substitute(rawStep, vars);
     // Real wall-clock gap so a time-window guard in the binary (burst dedup)
     // reads this step as a genuine retry, not a same-event sibling hook.
     if (step.delayMs && step.delayMs > 0) await Bun.sleep(step.delayMs);
-    const res = runHook(step.scope, step.event, tmp, env);
+    const res = runHook(harness, step.scope, step.event, tmp, env);
     const failure = checkStep(step, res);
     if (failure) {
       throw new Error(

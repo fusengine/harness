@@ -14,7 +14,12 @@ export const CODE_MUTATORS: readonly { re: RegExp; desc: string }[] = [
   { re: /\bsed\b[^|]*\s-i/, desc: "sed in-place edit" },
   { re: /\bperl\b[^|]*\s-[pi]i?\b/, desc: "perl in-place edit" },
   { re: /\bawk\b[^|]*-i\s*inplace/, desc: "awk in-place edit" },
-  { re: /\bpatch\b/, desc: "patch file modification" },
+  // `patch` ONLY as a command token: start of the command or right after a
+  // `;`/`&`/`|`/`(` separator, then a metachar/space/EOL. The bare word
+  // false-matched read-only commands merely NAMING a path (`jq . apply-patch.json`,
+  // `grep patch src/`). Prefix-wrapped forms (`env patch`, `timeout 5 patch`) are a
+  // known, accepted gap — the target agent does not shell-wrap its edits.
+  { re: /(?:^|[\n;&|(])\s*patch(?=\s|<|[;&|)>]|$)/, desc: "patch file modification" },
   { re: /<<[-~]?\s*['"]?\w+['"]?[\s\S]*?>/, desc: "heredoc redirected into a file" },
 ];
 

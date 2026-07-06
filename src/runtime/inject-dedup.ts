@@ -79,3 +79,11 @@ export function oncePerWindow(key: string, windowMs: number, opts: OnceOpts = {}
   }
   return true;
 }
+
+/**
+ * Cross-process-exact-once variant (exclusive file creation, not the shared
+ * JSON above) for high-concurrency callers — split out to
+ * {@link module:inject-dedup-exclusive} to keep this file under the SOLID
+ * line budget; re-exported here so both modes share one import surface.
+ */
+export { onceExclusive } from "./inject-dedup-exclusive";

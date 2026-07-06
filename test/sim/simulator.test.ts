@@ -47,6 +47,21 @@ test("validateScenario rejects a malformed stdout matcher", () => {
   expect(() => validateScenario(bad, "inline")).toThrow(/expect\.stdout must have one of/);
 });
 
+// The `harness` field is validated strictly against the adapter-backed set at
+// load time — a typo'd or unsupported id must fail fast, never silently spawn
+// the wrong adapter. An absent field is legal (defaults to claude-code).
+test("validateScenario rejects an unsupported harness id", () => {
+  const bad = { name: "x", harness: "gpt-cli", steps: [{ scope: "core", event: {}, expect: { exit: 0 } }] };
+  expect(() => validateScenario(bad, "inline")).toThrow(/"harness" must be one of/);
+});
+
+test("validateScenario accepts a supported harness id and defaults when absent", () => {
+  const withHarness = { name: "x", harness: "hermes", steps: [{ scope: "core", event: {}, expect: { exit: 0 } }] };
+  expect(validateScenario(withHarness, "inline").harness).toBe("hermes");
+  const noHarness = { name: "x", steps: [{ scope: "core", event: {}, expect: { exit: 0 } }] };
+  expect(validateScenario(noHarness, "inline").harness).toBeUndefined();
+});
+
 // Per-scenario timeout. A burst-dedup scenario (03, 16) spawns up to 3 real
 // binaries AND sleeps `delayMs` 2100 (> BURST_DEDUP_MS) to space a genuine
 // retry past the window: ~2.4s nominal in `dist` (node cold-start ~85ms each).

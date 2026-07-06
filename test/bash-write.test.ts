@@ -41,3 +41,17 @@ test("tilde prefix ~user is not expanded into a bogus safe home", () => {
   // `~user`/`~2xyz` are login-name forms — never $HOME-relative, so never safe.
   expect(bashWriteGuard({ tool: "Bash", command: "echo x > ~user/.fuse-harness/cache/x" })?.kind).toBe("ask");
 });
+
+// CODE_MUTATORS `patch` motif: the command token, NOT the bare word in a path/arg.
+
+test("does NOT block a read-only command merely NAMING a path with 'patch'", () => {
+  // Regression: `\bpatch\b` false-matched these (jq is not a SAFE_PREFIX, so it reaches CODE_MUTATORS).
+  expect(bashWriteGuard({ tool: "Bash", command: "jq . scenarios/22-codex-apply-patch-solid-deny.json" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "cat notes/apply-patch.md" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "echo running patch tests && ls" })).toBeNull();
+});
+
+test("blocks a real `patch` command invocation (start of command or after a `;` separator)", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "patch -p1 < changes.diff" })?.kind).toBe("block");
+  expect(bashWriteGuard({ tool: "Bash", command: "echo applying; patch -p1 < changes.diff" })?.kind).toBe("block");
+});

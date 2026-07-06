@@ -38,17 +38,18 @@ export function spawnEnv(fixtures: string, home: string, scenarioEnv?: Record<st
  * A relative `SIM_BIN` is resolved against the repo root (never `cwd`, which is
  * the scenario's `$TMP`) so `node` finds it regardless of where `bun test` ran.
  *
- * @param scope - Plugin scope (4th argv of the binary).
- * @param event - Raw hook payload, JSON-stringified onto the child's stdin.
- * @param cwd   - Working directory for the child (the scenario's `$TMP`).
- * @param env   - Env map from {@link spawnEnv}.
+ * @param harness - Harness id (3rd argv of the binary); selects the adapter.
+ * @param scope   - Plugin scope (4th argv of the binary).
+ * @param event   - Raw hook payload, JSON-stringified onto the child's stdin.
+ * @param cwd     - Working directory for the child (the scenario's `$TMP`).
+ * @param env     - Env map from {@link spawnEnv}.
  * @returns Captured stdout, exit code, and stderr.
  */
-export function runHook(scope: string, event: unknown, cwd: string, env: Record<string, string>): SpawnResult {
+export function runHook(harness: string, scope: string, event: unknown, cwd: string, env: Record<string, string>): SpawnResult {
   const simBin = process.env.SIM_BIN;
   const cmd = simBin ? "node" : "bun";
   const bin = simBin ? (isAbsolute(simBin) ? simBin : resolve(REPO_ROOT, simBin)) : join(REPO_ROOT, "src", "cli", "bin.ts");
-  const args = [bin, "hook", "claude-code", scope];
+  const args = [bin, "hook", harness, scope];
   const r = spawnSync(cmd, args, { input: JSON.stringify(event), cwd, env, encoding: "utf8" });
   const stderr = (r.stderr ?? "") + (r.error ? `\n[spawn error] ${String(r.error)}` : "");
   return { stdout: r.stdout ?? "", exit: r.status ?? 1, stderr };

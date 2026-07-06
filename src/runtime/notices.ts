@@ -8,15 +8,17 @@
  * nothing surfaced skill credits, freshness, or the sniper reminder to the human.
  *
  * The text builders are pure. `refCreditNoticeFor` is the one exception — like
- * `pre-allow.ts`/`track-changes.ts` already do, it calls the existing
- * {@link oncePerWindow} file-backed cooldown gate directly, so a caller can drop
- * it straight into a PostToolUse loop without re-deriving the dedup. Rendering
- * onto a harness's native stdout always goes through the existing adapter
- * helpers (`respond`/`attachSystemMessage`); a harness with no `systemMessage`
- * channel (e.g. cline) silently drops the notice there (documented no-op, never
- * a crash) — nothing in this module renders directly.
+ * `pre-allow.ts` uses the JSON `oncePerWindow`, this one uses the exclusive
+ * {@link onceExclusive} mode instead: it fires on the same short burst window
+ * as `track-changes.ts`'s sniper reminder, fanned out across every installed
+ * plugin's PostToolUse hook for ONE real edit, so the same lost-update race
+ * applies (lesson 2026-07-05 16:00). Rendering onto a harness's native stdout
+ * always goes through the existing adapter helpers (`respond`/
+ * `attachSystemMessage`); a harness with no `systemMessage` channel (e.g.
+ * cline) silently drops the notice there (documented no-op, never a crash) —
+ * nothing in this module renders directly.
  */
-import { oncePerWindow } from "./inject-dedup";
+import { onceExclusive } from "./inject-dedup";
 import { BURST_DEDUP_MS } from "./burst-window";
 
 /** One compliance line: `✓ <gate> — <detail>` (detail omitted when empty). */
@@ -73,7 +75,7 @@ export function refCreditNoticeFor(
     if (a.kind !== "ref" || !a.path) continue;
     const notice = refCreditedNotice(a.path);
     if (!notice) continue;
-    if (!oncePerWindow(`ref-credited:${sessionId}:${a.path}`, BURST_DEDUP_MS, { now, dir })) continue;
+    if (!onceExclusive(`ref-credited:${sessionId}:${a.path}`, BURST_DEDUP_MS, { now, dir })) continue;
     return notice;
   }
   return null;

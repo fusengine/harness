@@ -1,0 +1,41 @@
+{
+  "name": "cursor-shell-destructive-deny",
+  "harness": "cursor",
+  "doc": "Cursor `beforeShellExecution` can block a shell command (cursor.com/docs/hooks). The harness routes through the shared evaluate() chain and respond.ts:55-63 renders the cursor envelope: `{permission:\"deny\"|\"ask\", continue:false, user_message, agent_message}` — snake_case required (#141516/#142589, camelCase silently ignored). A destructive git force-push and a heredoc-into-code-file both deny; a plain read allows (empty stdout). Real output verified 2026-07-06 against `bun src/cli/bin.ts hook cursor core`. NOTE: cursor `afterFileEdit` is observe-only (cannot block) — file-edit enforcement on Cursor is best-effort, unlike the shell path proven here.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`git push --force` → GIT_BLOCKED deny → `permission:\"deny\"` (respond.ts:63). Asserts the permission field, the load-bearing shell-block signal Cursor honors.",
+      "event": {
+        "hook_event_name": "beforeShellExecution",
+        "session_id": "sc21",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin main --force" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "permission", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Heredoc redirected into a .ts file → bashWriteGuard deny, same `permission:\"deny\"` envelope. Proves the runGuards chain (not just the git gate) reaches the cursor shell path. Assert the [BLOCKED] tag in user_message.",
+      "event": {
+        "hook_event_name": "beforeShellExecution",
+        "session_id": "sc21",
+        "tool_name": "Bash",
+        "tool_input": { "command": "cat <<EOF > $TMP/x.ts\nexport const x = 1;\nEOF" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "[BLOCKED] Bash write to code file" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A plain read (`ls`) → allowed → empty stdout (verified). Parity: a benign shell command is silent on cursor, exactly like every other harness.",
+      "event": {
+        "hook_event_name": "beforeShellExecution",
+        "session_id": "sc21",
+        "tool_name": "Bash",
+        "tool_input": { "command": "ls -la $TMP" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

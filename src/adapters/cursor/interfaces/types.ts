@@ -13,6 +13,20 @@ export interface CursorEditPayload {
 }
 
 /**
+ * `afterFileEdit` stdout response. Its schema (cursor.com/docs/hooks#afterFileEdit)
+ * is DELIBERATELY narrower than the "before" hooks: `permission` + `user_message`
+ * only — there is NO `agent_message` and NO `updated_input`. Since the edit is
+ * already on disk when this "after" hook fires, `deny` cannot revert it and the
+ * correction reaches only the HUMAN (`user_message`), never the model — so this
+ * path is strictly ADVISORY, not an enforceable gate.
+ */
+export interface CursorEditResponse {
+  permission: "allow" | "deny";
+  /** User-visible correction — snake_case (#141516); the only channel afterFileEdit exposes. */
+  user_message?: string;
+}
+
+/**
  * `beforeShellExecution` stdout response. Message keys are snake_case:
  * Cursor silently ignores camelCase `userMessage`/`agentMessage` (#141516,
  * regression persists through v2.0.77+ — forum #142589), matching the

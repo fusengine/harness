@@ -11,6 +11,8 @@ import { lifecycleStdout } from "./lifecycle-bridge";
 import { handlePre } from "./handle-pre";
 import { handlePost } from "./handle-post";
 import { asyncScopeStdout } from "./handle-scope-async";
+import { resetFragmentRegistry } from "./fragment-registry";
+import { attachBudgetRecap } from "./inject-budget-recap";
 import type { PluginScope } from "./lifecycle";
 
 /** Raw Claude hook event name from a payload (empty when absent). */
@@ -44,6 +46,10 @@ export interface HandleOutcome {
  */
 export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
   const event = normalizeEvent(id, payload);
+  // Fresh slate for this invocation's capFragment tally — one hook event is
+  // exactly one lifecycle branch below (see dispatchLifecycle), so a single
+  // reset here can never mix fragments across unrelated events.
+  resetFragmentRegistry();
   const layout = projectLayout(opts.cwd);
   const file = trackFile(event.sessionId, defaultStateDir(opts.cwd));
   const mcpDir = layout.cacheDir;
@@ -63,7 +69,12 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
 
   // Ported lifecycle/session/context hooks (SessionStart, SubagentStart/Stop, etc.).
   const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now);
-  if (life !== null) return { stdout: life, exit: 0 };
+  if (life !== null) {
+    // Claude-Code-only: attachBudgetRecap's systemMessage envelope assumes the
+    // Claude adapter's stdout shape (mirrors the designLifecycle gate above).
+    const stdout = id === "claude-code" ? attachBudgetRecap(life, rawEventName(payload), event.sessionId, opts.cwd, opts.now) : life;
+    return { stdout, exit: 0 };
+  }
 
   // UserPromptSubmit (core scope): brainstorm flag + CLAUDE.md injection.
   const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
