@@ -2,6 +2,14 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.59] - 06-07-2026
+
+### Fixed
+
+- SubagentStop no longer demands sniper validation on files the agent deleted before stopping (scratch probes, temp dirs): the owned list is filtered against the disk (`existsSync(resolve(hookCwd, f))`) before the reminder; all gone → the "no code changes" path. TeammateIdle audited and confirmed not affected (already stats the disk). Found by the 0.1.58 live test.
+- notices.ts documents the channel contract: `userMessage`/`systemMessage` is human-only (excluded from formatPrompt, never reaches the agent) and emitted exactly once under the multi-plugin fan-out via onceExclusive — verified live 2026-07-06. Settles the "invisible notice" report as by-design (no code change; an agent-debate judge's differential probe overturned the initial fix verdict).
+- Tests: stale-file scenarios moved to a dedicated `agent-memory-stop.test.ts` with real on-disk fixtures plus two new cases (deleted-before-stop → silent; mixed present+deleted → only survivors listed); parity-freshness/receipts now create their fixture files on disk.
+
 ## [0.1.58] - 06-07-2026
 
 ### Added
