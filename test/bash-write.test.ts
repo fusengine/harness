@@ -55,3 +55,37 @@ test("blocks a real `patch` command invocation (start of command or after a `;` 
   expect(bashWriteGuard({ tool: "Bash", command: "patch -p1 < changes.diff" })?.kind).toBe("block");
   expect(bashWriteGuard({ tool: "Bash", command: "echo applying; patch -p1 < changes.diff" })?.kind).toBe("block");
 });
+
+// env-prefix / wrapper bypass closure: CMD-anchored motifs fire behind a
+// transparent wrapper but ignore a quoted/argument mention (bash-command-anchor.ts).
+
+test("blocks a code mutator behind a transparent wrapper (env / timeout / env VAR=)", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "env sed -i 's/x/y/' src/foo.ts" })?.kind).toBe("block");
+  expect(bashWriteGuard({ tool: "Bash", command: "timeout 5 patch -p1 < changes.diff" })?.kind).toBe("block");
+  expect(bashWriteGuard({ tool: "Bash", command: "env FOO=bar patch < d.diff" })?.kind).toBe("block");
+});
+
+test("blocks tee/dd into a code file — behind a safe prefix, and past a decoy target", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "cp a b; tee src/x.ts" })?.kind).toBe("block");
+  expect(bashWriteGuard({ tool: "Bash", command: "echo x | tee log.txt src/x.ts" })?.kind).toBe("block");
+  expect(bashWriteGuard({ tool: "Bash", command: "dd if=/dev/zero of=src/y.ts" })?.kind).toBe("block");
+});
+
+test("does NOT deny a mutator token quoted or in an argument (not a command position)", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "git commit -m \"fix sed -i doc\"" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "npm run test -- --grep \"sed -i\"" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "echo 'patch file'" })).toBeNull();
+});
+
+test("does NOT block a tee to a non-code target, nor a plain cp (legit flows preserved)", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "bun test | tee results.txt" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "cp src/a.ts src/b.ts" })).toBeNull();
+});
+
+test("wrapper-arg chain resolves fast to a non-match (no ReDoS backtracking)", () => {
+  // A long run of flag-like wrapper args with no mutator must stay linear.
+  const cmd = "env " + "--flag ".repeat(40) + "ls src";
+  const started = Date.now();
+  expect(bashWriteGuard({ tool: "Bash", command: cmd })).toBeNull();
+  expect(Date.now() - started).toBeLessThan(1000);
+});

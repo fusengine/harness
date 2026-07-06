@@ -1,27 +1,46 @@
+import { CMD } from "./bash-command-anchor";
+
+/** Code-file extensions the write guards police (shared by CODE_REDIRECT and
+ *  CODE_COMMAND_WRITE). Case-sensitive, parity with the Python guard's list. */
+const CODE_EXT = "ts|tsx|js|jsx|py|go|rb|rs|java|kt|php|swift|vue|svelte|astro|css|c|cpp|h";
+
 /** Redirect (`>`/`>>`) targeting a code-file extension. */
-export const CODE_REDIRECT: RegExp =
-  /(?:>>?)\s*[^\s|;&]*\.(?:ts|tsx|js|jsx|py|go|rb|rs|java|kt|php|swift|vue|svelte|astro|css|c|cpp|h)\b/;
+export const CODE_REDIRECT: RegExp = new RegExp(`(?:>>?)\\s*[^\\s|;&]*\\.(?:${CODE_EXT})\\b`);
 
 /**
  * Interpreters / tools that mutate source in place, plus heredoc-into-file —
  * split into labeled sub-patterns (parity bash-write-guard.py `DENY_PATTERNS`,
  * each with its own `desc`) so the deny reason names which motif matched
- * instead of a single generic message for all six.
+ * instead of a single generic message. Every command-named motif is
+ * {@link CMD}-anchored (start/separator + optional wrapper chain); only the
+ * structural heredoc-into-file motif is position-free.
  */
 export const CODE_MUTATORS: readonly { re: RegExp; desc: string }[] = [
-  { re: /\bpython3?\s+-\s*<</, desc: "Python heredoc input" },
-  { re: /\bpython3?\s+-c\b/, desc: "Python inline script" },
-  { re: /\bsed\b[^|]*\s-i/, desc: "sed in-place edit" },
-  { re: /\bperl\b[^|]*\s-[pi]i?\b/, desc: "perl in-place edit" },
-  { re: /\bawk\b[^|]*-i\s*inplace/, desc: "awk in-place edit" },
-  // `patch` ONLY as a command token: start of the command or right after a
-  // `;`/`&`/`|`/`(` separator, then a metachar/space/EOL. The bare word
-  // false-matched read-only commands merely NAMING a path (`jq . apply-patch.json`,
-  // `grep patch src/`). Prefix-wrapped forms (`env patch`, `timeout 5 patch`) are a
-  // known, accepted gap — the target agent does not shell-wrap its edits.
-  { re: /(?:^|[\n;&|(])\s*patch(?=\s|<|[;&|)>]|$)/, desc: "patch file modification" },
+  { re: new RegExp(`${CMD}python3?\\s+-\\s*<<`), desc: "Python heredoc input" },
+  { re: new RegExp(`${CMD}python3?\\s+-c\\b`), desc: "Python inline script" },
+  { re: new RegExp(`${CMD}sed\\b[^|]*\\s-i`), desc: "sed in-place edit" },
+  { re: new RegExp(`${CMD}perl\\b[^|]*\\s-[pi]i?\\b`), desc: "perl in-place edit" },
+  { re: new RegExp(`${CMD}awk\\b[^|]*-i\\s*inplace`), desc: "awk in-place edit" },
+  // `patch` as a command token (start/separator + optional wrapper chain), then a
+  // metachar/space/EOL. Never the bare word merely NAMING a path in a read-only
+  // command (`jq . apply-patch.json`, `grep patch src/`). Prefix-wrapped forms
+  // (`env patch`, `timeout 5 patch`) are now DENIED — the previously accepted gap
+  // was closed (owner decision 2026-07-06): the wrapper chain folds into CMD.
+  { re: new RegExp(`${CMD}patch(?=\\s|<|[;&|)>]|$)`), desc: "patch file modification" },
   { re: /<<[-~]?\s*['"]?\w+['"]?[\s\S]*?>/, desc: "heredoc redirected into a file" },
 ];
+
+/**
+ * `tee`/`dd of=` whose TARGET is a code file — the command-form parallel to
+ * CODE_REDIRECT. {@link CMD}-anchored so `env`/`timeout` wrappers don't shield
+ * it; the `tee` branch scans ALL args up to the next `;&|` separator so a
+ * decoy-first-target (`tee log.txt src/x.ts`) can't hide the code write. A tee
+ * to a NON-code target (`cmd | tee results.txt`) does not match — it stays a
+ * plain ASK_WRITERS ask, never a hard block, so ordinary logging is untouched.
+ */
+export const CODE_COMMAND_WRITE: RegExp = new RegExp(
+  `${CMD}(?:tee\\s+[^;&|\\n]*?|dd\\b[^|]*\\bof=\\S*)\\.(?:${CODE_EXT})\\b`,
+);
 
 /** File-mutating one-liners via `node -e` / `ruby -e` (parity NODE_WRITES/RUBY_WRITES). */
 export const NODE_WRITES: RegExp =
