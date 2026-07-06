@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.60] - 06-07-2026
+
+### Fixed
+
+- Closed the env/wrapper-prefix mutator bypass (previously a documented "accepted gap"): code mutators (sed/perl/awk in-place, patch, tee/dd into code files) are detected BEFORE the SAFE_PREFIXES short-circuit, so `env sed -i src/foo.ts`, `timeout 5 patch`, `cp a b; tee src/x.ts` now deny. Every pattern is command-position anchored via a shared CMD anchor (`bash-command-anchor.ts`) — a quoted MENTION (`git commit -m "fix sed -i doc"`, `--grep "sed -i"`) still passes, locked by explicit negative tests. Sim scenarios 24 (claude-code) + 25 (codex); the 27 pre-existing scenarios stay green in both modes. Documented residual: bare `--` end-of-options wrapper form (owner-accepted follow-up).
+
 ## [0.1.59] - 06-07-2026
 
 ### Fixed
