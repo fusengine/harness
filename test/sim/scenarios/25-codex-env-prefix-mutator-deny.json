@@ -1,0 +1,30 @@
+{
+  "name": "codex-env-prefix-mutator-deny",
+  "harness": "codex",
+  "doc": "Multi-harness parity for the env-prefix fix (0.1.60): the SAME shared bashWriteGuard runs over the codex spawn (`hook codex core`) — only the response envelope differs (respond.ts, codex shares the claude-code deny branch → hookSpecificOutput.permissionDecision). Step 1: `env sed -i` on a code file → deny on the codex envelope, proving the wrapper bypass is closed on Codex too, not just Claude Code. Step 2: a quoted mutator mention → allow (empty), identical to claude-code. The guard is harness-independent; cf. scenario 19 (codex shares the guard chain).",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`env sed -i` on a code file, spawned as `hook codex core`: CODE_MUTATORS (CMD-anchored) matches the `env`-wrapped `sed -i` → blockCodeWrite. Codex emits the claude-code deny envelope (respond.ts) → hookSpecificOutput.permissionDecision:deny. Same guard as scenario 24 step 1, harness-independent.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc25",
+        "tool_name": "Bash",
+        "tool_input": { "command": "env sed -i 's/foo/bar/' $TMP/app.ts" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A quoted mutator mention (`git commit`-style arg) under codex: `sed -i` inside a double-quoted value is not a command position → no match, allow → empty stdout. Confirms the fix does not over-block on Codex either.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc25",
+        "tool_name": "Bash",
+        "tool_input": { "command": "npm run test -- --grep \"sed -i\"" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}
