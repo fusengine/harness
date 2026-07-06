@@ -10,12 +10,12 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
       Le TS a remplacé tout ce mécanisme fichier par `SessionTrack` signé (`src/tracking/`) ; la
       pertinence de cette dérivation par-query est incertaine et toucher `activity.ts` (crédit
       doc-consultation) est risqué. À reprendre seulement si un cas réel le motive.
-- [ ] **`enforce-apex-phases.ts::isAuthorized`** — 2e mécanisme de doc-consultation par-skill/TTL
-      (distinct de `isDocConsulted`, déjà porté). Jamais implémenté (~7-8 fichiers).
-- [ ] **Préambule APEX** — le texte « task.json (auto-created on first Write/Edit) »
-      (`claude-md-context.ts:51`) est légèrement trompeur : `.claude/apex/docs/` EST auto-créé
-      (`auto-document-reads.ts`), mais `task.json`/`AGENTS.md` viennent de la commande `/apex`,
-      pas d'un hook. À reformuler.
+- [x] **`enforce-apex-phases.ts::isAuthorized`** — 2e mécanisme de doc-consultation par-skill/TTL
+      (distinct de `isDocConsulted`, déjà porté). Livré en 0.1.49 : `src/policy/apex-authorization.ts`
+      exporte `isAuthorized` (même nom que la source Python), `doc_consulted` par framework
+      re-validé contre `FUSE_ENFORCE_TTL_SEC`, `target` cross-crédité (parité `track-doc-consultation.py`) — cf. CHANGELOG 0.1.49.
+- [x] **Préambule APEX** — le texte trompeur a été corrigé : `claude-md-context.ts:51` dit
+      maintenant « created by the /apex command », plus « auto-created on first Write/Edit ».
 
 ### Faux « gaps » confirmés — NE PAS re-porter (vérifiés absents/morts côté Python)
 
@@ -30,16 +30,16 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 
 ## Harnais (adapters)
 
-- [ ] **Support Hermes** — ajouter `hermes: ".hermes"` à `HOME_DIR` (`src/config/dotenv.ts`)
-      + la détection dans `src/detect/harness.ts` (+ l'adapter `src/adapters/hermes/` si
-      Hermes a un format de hook propre). Aujourd'hui un `~/.hermes/.env` est ignoré
-      (fallback `.claude`). Ajouter aussi le wiring `init` (`src/init/templates.ts`).
+- [x] **Support Hermes** — livré en 0.1.49 : `hermes: ".hermes"` dans `HOME_DIR`
+      (`src/config/dotenv.ts:17`), détection + adapter `src/adapters/hermes/index.ts`
+      (`pre_tool_call`, protocole `{decision:"block",reason}`/`{context}`), wiring `respond()`.
+      `harness init` n'a volontairement pas de runner Hermes : sa config vit hors-projet
+      (`~/.hermes/config.yaml`), voir `hermes/index.ts:3-4`.
 
 ## Configuration `.env`
 
-- [ ] **TTL de cache configurables par env** — `WEBFETCH_TTL_MS` (24h) et `MCP_TTL_MS` (48h)
-      sont des constantes en dur dans `src/runtime/mcp-key.ts`. Les exposer via
-      `FUSE_WEBFETCH_TTL_SEC` / `FUSE_MCP_TTL_SEC` (parser `parseEnvInt`, `src/config/env.ts`).
+- [x] **TTL de cache configurables par env** — livré : `FUSE_WEBFETCH_TTL_SEC` /
+      `FUSE_MCP_TTL_SEC` lues dans `src/runtime/mcp-key.ts` (`parseEnvInt`, defaults 24h/48h).
 - [ ] **Variantes `.env.local` / `.env.*`** — le loader (`src/config/dotenv.ts` `envCandidates`)
       ne sonde que `~/.<harness>/.env` et `<cwd>/.env`. Ajouter `.env.local` (et l'ordre de
       précédence) si besoin d'un override non versionné.
@@ -119,18 +119,17 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 - [x] **`_shared/project_detect.py::is_tailwind_project`** : fallback « `tailwindcss` en dépendance
       `package.json` » (Tailwind v4 CSS-first sans fichier de config) — ajouté à
       `detect-project.ts::detectProjectType` (`hasTailwindDependency`).
-- [ ] **`ai-pilot/lib/apex/doc-helpers.ts` (Python source, malgré l'extension `.ts`) — reformulé,
+- [x] **`ai-pilot/lib/apex/doc-helpers.ts` (Python source, malgré l'extension `.ts`) — reformulé,
       correction d'une erreur d'attribution** : le TS harness (`freshness/doc-helpers.ts`) porte
       bien ce fichier (mêmes noms `isDocConsulted`/`resolveSessions`/`formatDocSatisfactionStatus`,
       même AND strict context7+exa côté source — pas `_shared/tracking.py::check_skill_common.py`
       comme précédemment écrit par erreur dans ce ROADMAP). CE mécanisme (pooling session-wide
-      des sources par framework, `isDocConsulted`) est correctement porté. Un SECOND mécanisme
-      Python distinct, non vérifié comme porté, reste ouvert : `enforce-apex-phases.ts::isAuthorized`
-      + `track-doc-consultation.py` — un `doc_consulted` horodaté PAR FRAMEWORK (détecté depuis le
-      fichier édité, pas la requête), avec cross-update vers `state.target.framework` (le framework
-      du dernier deny) quand la requête de recherche détecte un framework différent du fichier cible.
-      Sert le check "SOLID refs" (TTL framework-spécifique), pas le check "recherche en ligne"
-      (session-wide, déjà correct). À vérifier dans une prochaine session — non exploré ici.
+      des sources par framework, `isDocConsulted`) est correctement porté. Le SECOND mécanisme
+      Python distinct qui restait ouvert ici — `enforce-apex-phases.ts::isAuthorized` +
+      `track-doc-consultation.py` (un `doc_consulted` horodaté PAR FRAMEWORK, cross-update vers
+      `state.target.framework`) — est livré en 0.1.49 : `src/policy/apex-authorization.ts`
+      (fonction `isAuthorized`, même nom que la source), câblé dans `src/runtime/gate-apex.ts`.
+      Cf. CHANGELOG 0.1.49.
 - [x] **`bash-write-safe-paths.ts`** : `target.startsWith(safe)` sans frontière de segment,
       `stripped.startsWith("~")` sur-expansant `~foo`/`~1`, `hasSafeWriteTarget` non ancré au
       chemin extrait — les 3 corrigés (frontière `+"/"`, tilde POSIX strict, ancrage par guillemets
@@ -191,7 +190,13 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
       convention multi-harnais du reste du repo (`discoverRefs`), mais corriger ça est un changement
       d'architecture plus large, hors scope ici.
 
-## Abandonné (décision)
+## Abandonné (décision) — puis réintroduits, cf. CHANGELOG 0.1.47
 
-- ~~Ralph-mode~~ (bypass git/install) — non porté volontairement
-- ~~enforce-gemini-mcp~~ (guard Tailwind) — non porté volontairement
+Décision initiale inversée : les deux items ci-dessous, notés « non porté volontairement »,
+ont en fait été livrés en 0.1.47 (`RALPH_MODE` / `FUSE_ENFORCE_GEMINI_MCP`) — la note
+« Abandonné » ci-dessous est obsolète, gardée pour l'historique de la décision.
+
+- [x] ~~Ralph-mode~~ (bypass git/install) — livré 0.1.47 : `RALPH_MODE` (opt-in, défaut off),
+      exempte les commandes git sûres, n'exempte jamais le git destructif ni les installs système.
+- [x] ~~enforce-gemini-mcp~~ (guard Tailwind) — livré 0.1.47 : `FUSE_ENFORCE_GEMINI_MCP` (opt-in,
+      défaut off), `src/policy/gemini-mcp-gate.ts`.

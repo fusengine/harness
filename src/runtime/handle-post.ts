@@ -12,8 +12,11 @@ import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-e
 import { captureReceipt } from "../tracking/receipts";
 import { designPassNotice } from "../policy/design/gates";
 import { attachSystemMessage } from "../adapters/claude";
+import { refCreditNoticeFor } from "./notices";
+import { defaultStateDir } from "./paths";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
+import type { Prompt } from "../prompt/types";
 
 /**
  * Run the PostToolUse pipeline: store the MCP response, emit a design warning,
@@ -63,12 +66,17 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
     agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
     tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "", url: "", phase: "post",
   }, mcpDir);
-  if (designWarn) return { stdout: respond(id, notice?.userMessage ? { ...designWarn, userMessage: notice.userMessage } : designWarn), exit: 0 };
-  if (!notice?.userMessage) return { stdout: extra, exit: 0 };
-  if (!extra) return { stdout: respond(id, notice), exit: 0 };
+  // Compact compliance notice: a skill/SOLID `.md` reference credited by THIS
+  // PostToolUse call (dedup'd against the ×11 hook fan-out inside refCreditNoticeFor).
+  const refNotice = refCreditNoticeFor(activities, event.sessionId, opts.now, defaultStateDir(opts.cwd));
+  const userMessage = [notice?.userMessage, refNotice].filter(Boolean).join("\n") || undefined;
+  if (designWarn) return { stdout: respond(id, userMessage ? { ...designWarn, userMessage } : designWarn), exit: 0 };
+  if (!userMessage) return { stdout: extra, exit: 0 };
+  const withUserMessage: Prompt = notice ? { ...notice, userMessage } : { kind: "inform", title: "Compliance", reason: "", userMessage };
+  if (!extra) return { stdout: respond(id, withUserMessage), exit: 0 };
   // `extra` is already-rendered Claude-shaped stdout (postEditContext): claude/codex get the
   // notice attached onto it; other harnesses cannot parse `extra` anyway, so the notice —
   // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra).
-  if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, notice.userMessage), exit: 0 };
-  return { stdout: respond(id, notice) || extra, exit: 0 };
+  if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, userMessage), exit: 0 };
+  return { stdout: respond(id, withUserMessage) || extra, exit: 0 };
 }

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { capFragment } from "./inject-budget";
 
 /** Run a git subcommand in `cwd`, returning trimmed stdout or "" on error. */
 function git(cwd: string, args: string[]): string {
@@ -38,5 +39,5 @@ export function projectContext(cwd: string): string[] {
  * @returns The joined additionalContext text (possibly empty).
  */
 export function devContext(cwd: string): string {
-  return [...gitContext(cwd), ...projectContext(cwd)].join("\n");
+  return capFragment("dev-context", [...gitContext(cwd), ...projectContext(cwd)].join("\n"));
 }

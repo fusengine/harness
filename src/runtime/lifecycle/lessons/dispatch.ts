@@ -13,6 +13,7 @@ import { projectRoot } from "../../../util/project-root";
 import { atomicWrite } from "../../../util/json-io";
 import { curateLessons } from "../aipilot/curate-lessons";
 import { compressInjection } from "../aipilot/lesson-inject";
+import { capFragment } from "../../inject-budget";
 import { lessonsArchiveFileFor, lessonsFileFor } from "./state";
 import { markWrite, remindWrite } from "./reminder";
 
@@ -39,7 +40,10 @@ function persistCuration(file: string, root: string, curated: string, archive: s
  * Inject `MEMORY/LESSON.md` for `event`. Mechanical curation (dedup + cap→archive)
  * rewrites the FILE; the injected BLOCK is then COMPRESSED (newest bullets whole,
  * older ones distilled to their rule) so a growing file never inflates the
- * SessionStart/SubagentStart context. Any curation report surfaces via systemMessage.
+ * SessionStart/SubagentStart context. A hard {@link capFragment} budget is the
+ * last-resort backstop on top of compression — the regression that motivated it
+ * was this exact block silently reaching ~44k tokens. Any curation report
+ * surfaces via systemMessage.
  */
 function injectMemory(cwd: string, event: string, now: number): string {
   const root = projectRoot(cwd);
@@ -50,7 +54,8 @@ function injectMemory(cwd: string, event: string, now: number): string {
   if (!content) return "";
   const { content: curated, archive, report } = curateLessons(content, now, root);
   if (curated !== content) content = persistCuration(file, root, curated, archive, content);
-  const ctx = `Project lessons — never reproduce these:\n${compressInjection(content)}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
+  const body = capFragment("lessons", compressInjection(content));
+  const ctx = `Project lessons — never reproduce these:\n${body}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
   return report ? attachSystemMessage(contextResponse(event, ctx), `LESSON.md curation:\n${report}`) : contextResponse(event, ctx);
 }
 

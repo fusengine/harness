@@ -81,7 +81,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   });
   if (prompt) return { stdout: respond(id, prompt), exit: 0 };
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
-  // decision-time lesson). A deny/ask already returned above, so nothing it
-  // emits can block nor override a decision.
-  return allowOutcome(id, event, payload, mcpDir, opts.cwd);
+  // decision-time lesson + evidence-fresh notice). A deny/ask already returned
+  // above, so nothing it emits can block nor override a decision.
+  return allowOutcome(id, event, payload, mcpDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now });
 }

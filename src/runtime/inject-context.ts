@@ -3,6 +3,7 @@ import { buildClaudeMdContext } from "../policy/claude-md-context";
 import { buildApexTaskInjection } from "../policy/apex-task-context";
 import { hashText } from "../util/json-io";
 import { oncePerWindow, DEDUP_WINDOW_MS } from "./inject-dedup";
+import { capFragment } from "./inject-budget";
 
 /**
  * Build the {@link oncePerWindow} key for the CLAUDE.md preamble gate. The
@@ -40,10 +41,12 @@ export function promptSubmitContext(prompt: string, cwd: string): string {
 /**
  * PreToolUse Task context injection: render the APEX sub-agent context as a
  * Claude `additionalContext` response when `.claude/apex/` exists, else "".
+ * Harness-produced (not owner CLAUDE.md content), so it is subject to the
+ * per-fragment {@link capFragment} budget — unlike {@link promptSubmitContext}.
  * @param cwd - Fallback project root when `CLAUDE_PROJECT_DIR` is unset.
  * @returns The native hook stdout (possibly empty).
  */
 export function taskContext(cwd: string): string {
   const ctx = buildApexTaskInjection(process.env.CLAUDE_PROJECT_DIR ?? cwd);
-  return ctx ? contextResponse("PreToolUse", ctx) : "";
+  return ctx ? contextResponse("PreToolUse", capFragment("apex-task", ctx)) : "";
 }

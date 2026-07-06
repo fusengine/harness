@@ -14,7 +14,8 @@ for Bun; a built `dist` (`.mjs` + `.d.mts`) serves Node/bundler consumers.
   │ cache · freshness · memory · state       │      │ adapters/cursor          │
   │ config · prompt · statusline · util      │      │ adapters/cline           │
   │ runtime(handle · gate · mcp · storage)   │      │ adapters/gemini          │
-  └─────────────────────────────────────────┘      │ cli (init · hook · check)│
+  └─────────────────────────────────────────┘      │ adapters/hermes          │
+                                                    │ cli (init · hook · check)│
                                                     └──────────────────────────┘
 ```
 
@@ -22,7 +23,9 @@ for Bun; a built `dist` (`.mjs` + `.d.mts`) serves Node/bundler consumers.
 - **`detect`** identifies the running harness (`hook` vs `cli` mode).
 - **`runtime`** is the loop: `handleHook` gates on a PRE event and records on a
   POST event, fed from a per-harness session track.
-- **Adapters** parse a harness payload → core → that harness's native response.
+- **Adapters** parse a harness payload → core → that harness's native response —
+  but each adapter enforces a different SUBSET of the core policy, not the same
+  one; see [adapters.md](./adapters.md#compatibility-matrix) before assuming parity.
 
 ## Pages
 
@@ -44,7 +47,7 @@ See also: [CHANGELOG](../CHANGELOG.md) · [CONTRIBUTING](../CONTRIBUTING.md) · 
 
 ```sh
 bun add @fusengine/harness
-bun test            # 117 tests
+bun test            # 484 tests (94 files)
 bunx tsc --noEmit   # typecheck (isolatedDeclarations)
 bun run build       # dist + .d.mts
 ```

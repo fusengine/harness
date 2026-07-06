@@ -23,6 +23,8 @@ export interface OneShotState {
   corrected: number;
   pending: Record<string, Pending>;
   updatedAt: number;
+  /** Per-tool PostToolUseFailure tally. Optional — absent in pre-0.1.57 sidecars (additive, back-compatible). */
+  failures?: Record<string, number>;
 }
 
 /** A fresh, empty state — always spread (`{ ...EMPTY }`) so the const is never shared. */

@@ -1,0 +1,16 @@
+{
+  "name": "post-compact",
+  "doc": "PostCompact (core scope) re-injects the reconciliation snapshot plus the one-line 'context was compacted' reminder as additionalContext (dispatch.ts → postCompactContext → renderSnapshot). $TMP is not a git repo but the Version collector always renders the running harness version, so the block is present and the reminder rides in front. Unit parity: test/post-compact.test.ts.",
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "PostCompact → stdout additionalContext leads with the compaction reminder.",
+      "event": {
+        "hook_event_name": "PostCompact",
+        "session_id": "sc18",
+        "trigger": "auto"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "Context was compacted" } }
+    }
+  ]
+}

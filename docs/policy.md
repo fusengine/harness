@@ -6,7 +6,11 @@ The harness-agnostic decision layer. Pure functions — no I/O, no harness coupl
 
 ## `evaluate(ctx): PolicyResult`
 
-The unified entry point. Adapters call this and translate the result.
+The unified entry point (`src/policy/evaluate.ts`). Adapters call this and
+translate the `prompt` it returns; it runs only the **stateless** checks — the
+stateful APEX gates (freshness, doc-consulted, solid-read, brainstorm) need
+session state and only run through `runtime`'s `gate()`, see
+[runtime.md](./runtime.md) and [guards.md](./guards.md).
 
 ```ts
 interface PolicyContext {
@@ -15,23 +19,35 @@ interface PolicyContext {
   content?: string;
   command?: string;      // for Bash tools
   maxLines?: number;     // override SOLID limit
+  agentType?: string;    // "Explore"/"Plan" exempts the file-size check
+  existingLines?: number; // on-disk line count, for an Edit's file-size judgment
 }
 interface PolicyResult {
-  decision: "allow" | "deny" | "warn";
+  decision: "allow" | "deny";
   message: string | null;
+  prompt?: Prompt;       // the portable { kind, title, reason, actions? }
   meta?: Record<string, unknown>;
 }
 ```
 
-Current policies, in order:
-1. **git guard** — `command` matching `GIT_BLOCKED` → `deny`.
-2. **file-size** — a code `filePath` whose `content` exceeds the SOLID limit →
-   `deny` (with `meta.framework`, `meta.lines`, `meta.max`).
-3. otherwise `allow`.
+Current policies, in order (`evaluate.ts`):
+1. **guard chain** (`runGuards`, see [guards.md](./guards.md)) — security,
+   protected-path, bash-write, interface-separation, install → `deny`
+   (block or ask) on the first match. Fail-closed: a guard that throws is
+   treated as a block.
+2. **git guard** — `command` matching `GIT_BLOCKED` → block;
+   `GIT_ASK` → ask. Both are skipped for `RALPH_SAFE` commands when
+   `RALPH_MODE` is on (destructive commands are never in that safe list).
+3. **file-size (SOLID)** — a code `filePath` scoped by `isFileSizeScoped`
+   (`.css` excluded) whose line count exceeds `FUSE_SOLID_MAX_LINES` → `deny`
+   (with `meta.framework`, `meta.lines`, `meta.max`). A `Write` judges its new
+   content; an `Edit` judges the existing on-disk file
+   (`ctx.existingLines`). `Explore`/`Plan` agents are exempt.
+4. otherwise `allow`.
 
 ```ts
 const r = evaluate({ tool: "Write", filePath: "src/big.ts", content });
-if (r.decision === "deny") report(r.message);
+if (r.decision === "deny") report(r.prompt?.reason ?? r.message);
 ```
 
 ## Building blocks
