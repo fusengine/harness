@@ -72,7 +72,9 @@ test("validateTaskSolid: a session with no code changes passes without any recei
 
 test("trackAgentMemory: owned code with no fresh receipt appends the receipt reminder", () => {
   const home = tmp("fh-rcpt-agent-");
-  saveSessionState("s-ag", { changes: { cumulativeCodeFiles: 1, modifiedFiles: [join(tmp("fh-x-"), "b.ts")] } }, home);
+  const code = join(tmp("fh-x-"), "b.ts");
+  writeFileSync(code, "export const b = 1;\n"); // owned file must exist on disk to be reported
+  saveSessionState("s-ag", { changes: { cumulativeCodeFiles: 1, modifiedFiles: [code] } }, home);
   const parsed = JSON.parse(trackAgentMemory({ agent_type: "laravel-expert", session_id: "s-ag" }, home, T)) as { hookSpecificOutput?: { additionalContext?: string } };
   expect(parsed.hookSpecificOutput?.additionalContext).toContain("NO VERIFICATION RECEIPT");
 });

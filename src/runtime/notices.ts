@@ -17,6 +17,15 @@
  * `attachSystemMessage`); a harness with no `systemMessage` channel (e.g.
  * cline) silently drops the notice there (documented no-op, never a crash) —
  * nothing in this module renders directly.
+ *
+ * CHANNEL CONTRACT — human-only, exactly once: the `userMessage`/`systemMessage`
+ * these notices ride is a HUMAN channel by platform contract. It never reaches
+ * the agent — `formatPrompt` (src/prompt/types.ts) excludes it — so the emitting
+ * sub-agent does NOT see its own notice; only the human owner does, and exactly
+ * ONCE even under the multi-plugin fan-out, because the emitter is gated by
+ * {@link onceExclusive}. Verified live 2026-07-06: under the real ×11 fan-out a
+ * single skill-ref Read surfaced one `✓ SOLID refs read` line in the owner's
+ * terminal (not duplicated, and correctly invisible to the agent).
  */
 import { onceExclusive } from "./inject-dedup";
 import { BURST_DEDUP_MS } from "./burst-window";
