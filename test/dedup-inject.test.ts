@@ -1,8 +1,8 @@
 import { test, expect } from "bun:test";
 import { tmpdir } from "node:os";
-import { mkdtempSync, existsSync } from "node:fs";
+import { mkdtempSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { oncePerWindow, DEDUP_WINDOW_MS } from "../src/runtime/inject-dedup";
+import { oncePerWindow, onceExclusive, DEDUP_WINDOW_MS } from "../src/runtime/inject-dedup";
 import { claudeMdKey } from "../src/runtime/inject-context";
 
 const dir = (): string => mkdtempSync(join(tmpdir(), "fh-dedup-"));
@@ -57,4 +57,34 @@ test("owner invariant: the SAME turn (same prompt + same block) double-firing is
   const ctx = "# CLAUDE.md\nsame block";
   expect(oncePerWindow(claudeMdKey("same prompt", ctx), DEDUP_WINDOW_MS, { dir: d, now: 1000 })).toBe(true);
   expect(oncePerWindow(claudeMdKey("same prompt", ctx), DEDUP_WINDOW_MS, { dir: d, now: 1200 })).toBe(false);
+});
+
+test("onceExclusive: same key twice inside the window → only the first call wins", () => {
+  const d = dir();
+  expect(onceExclusive("k", 5000, { dir: d, now: 1000 })).toBe(true);
+  expect(onceExclusive("k", 5000, { dir: d, now: 1500 })).toBe(false);
+});
+
+test("onceExclusive: different keys both win in the same window", () => {
+  const d = dir();
+  expect(onceExclusive("a", 5000, { dir: d, now: 1000 })).toBe(true);
+  expect(onceExclusive("b", 5000, { dir: d, now: 1000 })).toBe(true);
+});
+
+test("onceExclusive: re-emission allowed once the window has elapsed (expired marker is swept)", () => {
+  const d = dir();
+  expect(onceExclusive("k", 5000, { dir: d, now: 1000 })).toBe(true);
+  expect(onceExclusive("k", 5000, { dir: d, now: 6000 })).toBe(true);
+});
+
+test("onceExclusive: purge sweeps expired marker files out of the lock directory", () => {
+  const d = dir();
+  onceExclusive("k1", 1000, { dir: d, now: 1000 });
+  onceExclusive("k2", 1000, { dir: d, now: 1000 });
+  const lockDir = join(d, "inject-dedup-locks");
+  expect(readdirSync(lockDir).length).toBe(2);
+  // Both markers are now older than the window; the next call's sweep removes them
+  // before creating its own — the directory never grows unbounded.
+  onceExclusive("k3", 1000, { dir: d, now: 5000 });
+  expect(readdirSync(lockDir).length).toBe(1);
 });

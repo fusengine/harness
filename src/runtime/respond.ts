@@ -41,6 +41,12 @@ export function respond(id: string, prompt: Prompt): string {
       if (kind === "inform") {
         return userMessage ? informResponse("PreToolUse", userMessage, reason ? message : "") : contextResponse("PreToolUse", message);
       }
+      // Codex parses but NEVER honors `permissionDecision: "ask"` (deny-only) — an
+      // `ask` would silently fail open. Downgrade it to an explicit deny so the
+      // gate still bites; the reason is prefixed so the honest limit is visible.
+      if (id === "codex") {
+        return denyResponse("PreToolUse", `[downgraded from ask — Codex has no interactive approval]\n${message}`);
+      }
       return JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PreToolUse",

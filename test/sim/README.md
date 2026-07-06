@@ -10,6 +10,7 @@ asserts the declared expectations.
 ```jsonc
 {
   "name": "pretooluse-blocks-git-push",   // human label (file basename is the test name)
+  "harness": "claude-code",                // optional: harness id; default "claude-code"
   "env": { "HARNESS_FRAMEWORK": "react" }, // optional: env applied to every step
   "steps": [
     {
@@ -21,6 +22,13 @@ asserts the declared expectations.
 }
 ```
 
+- **`harness`** *(optional)* — the harness id spawned as `hook <harness> <scope>`,
+  selecting which adapter renders the response. Omitted → `"claude-code"`, so every
+  pre-existing scenario spawns byte-identically. Validated (fail-fast at load) against
+  the adapter-backed set: `claude-code`, `codex`, `cursor`, `cline`, `gemini-cli`,
+  `hermes` — exactly the ids `src/runtime/respond.ts` emits a native response for.
+  Cross-harness scenarios (`19+`, prefix `<harness>-…`) prove the guards/gates are
+  shared across editions: the multi-harness invariant is mechanical here, not a claim.
 - **Placeholders** — `$TMP` (per-run temp dir) and `$FIXTURES` (this suite's
   fixtures) are substituted inside `env` and `event` before each step runs.
 - **`steps`** run in order, sharing the same `$TMP`, so a scenario can assert
@@ -31,10 +39,11 @@ asserts the declared expectations.
 By default `run-scenario.ts` spawns the source CLI:
 
 ```
-bun src/cli/bin.ts hook claude-code <scope>
+bun src/cli/bin.ts hook <harness> <scope>
 ```
 
-with the step's `event` piped to stdin. This is the fast local mode.
+where `<harness>` is the scenario's `harness` field (default `claude-code`), with
+the step's `event` piped to stdin. This is the fast local mode.
 
 ## `SIM_BIN` — run against the built binary
 

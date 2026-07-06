@@ -12,6 +12,7 @@
  * bloating every SessionStart/SubagentStart turn.
  * @packageDocumentation
  */
+import { recordFragment } from "./fragment-registry";
 
 /**
  * Hard cap per fragment, in characters. ~8000 chars ≈ 2000 tokens at the
@@ -37,7 +38,10 @@ export const FRAGMENT_CHAR_CAP = 8000;
  * @returns `text` unchanged, or a truncated copy ending in the cut notice — always ≤ the cap.
  */
 export function capFragment(label: string, text: string): string {
-  if (text.length <= FRAGMENT_CHAR_CAP) return text;
+  if (text.length <= FRAGMENT_CHAR_CAP) {
+    recordFragment(label, text.length);
+    return text;
+  }
   const totalLen = text.length;
   // Bound the label so a pathological (very long) label can never, by itself,
   // push the suffix — and thus the output — past the cap. Real labels are short
@@ -52,7 +56,9 @@ export function capFragment(label: string, text: string): string {
   const slice = text.slice(0, budget);
   const lastNl = slice.lastIndexOf("\n");
   const kept = (lastNl > 0 ? slice.slice(0, lastNl) : slice).trimEnd();
-  return kept + suffixFor(kept.length);
+  const result = kept + suffixFor(kept.length);
+  recordFragment(label, result.length);
+  return result;
 }
 
 /** One named fragment's injected size, for {@link budgetReport}. */

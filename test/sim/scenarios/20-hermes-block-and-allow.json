@@ -1,0 +1,44 @@
+{
+  "name": "hermes-block-and-allow",
+  "harness": "hermes",
+  "doc": "Hermes wire-shape parity. Nous Research's hermes-agent pipes a `pre_tool_call` payload (same INPUT shape as Claude Code) and reads JSON back; a block is `{decision:\"block\",reason}` (respond.ts:64 → adapters/hermes/toHermesResponse), an allow prints EMPTY stdout (the `hook` command emits the allow-path assembly, which for a plain read is \"\" — NOT `{}`; the adapter's own guard() would print `{}` but that path is unused by `hook`). Same guard/gate chain as every other harness — only the envelope differs. Real output verified 2026-07-06 against `bun src/cli/bin.ts hook hermes core`.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Destructive git via the hermes `terminal` tool → GIT_BLOCKED deny, rendered as `{decision:\"block\"}`. Asserts the block decision AND that the tool_name is irrelevant to the git gate (evaluate keys off ctx.command, not the tool name).",
+      "event": {
+        "hook_event_name": "pre_tool_call",
+        "session_id": "sc20",
+        "tool_name": "terminal",
+        "tool_input": { "command": "git push origin main --force" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "decision", "equals": "block" } }
+    },
+    {
+      "scope": "core",
+      "doc": "150-line `write_file` (hermes path+content) > 100 → SOLID file-size block, proving the file-size gate runs on the hermes edition too (not just Claude). Assert the [BLOCKED] title survives into `reason`.",
+      "event": {
+        "hook_event_name": "pre_tool_call",
+        "session_id": "sc20b",
+        "tool_name": "write_file",
+        "tool_input": {
+          "path": "$TMP/big.ts",
+          "content": "const l1 = 1;\nconst l2 = 2;\nconst l3 = 3;\nconst l4 = 4;\nconst l5 = 5;\nconst l6 = 6;\nconst l7 = 7;\nconst l8 = 8;\nconst l9 = 9;\nconst l10 = 10;\nconst l11 = 11;\nconst l12 = 12;\nconst l13 = 13;\nconst l14 = 14;\nconst l15 = 15;\nconst l16 = 16;\nconst l17 = 17;\nconst l18 = 18;\nconst l19 = 19;\nconst l20 = 20;\nconst l21 = 21;\nconst l22 = 22;\nconst l23 = 23;\nconst l24 = 24;\nconst l25 = 25;\nconst l26 = 26;\nconst l27 = 27;\nconst l28 = 28;\nconst l29 = 29;\nconst l30 = 30;\nconst l31 = 31;\nconst l32 = 32;\nconst l33 = 33;\nconst l34 = 34;\nconst l35 = 35;\nconst l36 = 36;\nconst l37 = 37;\nconst l38 = 38;\nconst l39 = 39;\nconst l40 = 40;\nconst l41 = 41;\nconst l42 = 42;\nconst l43 = 43;\nconst l44 = 44;\nconst l45 = 45;\nconst l46 = 46;\nconst l47 = 47;\nconst l48 = 48;\nconst l49 = 49;\nconst l50 = 50;\nconst l51 = 51;\nconst l52 = 52;\nconst l53 = 53;\nconst l54 = 54;\nconst l55 = 55;\nconst l56 = 56;\nconst l57 = 57;\nconst l58 = 58;\nconst l59 = 59;\nconst l60 = 60;\nconst l61 = 61;\nconst l62 = 62;\nconst l63 = 63;\nconst l64 = 64;\nconst l65 = 65;\nconst l66 = 66;\nconst l67 = 67;\nconst l68 = 68;\nconst l69 = 69;\nconst l70 = 70;\nconst l71 = 71;\nconst l72 = 72;\nconst l73 = 73;\nconst l74 = 74;\nconst l75 = 75;\nconst l76 = 76;\nconst l77 = 77;\nconst l78 = 78;\nconst l79 = 79;\nconst l80 = 80;\nconst l81 = 81;\nconst l82 = 82;\nconst l83 = 83;\nconst l84 = 84;\nconst l85 = 85;\nconst l86 = 86;\nconst l87 = 87;\nconst l88 = 88;\nconst l89 = 89;\nconst l90 = 90;\nconst l91 = 91;\nconst l92 = 92;\nconst l93 = 93;\nconst l94 = 94;\nconst l95 = 95;\nconst l96 = 96;\nconst l97 = 97;\nconst l98 = 98;\nconst l99 = 99;\nconst l100 = 100;\nconst l101 = 101;\nconst l102 = 102;\nconst l103 = 103;\nconst l104 = 104;\nconst l105 = 105;\nconst l106 = 106;\nconst l107 = 107;\nconst l108 = 108;\nconst l109 = 109;\nconst l110 = 110;\nconst l111 = 111;\nconst l112 = 112;\nconst l113 = 113;\nconst l114 = 114;\nconst l115 = 115;\nconst l116 = 116;\nconst l117 = 117;\nconst l118 = 118;\nconst l119 = 119;\nconst l120 = 120;\nconst l121 = 121;\nconst l122 = 122;\nconst l123 = 123;\nconst l124 = 124;\nconst l125 = 125;\nconst l126 = 126;\nconst l127 = 127;\nconst l128 = 128;\nconst l129 = 129;\nconst l130 = 130;\nconst l131 = 131;\nconst l132 = 132;\nconst l133 = 133;\nconst l134 = 134;\nconst l135 = 135;\nconst l136 = 136;\nconst l137 = 137;\nconst l138 = 138;\nconst l139 = 139;\nconst l140 = 140;\nconst l141 = 141;\nconst l142 = 142;\nconst l143 = 143;\nconst l144 = 144;\nconst l145 = 145;\nconst l146 = 146;\nconst l147 = 147;\nconst l148 = 148;\nconst l149 = 149;\nconst l150 = 150;\n"
+        }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "[BLOCKED] SOLID file-size limit" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A plain read (`ls`) via `terminal` → allowed. The `hook` allow-path prints EMPTY stdout on hermes (verified) — the parity check that an allow is silent, NOT `{}`.",
+      "event": {
+        "hook_event_name": "pre_tool_call",
+        "session_id": "sc20c",
+        "tool_name": "terminal",
+        "tool_input": { "command": "ls -la $TMP" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

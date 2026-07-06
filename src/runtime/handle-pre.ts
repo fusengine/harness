@@ -9,6 +9,7 @@ import { taskContext } from "./inject-context";
 import { securityAdvisory } from "./lifecycle/security/check-skill";
 import { validateSolidGate } from "./lifecycle";
 import { allowOutcome } from "./pre-allow";
+import { applyPatchGate } from "./apply-patch-gate";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -60,6 +61,15 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   if (event.tool === "Task") {
     const taskCtx = taskContext(opts.cwd);
     if (taskCtx) return { stdout: taskCtx, exit: 0 };
+  }
+
+  // Codex `apply_patch`: normalize.ts fanned the freeform patch into per-file
+  // changes. OR their static file-size/DRY/protected-path verdict — one violating
+  // hunk blocks the whole envelope. `event.files` is undefined for every other
+  // tool/harness, so the single-file gate() below is unchanged there.
+  if (event.files && event.files.length > 0) {
+    const patchPrompt = applyPatchGate(event.files, opts.cwd);
+    if (patchPrompt) return { stdout: respond(id, patchPrompt), exit: 0 };
   }
 
   const prompt = await gate({

@@ -44,10 +44,16 @@ export interface SetupFile {
   content: string;
 }
 
-/** A full scenario file: a name, an optional env overlay, setup files, and ordered steps. */
+/** A full scenario file: a name, an optional harness, an optional env overlay, setup files, and ordered steps. */
 export interface Scenario {
   /** Human-readable scenario name (surfaced in failure messages). */
   name: string;
+  /**
+   * Harness id spawned as the binary's 3rd argv (`hook <harness> <scope>`).
+   * Optional; defaults to `"claude-code"` so every pre-existing scenario is
+   * byte-identical. Validated against the adapter-backed set in ./validate.
+   */
+  harness?: string;
   /** Optional env overlay merged over the deterministic minimal spawn env. */
   env?: Record<string, string>;
   /** Files to create under `$TMP` before steps run — e.g. `.git`/`package.json` roots. */

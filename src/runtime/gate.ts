@@ -8,6 +8,7 @@ import { preCommitGate } from "./precommit";
 import { modularGate } from "./modular";
 import { frameworkSkillGate } from "./framework-skill-gate";
 import { reconcileRefReadsFromTranscript } from "../freshness/ref-evidence";
+import { reconcileRefReadsFromJournal } from "../freshness/ref-journal";
 import { isShadcnWrite, shadcnSkillGate } from "../policy/shadcn-skill-gate";
 import { isTailwindWrite, tailwindSkillGate } from "../policy/tailwind-skill-gate";
 import { geminiMcpGate } from "../policy/gemini-mcp-gate";
@@ -67,10 +68,12 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   if (modular) return modular;
   if (!input.filePath) return null;
   const filePath = input.filePath;
-  // Reconcile ref reads from the durable transcript BEFORE any refsRead consumer: the racy
-  // load→save track loses lone `refsRead` writes under the hook fan-out (see ref-evidence.ts) —
-  // why only the lead's solidReadGate never credited. Fixes framework/shadcn/tailwind + APEX at once.
-  const track = reconcileRefReadsFromTranscript(await loadTrack(input.trackFile), input.transcriptPath, input.now);
+  // Reconcile refsRead BEFORE any consumer from two durable, race-immune sources (racy load→save loses lone
+  // writes under the fan-out): the transcript restores the LEAD's flushed read, the append-only journal (ref-journal.ts) the TEAMMATE's un-flushed one (lag > TTL).
+  const track = reconcileRefReadsFromJournal(
+    reconcileRefReadsFromTranscript(await loadTrack(input.trackFile), input.transcriptPath, input.now),
+    dirname(input.trackFile), input.now,
+  );
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingCodeLines);
   if (solidOrSkill) return solidOrSkill;
   // Standalone shadcn/ui gate (ports check-skill-loaded.py): runs independently of `framework` since a components.json / .css write may detect as "generic", mirroring the real plugin's own PreToolUse hook alongside react's.

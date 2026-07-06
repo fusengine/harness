@@ -7,7 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import type { Scenario } from "./types";
-import { asObject, validateSetup, validateStep } from "./validate";
+import { asObject, validateHarness, validateSetup, validateStep } from "./validate";
 
 /** Validate a parsed scenario against {@link Scenario}. Throws on any schema breach. */
 export function validateScenario(data: unknown, path: string): Scenario {
@@ -16,7 +16,7 @@ export function validateScenario(data: unknown, path: string): Scenario {
   if (!Array.isArray(o.steps) || o.steps.length === 0) throw new Error(`scenario ${path}: "steps" must be a non-empty array`);
   const steps = o.steps.map((s, i) => validateStep(s, `scenario ${path} step ${i + 1}`));
   const env = o.env === undefined ? undefined : (asObject(o.env, `scenario ${path} env`) as Record<string, string>);
-  return { name: o.name, env, setup: validateSetup(o.setup, `scenario ${path}`), steps };
+  return { name: o.name, harness: validateHarness(o.harness, `scenario ${path}`), env, setup: validateSetup(o.setup, `scenario ${path}`), steps };
 }
 
 /** Read and structurally validate a scenario JSON file. Throws on bad JSON or schema. */
