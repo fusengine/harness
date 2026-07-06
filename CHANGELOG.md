@@ -2,6 +2,14 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.56] - 06-07-2026
+
+### Fixed
+
+- Lead `refsRead` credit (root-caused with live data): `saveTrack` does an unlocked load→mutate→write, so under the ~11-process hook fan-out a ref read recorded ONCE was lost with ~100% probability while agents/doc evidence self-healed on later writes — the lead could read every listed SOLID ref and never satisfy `solidReadGate` (subagents were unaffected: SubagentStop already harvests their transcript). `gate()` now reconciles `.md` Reads from the session transcript (append-only, race-immune) into `refsRead` before any consumer — never downgrades a newer stamp, fail-open, TTL semantics unchanged. Regression test proves lost-write → BLOCK → reconcile → PASS, and stale reads stay blocked.
+- Lesson compression: the rule separator is a SPACED arrow only — a glued arrow (`120s→300s`) is prose; short trailing asides are dropped without losing in-prose arrows. Fixes the last 2/40 mid-token compressed bullets found by the live test.
+- Residual 2× sniper reminder documented as an accepted tradeoff (a per-key exclusive-create dedup would need its own purge sweep — separate batch if ever needed).
+
 ## [0.1.55] - 05-07-2026
 
 ### Fixed
