@@ -2,6 +2,22 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.57] - 06-07-2026
+
+### Added
+
+- Failure-time lessons (`PostToolUseFailure`, Claude-Code-only): a failing tool call is matched against the lesson `[TRIGGERS error:]` regexes and THE matching lesson is injected at the moment of the error; failures land in the one-shot sidecar (additive `failures` field). Sim scenario 17.
+- Teammate-idle deliverable check (`TeammateIdle`, Claude-Code-only): on a teammate's idle, its announced deliverables (harvested `modifiedFiles`) are stat'ed on disk — a missing one warns the lead "verify before treating as done". The idle≠done discipline, mechanized.
+- Post-compact reinjection (`PostCompact`, core scope): reconciliation snapshot + "context was compacted — reread files before editing" reminder, burst-deduped. Sim scenario 18.
+- Injection budget: every harness-produced fragment (lessons, snapshot, apex-task, dev-context, apex-subagent) is hard-capped at 8000 chars with a located truncation notice; the owner's CLAUDE.md context is exempt by test-locked invariant.
+- Compliance notices (user-visible `systemMessage`): `✓ SOLID refs read`, `✓ evidence fresh — explore+research`, `⚠ sniper required: <file>` — burst-deduped per session, no-op on harnesses without the channel.
+- Honest documentation: README + adapters/policy/runtime/config/index rewritten — compatibility matrix with per-harness limits (file:line cited), dual state roots documented, every feature claim backed by a cited test or sim scenario; ROADMAP swept against reality (6 stale items closed with proof).
+
+### Fixed
+
+- Codex adapter comments now state the real coverage (`apply_patch` edits gated at 0% — parser on the roadmap) and guard against wiring Codex `PermissionRequest` until `respond()` emits its wire shape; Claude-Code-only docstrings on non-portable features.
+- Simulator: explicit 30s per-scenario test timeout (kills the bun 5s-default flake vector under load; the 2s burst window itself has ×23 measured margin).
+
 ## [0.1.56] - 06-07-2026
 
 ### Fixed
