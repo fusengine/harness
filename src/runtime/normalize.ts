@@ -1,4 +1,5 @@
 import { parseApplyPatch } from "../adapters/codex/apply-patch";
+import { commandToString } from "./command-string";
 
 /** One file fanned out of a multi-file edit primitive (Codex `apply_patch`). */
 export interface NormalizedFile {
@@ -75,6 +76,6 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     ...base,
     filePath: str(input.file_path) ?? str(input.path) ?? str(payload.file_path),
     content: str(input.content) ?? str(input.new_string),
-    command: str(input.command) ?? str(payload.command),
+    command: commandToString(input.command) ?? commandToString(payload.command),
   };
 }

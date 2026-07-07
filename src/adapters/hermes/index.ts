@@ -12,6 +12,7 @@
 import { evaluate } from "../../policy/evaluate";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { readClaudeInput } from "../claude";
+import { commandToString } from "../../runtime/command-string";
 import type { HermesHookInput, HermesResponse } from "./interfaces/types";
 
 export type { HermesHookInput, HermesResponse } from "./interfaces/types";
@@ -47,7 +48,7 @@ export function guard(input: HermesHookInput): string | null {
     tool: input.tool_name ?? "write_file",
     filePath: t?.path ?? t?.file_path,
     content: t?.content,
-    command: t?.command,
+    command: commandToString(t?.command),
   });
   if (r.decision === "allow" || !r.prompt) return null;
   return toHermesResponse(r.prompt);

@@ -9,7 +9,7 @@
 export interface HermesHookInput {
   hook_event_name?: string;
   tool_name?: string;
-  tool_input?: { path?: string; file_path?: string; content?: string; command?: string };
+  tool_input?: { path?: string; file_path?: string; content?: string; command?: string | string[] };
   session_id?: string;
   cwd?: string;
 }
