@@ -5,12 +5,13 @@
 import { evaluate } from "../../policy/evaluate";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { readStdin } from "../../util/runtime-io";
+import { commandToString } from "../../runtime/command-string";
 
 /** Subset of the Claude Code hook stdin payload we consume. */
 export interface ClaudeHookInput {
   hook_event_name?: string;
   tool_name?: string;
-  tool_input?: { file_path?: string; content?: string; new_string?: string; command?: string };
+  tool_input?: { file_path?: string; content?: string; new_string?: string; command?: string | string[] };
   cwd?: string;
 }
 
@@ -88,7 +89,7 @@ export function guard(input: ClaudeHookInput): string | null {
     tool: input.tool_name ?? "Write",
     filePath: input.tool_input?.file_path,
     content: input.tool_input?.content ?? input.tool_input?.new_string,
-    command: input.tool_input?.command,
+    command: commandToString(input.tool_input?.command),
   });
   if (result.decision === "allow" || !result.prompt) return null;
   return toClaudeResponse(input.hook_event_name ?? "PreToolUse", result.prompt);

@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.61] - 07-07-2026
+
+### Fixed
+
+- Closed a total fail-open on Codex: `tool_input.command` arrives as an ARRAY (`["bash","-lc","…"]`) on Codex, and `normalize.ts` silently dropped non-string commands (`str()` → undefined), so every command gate (git blocked/ask, mutators, RALPH exemptions) allowed anything. New `runtime/command-string.ts` normalizer (string passthrough; `[shell, -c|-lc, script]` → script; other string arrays → joined) wired into `normalizeEvent` and the codex/claude/hermes adapters. Array and string payloads now produce byte-identical verdicts (proven by replay); string behavior is a strict no-op (full suite unchanged: 535 pass). New sim scenario 26 (codex array-form deny) + unit/pipeline tests.
+
 ## [0.1.60] - 06-07-2026
 
 ### Fixed

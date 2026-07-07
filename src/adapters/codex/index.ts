@@ -18,6 +18,7 @@ import { evaluate } from "../../policy/evaluate";
 import { countLines } from "../../policy/file-size";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { parseApplyPatch } from "./apply-patch";
+import { commandToString } from "../../runtime/command-string";
 import { contextResponse, denyResponse, type ClaudeHookInput } from "../claude";
 
 export { readClaudeInput as readCodexInput, denyResponse, contextResponse, type ClaudeHookInput as CodexHookInput } from "../claude";
@@ -50,7 +51,7 @@ function resolvePrompt(input: ClaudeHookInput): Prompt | null {
     tool: input.tool_name ?? "Write",
     filePath: i?.file_path,
     content: i?.content ?? i?.new_string,
-    command: i?.command,
+    command: commandToString(i?.command),
   });
   return r.decision === "allow" || !r.prompt ? null : r.prompt;
 }
@@ -63,7 +64,7 @@ function resolvePrompt(input: ClaudeHookInput): Prompt | null {
 export function guard(input: ClaudeHookInput): string | null {
   const prompt =
     input.tool_name === "apply_patch"
-      ? applyPatchPrompt(input.tool_input?.command ?? "")
+      ? applyPatchPrompt(commandToString(input.tool_input?.command) ?? "")
       : resolvePrompt(input);
   return prompt ? toCodexResponse(prompt) : null;
 }
