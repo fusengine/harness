@@ -1,4 +1,5 @@
 import { routeReferences } from "../refs/router";
+import { skillRefKey } from "../refs/ref-key";
 import type { Prompt } from "../prompt/types";
 import { DEFAULT_TTL_SEC, ttlLabel } from "../config/ttl";
 import { PLUGINS_DIR, SOLID_REF } from "./file-size";
@@ -43,12 +44,22 @@ export const solidReadGate: ApexGate = (ctx: ApexContext) => {
   // (parity require-solid-read.py, which re-validates the TTL on EVERY edit,
   // making the "(expires every …)" wording below actually true).
   const read = new Set((ctx.refsRead ?? []).filter((p) => refReadFresh(ctx, p, windowMs)));
+  // A sub-agent/teammate reads the SAME skill material through a different
+  // root than the marketplace-first path discoverRefs put in ctx.refs (a
+  // version cache, or a standalone .codex/.cursor/.agents dir) — normalize
+  // both sides to the `skills/<skill>/...` suffix so that read still credits.
+  const readKeys = new Set([...read].map(skillRefKey).filter((k): k is string => k !== null));
+  const credited = (path: string): boolean => {
+    if (read.has(path)) return true;
+    const key = skillRefKey(path);
+    return key !== null && readKeys.has(key);
+  };
   // Parity with the 3 other refsRead-consuming gates (skillTriggerGate's
   // `skills/${s}/` substring match, shadcnBaseSkillRead, designSkillRead):
   // reading the ref's PARENT SKILL.md counts as proof of consultation too,
   // not just the exact ref file path.
-  const skillRead = !!routed.skillPath && read.has(routed.skillPath);
-  const missing = skillRead ? [] : routed.required.map((r) => r.meta.filePath).filter((p) => !read.has(p));
+  const skillRead = !!routed.skillPath && credited(routed.skillPath);
+  const missing = skillRead ? [] : routed.required.map((r) => r.meta.filePath).filter((p) => !credited(p));
   if (missing.length === 0) return null;
   const optional = routed.optional.map((r) => r.meta.filePath);
   const reason = [

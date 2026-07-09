@@ -2,6 +2,13 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.62] - 09-07-2026
+
+### Fixed
+
+- Destructive git flag patterns no longer match as bare substrings of arguments: `-f`/`--force`/`--force-with-lease`, `--hard`, `-D` and the `git clean` f+d short-cluster now anchor on token boundaries (leading space, trailing space/`=`/end), so a branch named `fix/guard-false-positives` pushes normally (3rd live repro closed) while `-fd`, `-df`, `-fdx`, `-xfd` clusters stay denied. Sim scenario 27 locks both directions.
+- `solidReadGate` now credits a SOLID ref read performed through a DIFFERENT root than the marketplace-first path it expects: new `refs/ref-key.ts` normalizes recognized skill paths (config-dir-anchored marketplace/version-cache trees, standalone `.claude|.codex|.cursor|.agents/skills`, `/etc/codex/skills`) to their `skills/<skill>/…` suffix before comparison. Closes the "sub-agent/teammate reads the versioned cache path (`fuse-solid/1.0.12/skills/…`), gate expects the marketplace path (`plugins/solid/skills/…`), never credited" gap. Exact-match check stays first (lead behavior byte-identical, strictly additive); forged paths outside recognized roots never credit by suffix (sniper-tightened anchoring + regression tests). +10 tests (545 pass), sim 31/31.
+
 ## [0.1.61] - 07-07-2026
 
 ### Fixed

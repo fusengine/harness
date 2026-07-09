@@ -2,6 +2,61 @@
 
 Améliorations futures (hors parité Python, déjà faite). Une case = une tâche.
 
+> État au **2026-07-07** · version publiée **0.1.61** (npm).
+> Légende : `[x]` livré et vérifié · `[~]` partiel/assumé · `[ ]` à faire. Chaque ligne est ancrée sur `fichier:ligne`.
+
+---
+
+## 🎯 Gouvernance & Loops (axe stratégique — post article Anthropic « Getting started with loops », 2026-06-30)
+
+### Adapters — support multi-harnais
+- [x] **claude** complet (pre/post + `commandToString`) — `src/adapters/claude/index.ts:92`
+- [x] **codex** complet (apply_patch par fichier, `ask`→deny, array-command) — `src/adapters/codex/index.ts`, `apply-patch.ts:37`
+- [~] **cursor** — shell deny/ask OK ; `afterFileEdit` advisory-only (deny cassé côté Cursor, décision produit) — `src/adapters/cursor/index.ts:23`
+- [~] **hermes** — `pre_tool_call` seul prouvé, pas d'`ask` interactif — `src/adapters/hermes/index.ts:27`
+- [~] **cline / gemini** — minimal (un seul event) — `src/adapters/{cline,gemini}/index.ts`
+- [ ] hermes : dispatch cycle de vie complet + `harness init` (absent de `src/init/templates.ts:29`)
+- [ ] hermes/cline/gemini : prouver le deny par scénario sim dédié (invariant compat)
+
+### 🐛 Bug live confirmé — faux positif git flags
+- [ ] **`GIT_BLOCKED` non ancré** — `/git push.*-f/`, `/git branch.*-D/` matchent `-f`/`-D` en **sous-chaîne** (ex. `fix/api-keys-fossil` → deny à tort) — `src/policy/patterns.ts:8`, `evaluate.ts:22`. Fix : ancrer les flags destructifs sur frontière de token. **Aucun test ne couvre le cas.**
+- [ ] scénario sim `27-*` : nom de branche/fichier avec `-f`/`-D` collés → attendu **allow**
+
+### 🐛 Bug live confirmé — RALPH inline ignoré + sur-match motif (Codex, 2026-07-08)
+- [ ] **Préfixe inline `RALPH_MODE=1 <cmd>` non honoré** — le guard lit `process.env.RALPH_MODE` (`src/policy/patterns.ts:52`), il ne parse **jamais** un préfixe env collé dans la commande jugée. Donc `RALPH_MODE=1 git add -A` reste OFF côté hook → hard-deny malgré l'autorisation utilisateur. Le hook s'exécute **avant** le shell, il ne voit pas l'assignation inline. **UX piège** : le prompt « Authorize: RALPH_MODE=1 … » laisse croire que ça débloque, mais le guard re-bloque derrière. Fix : réutiliser le skip de préfixes `VAR=value` déjà présent (`src/freshness/explore-tools.ts:61`) pour détecter `RALPH_MODE` en tête de commande, OU documenter que RALPH ne s'active QUE via l'env du process (jamais inline). **Aucun test.**
+- [ ] **Sur-match motif-dans-texte** — une recherche texte contenant l'expression (`grep "git add"`, body de PR, message citant un motif) est interceptée comme opération git/mutator. Même classe que les faux positifs LESSON (`jq …apply-patch…`, `env sed` inline, `gh pr create --body "…"`). Fix : matcher le motif en **position de commande réelle** (frontière de token / premier exécutable), pas en sous-chaîne. Scénario sim dédié à ajouter.
+
+### 🔒 `ask` sur Codex — déléguer au canal natif `rules` au lieu du deny dur (recherche doc, 2026-07-08)
+> Doc Codex vérifiée en intégral : un hook `PreToolUse` **ne peut PAS** demander de confirmation interactive. `permissionDecision:"ask"` existe dans le schéma mais est **« parsed but not supported yet »** et **fail-OPEN** (le hook échoue, la commande passe quand même) → l'émettre serait PIRE que deny. `PermissionRequest` (allow/deny only) ne peut pas *créer* un prompt, juste trancher un prompt déjà déclenché par la config statique. Issues openai/codex #15311 + #16301 fermées sans valeur `ask`.
+- [x] **`ask→deny` est le choix SÛR sur Codex** — confirmé, pas un bug : `src/adapters/codex/index.ts:32`. Mapper vers `"ask"` casserait l'approbation (fail-open). Ne PAS « corriger » en ce sens.
+- [ ] **Vrai canal d'approbation = Codex `rules`** (`.codex/rules/*.rules`, Starlark, `prefix_rule(pattern=["git","commit"], decision="prompt")`) → prompt natif « autoriser ce commit ? ». Chantier : l'installeur fusengine **génère** un `.codex/rules/git-approval.rules` (gouvernance toujours possédée par fusengine, exprimée dans le canal natif), et l'adapter Codex **cesse de hard-deny la catégorie « ask »** pour la déléguer aux rules. Preuve : `developers.openai.com/codex/rules`.
+- [ ] **Pré-requis à vérifier avant de coder** : ordre d'évaluation Codex `PreToolUse` (hook) **vs** `rules` — si le hook deny d'abord, le prompt `rules` ne s'affiche jamais. Le hook doit laisser passer (`allow`/no-match) la catégorie ask pour déléguer. **Invariant compat** : claude/cursor/hermes gardent le `ask` interactif natif, changement scoped Codex uniquement.
+
+### ⭐ Loop-gate — boucles autonomes gouvernées (chantier principal)
+- [x] **RALPH_MODE** opt-in strict (`RALPH_MODE=1|true`, pas d'auto-activation) — `src/policy/patterns.ts:51`
+- [x] **RALPH_SAFE** exempte git sûr, jamais le destructif — `patterns.ts:39`
+- [x] **Journal append-only** des refs (O_APPEND atomique + reconcile) — `src/freshness/ref-journal.ts:51`
+- [ ] **Cap d'itérations** hard-deny possédé par le harness (≈ `max_turns`) — **absent** (grep maxTurns = 0)
+- [ ] **Plafond budget tokens/coût** (≈ `max_budget_usd`) — **absent** (seul `FRAGMENT_CHAR_CAP` d'injection existe, sans rapport)
+- [ ] **Completion-promise déterministe** — sortie de loop autorisée UNIQUEMENT sur `bun test` + `tsc --noEmit 0` + sim green + lint 0, jamais sur jugement d'agent
+- [ ] **State-from-disk générique** — `task.json`/état durable relu à chaque itération (referme aussi le gap solidRead / lag transcript ~230s, `ref-journal.ts:8`)
+- [ ] **Une tâche par itération** (anti-batching) + **signaux de sortie** standardisés (`COMPLETE`/cap/`BLOCKED`/`DECIDE`)
+- [ ] **Composition avec le plugin officiel `ralph-loop`** (Stop hook Anthropic) — vérifier non-duplication côté Claude Code
+
+### Observabilité / trackers
+- [x] Comptage reads SOLID (`refsRead` + journal) — `src/freshness/ref-journal.ts`
+- [~] Budget contexte = cap **caractère** par fragment (8000), pas par skill — `inject-budget.ts`
+- [ ] Décider du sort du **tracker exa** (pas de module dédié ; Exa vit dans `docConsultedGate`)
+- [ ] **Budget par skill** (~2% contexte) — sélection de plugins à l'install
+- [ ] **Télémétrie par itération** (tokens/guard-hits/fichiers touchés → journal, ≈ `/usage`)
+
+### Correction de note périmée
+- [x] **Gap `env sed` FERMÉ** (v0.1.60) — mutators testés avant SAFE_PREFIXES, `env sed -i x.ts`→deny — `src/policy/guards/bash-write.ts:37`. (L'ancienne mémoire « accepted gap » est obsolète.)
+
+**Priorité :** 1) fix git `-f`/`-D` (faible effort, gêne prouvée) → 2) loop-gate socle (cap+budget+completion-promise+state-from-disk, plus haut ROI) → 3) télémétrie loop → 4) complétion adapters.
+
+---
+
 ## Reliquats parité (batch `fix/parity-audit-batch3` — 2026-07-01)
 
 - [ ] **trackframework (G2) — `tracking.py::track_mcp_research` classification framework par mots-clés**
