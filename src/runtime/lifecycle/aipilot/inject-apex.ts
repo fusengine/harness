@@ -83,7 +83,11 @@ ${agents}
 ### 5. Research Before Code
 - Use Context7/Exa for docs | Write notes to .claude/apex/docs/
 
-### 6. When Done
+### 6. Before Done (NEVER skip)
+- eLicit: self-review with a NAMED elicitation technique; fix findings first
+- Verify: run/functional-check your changes (references⇔declarations)
+
+### 7. When Done
 - TaskUpdate(taskId, status: completed) triggers auto-commit${cartographerContext()}`;
 
   return contextResponse("SubagentStart", capFragment("apex-subagent", context));
