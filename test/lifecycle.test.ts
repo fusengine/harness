@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { detectSolidProfile, solidDetectStart } from "../src/runtime/lifecycle/solid-detect";
 import { readRules, injectRules } from "../src/runtime/lifecycle/inject-rules";
+import { dispatchLifecycle } from "../src/runtime/lifecycle";
 import { trackSessionChanges } from "../src/runtime/lifecycle/track-changes";
 import { sessionStartCore } from "../src/runtime/lifecycle/session-start";
 import { loadSessionState } from "../src/runtime/home-state";
@@ -42,6 +43,27 @@ test("readRules + injectRules: concatenates sorted *.md as additionalContext", (
   expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
   expect(parsed.hookSpecificOutput.additionalContext).toBe("BETA\n\nALPHA");
   expect(injectRules(root())).toBe("");
+});
+
+test("dispatchLifecycle: SubagentStart scope 'rules' emits the rules bundle, scope 'core' keeps the cache fallback", () => {
+  const pluginRoot = root();
+  const rules = join(pluginRoot, "rules");
+  mkdirSync(rules, { recursive: true });
+  writeFileSync(join(rules, "00-a.md"), "RULE-A");
+  const prevRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  try {
+    process.env.CLAUDE_PLUGIN_ROOT = pluginRoot;
+    const out = dispatchLifecycle({ event: "SubagentStart", payload: { session_id: "s-rules" }, cwd: pluginRoot, scope: "rules", now: Date.now() });
+    expect(out).not.toBeNull();
+    const parsed = JSON.parse(out as string);
+    expect(parsed.hookSpecificOutput.additionalContext).toBe("RULE-A");
+  } finally {
+    if (prevRoot === undefined) delete process.env.CLAUDE_PLUGIN_ROOT;
+    else process.env.CLAUDE_PLUGIN_ROOT = prevRoot;
+  }
+  // non-regression: scope "core" (no rules routing) still falls through to subagentCacheContext
+  const coreOut = dispatchLifecycle({ event: "SubagentStart", payload: { session_id: "fh-lifecycle-no-such-session" }, cwd: root(), scope: "core", now: Date.now() });
+  expect(coreOut).toBe("");
 });
 
 test("trackSessionChanges: tracks code files + emits sniper reminder, skips non-code", () => {

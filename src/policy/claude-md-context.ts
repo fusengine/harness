@@ -48,13 +48,16 @@ export function buildApexInstruction(projectType: ProjectType, maxLines: number)
   const expertAgent = getExpertAgent(projectType);
   return (
     `INSTRUCTION: This is a development task. Use APEX methodology:\n\n` +
-    `**TRACKING FILE**: [project]/.claude/apex/task.json (created by the /apex command)\n\n` +
+    `**TRACKING FILE**: [project]/.claude/apex/task.json — create it yourself via apex-methodology Step 0 (init-tracking) if missing\n\n` +
     `1. **ANALYZE** (MANDATORY - 3 AGENTS IN PARALLEL):\n` +
     `   - explore-codebase + research-expert + ${expertAgent} (framework expertise)\n` +
     `   - Project type detected: ${projectType}\n\n` +
     `2. **PLAN**: Use TaskCreate to break down tasks (<${maxLines} lines per file)\n\n` +
     `3. **EXECUTE**: ${expertAgent}, follow SOLID principles, split at ${maxLines - 10} lines\n\n` +
-    `4. **EXAMINE**: Run sniper agent after ANY modification\n\n` +
+    `4. **eLICIT**: self-review with NAMED elicitation techniques (apex ref 03.5-elicit) — fix findings BEFORE validation\n\n` +
+    `5. **VERIFY**: functional check — run it, confirm references⇔declarations consistency\n\n` +
+    `6. **eXAMINE**: Run sniper agent after ANY modification\n\n` +
+    `**GATE**: eLicit + Verify BEFORE sniper — NEVER skip.\n\n` +
     `**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.`
   );
 }

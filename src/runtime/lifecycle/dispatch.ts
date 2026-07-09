@@ -53,6 +53,7 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "UserPromptSubmit":
       return input.scope === "rules" ? injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd) : null;
     case "SubagentStart":
+      if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd);
       if (input.scope === "aipilot") return "";
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now);
       return subagentCacheContext(input.payload.session_id);

@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.63] - 10-07-2026
+
+### Fixed
+
+- The per-prompt APEX condensate (buildApexInstruction) now lists all 6 phases — eLICIT (named-technique self-review) and VERIFY (functional check) were omitted, so leads followed the injected 4-phase text and skipped both; an explicit gate line ("eLicit + Verify BEFORE sniper — NEVER skip") is appended. The tracking-file line no longer claims `/apex` creates `.claude/apex/task.json` (no code path ever creates it — proven by grep of sync-task/apex-task-store): the agent is instructed to create it via apex-methodology Step 0. The SubagentStart "APEX Sub-Agent Instructions" gain a "Before Done (NEVER skip)" eLicit/Verify section. `dispatchLifecycle` routes scope `rules` on SubagentStart (mirroring SessionStart; previously fell through to the MCP cache default — inert in prod until claude-rules registers that hook). Fresh-build behavioral diff across all 34 event×scope pairs: only the two intended outputs changed. Companion audit claim "PreToolUse gates don't fire inside Task-tool subagents" investigated and REFUTED (docs agent_id/agent_type, maintainer test closing anthropics/claude-code#21460, live repro) — no disk-artifact migration needed.
+
 ## [0.1.62] - 09-07-2026
 
 ### Fixed
