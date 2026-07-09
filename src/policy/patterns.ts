@@ -1,13 +1,39 @@
 /**
  * Guard pattern data, ported verbatim from the fusengine git/install guards.
- * Note (faithful): `git push.*--force` also matches `--force-with-lease` —
- * preserved from the source guard.
+ * Note (faithful): `--force` also matches `--force-with-lease` — preserved
+ * from the source guard, now as an explicit alternation instead of an
+ * accidental substring match (see {@link GIT_BLOCKED}).
  */
+
+/**
+ * Token-boundary suffix for a destructive flag: only whitespace, `=`, or
+ * end-of-string may follow — never another word character. Without this, a
+ * flag regex matches as a plain substring of any argument (a branch/file name
+ * like `fix/guard-false-positives` contains `-f`, `feature-force-refactor`
+ * contains `-force`), turning a rename into a false-positive hard block
+ * (proven live: `git push -u origin fix/api-keys-fossil` denied as
+ * "Destructive git command"). No leading-boundary group is needed on the flag
+ * side — every pattern below prefixes the flag with a literal `\s`, and the
+ * flag can never be the first character of the whole command since a git
+ * verb (`git push`, `git reset`, ...) always precedes it.
+ */
+const FLAG_END = "(?:\\s|=|$)";
+/** `-f` / `--force` / `--force-with-lease`, boundary-anchored on both flag forms. */
+const FORCE_FLAG = `\\s(?:--force(?:-with-lease)?|-f)${FLAG_END}`;
+/**
+ * `git clean` short-flag cluster containing both `f` and `d` in any order
+ * (`-fd`, `-df`, `-fdx`, `-fdX`, `-xfd`…): a MORE destructive superset than a
+ * bare `-fd` — must stay blocked, never downgrade to `git clean`'s GIT_ASK.
+ */
+const CLEAN_FD_FLAG = `\\s-(?=[a-zA-Z]*f)(?=[a-zA-Z]*d)[a-zA-Z]+${FLAG_END}`;
 
 /** Destructive git operations to block outright. */
 export const GIT_BLOCKED: ReadonlyArray<RegExp> = [
-  /git push.*--force/, /git push.*-f/, /git reset.*--hard/,
-  /git clean.*-fd/, /git branch.*-D/, /git rebase.*--force/,
+  new RegExp(`git push.*${FORCE_FLAG}`),
+  new RegExp(`git reset.*\\s--hard${FLAG_END}`),
+  new RegExp(`git clean.*${CLEAN_FD_FLAG}`),
+  new RegExp(`git branch.*\\s-D${FLAG_END}`),
+  new RegExp(`git rebase.*${FORCE_FLAG}`),
 ];
 
 /** Git operations that warrant a confirmation prompt. */

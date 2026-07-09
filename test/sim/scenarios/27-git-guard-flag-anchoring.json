@@ -1,0 +1,29 @@
+{
+  "name": "git-guard-flag-anchoring",
+  "doc": "Regression for the token-boundary fix (patterns.ts FLAG_END, 0.1.61): destructive flags like `-f`/`--force`/`--hard`/`-D` must never match as a plain substring of a branch/file-name argument.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Live false-positive (proven pre-fix): `-f` inside `guard-false-positives` used to match GIT_BLOCKED's `/git push.*-f/` as a substring, hard-denying an ordinary branch delete. After anchoring, GIT_BLOCKED no longer matches — the command falls through to GIT_ASK's plain `/git push/` (evaluate.ts:35), same confirmation any push gets, not a 'Destructive git command' hard block.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc27",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin --delete fix/guard-false-positives-and-skills-install" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "ask" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A real `--force` flag (token-boundary, not embedded in a word) still hard-blocks via GIT_BLOCKED — the anchoring fix must not open a hole for genuine destructive pushes.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc27",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push --force" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    }
+  ]
+}
