@@ -40,11 +40,23 @@ export function spawnCapture(cmd: string, args: string[], cwd: string): string {
   }
 }
 
-/** Read the full process stdin as UTF-8 text (works under Node and Bun). */
+/**
+ * Read the full process stdin as UTF-8 text (works under Node and Bun).
+ * Synchronous fd-0 read — never `for await (const c of process.stdin)` —
+ * because Bun has a confirmed Linux-only bug where merely adding a new
+ * top-level module import shifts stdin's internal init order and makes
+ * that async iterator silently yield zero bytes (oven-sh/bun#25320,
+ * #27849): exactly what broke every `harness hook` invocation on CI the
+ * moment `figures` became this package's first runtime dependency.
+ * `readFileSync(0)` bypasses that stream/ownership machinery entirely and
+ * is well-supported for piped (non-TTY) stdin under both runtimes.
+ */
 export async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
+  try {
+    return readFileSync(0, "utf8");
+  } catch {
+    return "";
+  }
 }
 
 /**

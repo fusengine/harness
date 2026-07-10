@@ -18,17 +18,16 @@ import { discoverRefs } from "../refs/discover";
 import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 import { runDoctor, runningVersion, versionBanner } from "./doctor";
+import { readStdin as readRawStdin } from "../util/runtime-io";
 
-// Inline trace (no new import, to dodge Bun's stdin-init-order bug oven-sh/bun#25320) — stderr-only, on only under FUSE_HARNESS_DEBUG=1 (set by test/sim/exec.ts).
+// Inline trace helper (kept in this file, not a separate module) — stderr-only, on only under FUSE_HARNESS_DEBUG=1 (set by test/sim/exec.ts).
 const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1";
 function traceHook(label: string, data: unknown): void {
   if (hookDebug) process.stderr.write(`[hook-debug] ${label}: ${typeof data === "string" ? data : JSON.stringify(data)}\n`);
 }
 
 async function readStdin(): Promise<Record<string, unknown>> {
-  const chunks: Buffer[] = [];
-  for await (const c of process.stdin) chunks.push(c as Buffer);
-  const text = Buffer.concat(chunks).toString("utf8").trim();
+  const text = (await readRawStdin()).trim();
   traceHook("stdin-text-length", text.length);
   if (!text) return {};
   try {
