@@ -1,0 +1,20 @@
+{
+  "name": "claude-bypass-permissions-unaffected",
+  "harness": "claude-code",
+  "doc": "Guard proof: handle-pre.ts only sets neverApproval when `id === \"codex\"` — Claude Code's OWN bypassPermissions mode (a real, documented `--permission-mode bypassPermissions` value) must NEVER be mistaken for Codex's approval_policy=never, even though both harnesses emit the identical `permission_mode:\"bypassPermissions\"` string. A `git commit` on claude-code with that field set still resolves to the ordinary interactive `permissionDecision:\"ask\"` — byte-identical to scenario 11, unaffected by this whole feature.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Same payload shape as scenario 28 step 1 (permission_mode bypassPermissions + git commit) but spawned as `hook claude-code core` instead of `hook codex core` — must resolve to the normal interactive ask, not the codex-only auto-approve warn.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc29b",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git commit -m x" },
+        "permission_mode": "bypassPermissions"
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "ask" } }
+    }
+  ]
+}

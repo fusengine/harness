@@ -19,16 +19,24 @@ import { countLines } from "../../policy/file-size";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { parseApplyPatch } from "./apply-patch";
 import { commandToString } from "../../runtime/command-string";
-import { contextResponse, denyResponse, type ClaudeHookInput } from "../claude";
+import { contextResponse, denyResponse, informResponse, type ClaudeHookInput } from "../claude";
+import { isBypassPermissions } from "./permission-mode";
 
-export { readClaudeInput as readCodexInput, denyResponse, contextResponse, type ClaudeHookInput as CodexHookInput } from "../claude";
+export { readClaudeInput as readCodexInput, denyResponse, contextResponse, informResponse, type ClaudeHookInput as CodexHookInput } from "../claude";
 
 const ASK_PREFIX = "[downgraded from ask — Codex has no interactive approval]";
 
-/** Render a portable {@link Prompt} as a Codex hook response, `ask` → explicit deny. */
+/**
+ * Render a portable {@link Prompt} as a Codex hook response, `ask` → explicit deny.
+ * NOTE: the REAL wired route is `harness hook codex` → handleHook → respond.ts
+ * (source of truth for the ask→deny downgrade); this thin export exists for
+ * direct package consumers and is kept aligned so it never silently diverges.
+ */
 export function toCodexResponse(prompt: Prompt): string {
   const message = formatPrompt(prompt);
-  if (prompt.kind === "inform") return contextResponse("PreToolUse", message);
+  if (prompt.kind === "inform") {
+    return prompt.userMessage ? informResponse("PreToolUse", prompt.userMessage, prompt.reason ? message : "") : contextResponse("PreToolUse", message);
+  }
   if (prompt.kind === "ask") return denyResponse("PreToolUse", `${ASK_PREFIX}\n${message}`);
   return denyResponse("PreToolUse", message);
 }
@@ -52,6 +60,7 @@ function resolvePrompt(input: ClaudeHookInput): Prompt | null {
     filePath: i?.file_path,
     content: i?.content ?? i?.new_string,
     command: commandToString(i?.command),
+    neverApproval: isBypassPermissions(input.permission_mode),
   });
   return r.decision === "allow" || !r.prompt ? null : r.prompt;
 }

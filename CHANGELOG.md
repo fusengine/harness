@@ -2,6 +2,16 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.65] - 10-07-2026
+
+### Added
+
+- Codex `approval_policy=never` is now handled instead of dead-ending: the RALPH_SAFE git subset (checkout -b / add / commit / status / diff / log) auto-approves with a VISIBLE `[fuse-harness] Auto-approved …` notice when the hook payload's resolved `permission_mode` is `"bypassPermissions"` (the only value Codex maps from `AskForApproval::Never` — verified at openai/codex@342e4d4b, regression-marker test). Three hard conditions: safe prefix, no destructive match anywhere in the string, single command only (chaining rejected: `&&`, `||`, `;`, `|`, lone background `&` with a bash-redirect exclusion, backticks, `$(`, newlines — quote-unaware fail-closed). RALPH_MODE keeps priority (silent). Claude Code's own bypassPermissions mode is untouched (sim-proven); everything outside the safe subset keeps the existing ask→deny downgrade.
+
+### Security
+
+- `~/.codex/config.toml` and `.codex/rules/` are now write-protected on every harness — an agent can no longer self-grant the never exemption by rewriting Codex's own approval config or authoring an allow rule (Codex's sandbox does not cover user-level `.codex` under danger-full-access).
+
 ## [0.1.64] - 10-07-2026
 
 ### Fixed

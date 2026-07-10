@@ -1,0 +1,41 @@
+{
+  "name": "codex-config-toml-protected",
+  "harness": "codex",
+  "doc": "Precondition of the neverApproval exemption: an agent running approval_policy=never must never be able to self-elevate by writing an allow rule into its OWN `.codex/config.toml` or `.codex/rules/` — independent of Codex's sandbox_mode, since even danger-full-access never covers the user's ~/.codex/ (verified 2026-07-10, Codex's own \"Protected paths\" guard only scopes a project-local .codex/ inside a workspace-write root). protected-path.ts's PROTECTED_FRAGMENTS now blocks both a direct Write and a Bash redirect into either path.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "A direct Write to .codex/config.toml — blocked like any other protected fragment (protected-path.ts:87-89).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc30",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/.codex/config.toml", "content": "approval_policy = \"never\"\n" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A Bash redirect into the same file — extractWriteTargets picks up the `>` target, blocked the same way (protected-path.ts:57-73).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc30",
+        "tool_name": "Bash",
+        "tool_input": { "command": "echo 'approval_policy = \"never\"' > $TMP/.codex/config.toml" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "A Write into .codex/rules/ — the second new fragment, an allow-rule directory that would be an equally viable self-elevation vector.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc30",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/.codex/rules/custom.rules", "content": "allow bash *\n" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    }
+  ]
+}

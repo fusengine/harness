@@ -12,6 +12,7 @@ import { securityAdvisory } from "./lifecycle/security/check-skill";
 import { validateSolidGate } from "./lifecycle";
 import { allowOutcome } from "./pre-allow";
 import { applyPatchGate } from "./apply-patch-gate";
+import { isBypassPermissions } from "../adapters/codex/permission-mode";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -26,9 +27,7 @@ export interface PreContext {
 }
 
 /**
- * Run the PreToolUse pipeline: MCP/WebFetch cache intercept, design gate, APEX
- * Task context injection, then the stateless+APEX gate chain. Returns the native
- * hook outcome (deny/ask/inject or allow).
+ * Run the PreToolUse pipeline: MCP/WebFetch cache intercept, design gate, APEX Task context injection, then the stateless+APEX gate chain, returning the native hook outcome (deny/ask/inject or allow).
  * @param ctx - The resolved pre-context.
  * @returns The hook outcome.
  */
@@ -90,6 +89,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     now: opts.now,
     trackFile: file,
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
+    neverApproval: id === "codex" && isBypassPermissions(event.permissionMode),
   });
   if (prompt) return { stdout: withDenyNotice(id, respond(id, prompt), prompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +

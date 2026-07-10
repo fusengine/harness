@@ -19,4 +19,6 @@ export interface GateInput {
   agentId?: string;
   /** Absolute path to the session transcript (Claude `transcript_path`) for evidence-based freshness. */
   transcriptPath?: string;
+  /** See PolicyContext.neverApproval — populated only by handle-pre.ts for id==="codex" (approval_policy=never has no interactive ask channel). */
+  neverApproval?: boolean;
 }
