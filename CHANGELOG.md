@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.66] - 10-07-2026
+
+### Added
+
+- Plain `git push` joins the auto-approved subset under Codex `approval_policy=never` (NEVER_SAFE = RALPH_SAFE + `git push`, visible `[fuse-harness] Auto-approved …` notice) — pushing is the agent's job in that mode and the approval prompt cannot exist. Codex `bypassPermissions` ONLY: Claude Code and RALPH paths are byte-identical (patterns.ts untouched, parity scenario green). Destructive forms still deny via `isSafePushForm`: `--delete`/`-d`, `--mirror`, `--prune`, refspec deletion (`git push origin :branch`), and the flagless `+refspec` force-push (`git push origin +main` — git-push(1): leading `+` ≡ `--force`), on top of the pre-existing `--force`/`-f`/`--force-with-lease` block. No false positive on `feature+x` tokens or `host:port` URLs; `--force-if-includes` alone is a documented no-op and stays approved; chaining remains fail-closed.
+
 ## [0.1.65] - 10-07-2026
 
 ### Added

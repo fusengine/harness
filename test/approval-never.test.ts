@@ -27,8 +27,8 @@ test("neverApproval never exempts a destructive command — still a hard block",
   expect(r.prompt?.kind).toBe("block");
 });
 
-test("neverApproval does not touch commands outside RALPH_SAFE (plain push still asks)", () => {
-  const r = evaluate(never("git push origin main"));
+test("neverApproval does not touch commands outside NEVER_SAFE (checkout still asks)", () => {
+  const r = evaluate(never("git checkout main"));
   expect(r.decision).toBe("deny");
   expect(r.prompt?.kind).toBe("ask");
 });
