@@ -28,6 +28,10 @@ export function spawnEnv(fixtures: string, home: string, scenarioEnv?: Record<st
     PATH: process.env.PATH ?? "",
     HOME: home,
     FUSE_HARNESS_REFS: join(fixtures, "refs"),
+    // Test-harness-only tracer (src/cli/bin.ts's inline traceHook) — never set
+    // by real hook wiring. Lets a silent child (empty stdout/exit 0) leave a
+    // stderr trail instead of nothing.
+    FUSE_HARNESS_DEBUG: "1",
     ...(scenarioEnv ?? {}),
   };
 }

@@ -4,6 +4,10 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [0.1.64] - 10-07-2026
 
+### Fixed
+
+- Linux-only total silence of the hook CLI (all 25 sim scenarios red on CI while green on macOS): a Bun Linux stdin-init ordering bug (oven-sh/bun#25320/#27849) — adding `figures` as the package's first runtime dependency shifted `process.stdin` initialization, and the `for await` stdin loop silently read empty, so every hook ran on an empty payload (stdout "", exit 0, no error). `readStdin` now uses a synchronous fd-0 read (`readFileSync(0)`), shared via `util/runtime-io.ts`. A permanent env-gated stderr tracer (`FUSE_HARNESS_DEBUG=1`, set by the simulator's spawn env) makes any future silent child speak in every scenario failure — CI and local alike. Root cause proven by the tracer's live CI trace (`stdin-text-length: 0` on 25/25).
+
 ### Added
 
 - Every deny/ask gate outcome now carries a user-visible `systemMessage` (`✘ <gate title>` / `? <gate title>` via the `figures` package — text-presentation symbols, Windows fallbacks, never emoji) on claude-code/codex, deduped across the ~11 sibling-plugin fan-out (`onceExclusive`, 2s burst window, re-emission after the window proven by test). All THREE deny return points in handle-pre.ts are covered (designGate, applyPatchGate, main gate) — the owner watched agents obey blocks that were invisible in the TUI since 0.1.57 equipped only the allow path. The agent channel (`permissionDecision`/`permissionDecisionReason`) is byte-identical (stdin-proven on all three paths); cursor/hermes/cline pass through untouched (cursor already emits its native `user_message`); notice attachment is fail-open — any FS error still ships the untouched deny decision.
