@@ -1,0 +1,20 @@
+{
+  "name": "codex-array-command-bypass-permissions-allow",
+  "harness": "codex",
+  "doc": "Array-command twin of scenario 26 step 3: Codex's argv-array `tool_input.command` (`[\"bash\",\"-lc\",<script>]`) unwraps through commandToString to the same string evaluate.ts sees — so the neverApproval exemption fires identically regardless of the wire shape. Pre-fix (scenario 26), this exact `git commit` argv array denied under Codex's ask-downgrade; under approval_policy=never it now auto-approves with the same visible notice as the string form (scenario 28 step 1).",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`git commit` as an argv array + permission_mode bypassPermissions — commandToString unwraps it to \"git commit -m test\", RALPH_SAFE/isSingleCommand/GIT_BLOCKED all pass, so it auto-approves exactly like the string form.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc31",
+        "tool_name": "Bash",
+        "tool_input": { "command": ["bash", "-lc", "git commit -m test"] },
+        "permission_mode": "bypassPermissions"
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "approval_policy=never" } }
+    }
+  ]
+}

@@ -13,6 +13,9 @@ export interface PolicyContext {
   agentType?: string;
   /** Line count of the existing on-disk file (so an Edit on an oversized file blocks). */
   existingLines?: number;
+
+  /** Codex-only, populated by handle-pre.ts from the resolved `permission_mode` of an `approval_policy=never` session (adapters/codex/permission-mode.ts) — auto-approve gate, wired through evaluate.ts's anti-chaining check. */
+  neverApproval?: boolean;
 }
 
 /** Harness-agnostic policy decision (+ a portable prompt for adapters to render). */

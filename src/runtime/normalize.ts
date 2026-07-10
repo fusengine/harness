@@ -19,6 +19,8 @@ export interface NormalizedEvent {
   command?: string;
   /** Subagent type, if the tool-use came from one (Explore/Plan are file-size-exempt). */
   agentType?: string;
+  /** Harness-resolved permission mode (Claude emits it natively; Codex maps `AskForApproval::Never` to the same "bypassPermissions" string — see adapters/codex/permission-mode.ts). Generic field, Codex-only consumer today. */
+  permissionMode?: string;
   /**
    * Per-file changes when the tool is a multi-file edit primitive (Codex
    * `apply_patch`). Present ONLY for `apply_patch`; the file gates OR each
@@ -61,6 +63,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     input,
     sessionId: str(payload.session_id) ?? str(payload.conversation_id) ?? "",
     agentType: str(payload.agent_type) ?? str(input.subagent_type),
+    permissionMode: str(payload.permission_mode),
   };
   // Codex's `apply_patch` (its PRIMARY edit primitive) carries the whole change
   // set as a freeform patch in `command` — no `file_path`/`content`, so the

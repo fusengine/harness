@@ -59,7 +59,7 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   const { raw: existingLines, code: existingCodeLines } = existingLineCounts(input.filePath);
   let quick: PolicyResult;
   try {
-    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines });
+    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines, neverApproval: input.neverApproval });
   } catch {
     return FAIL_CLOSED;
   }

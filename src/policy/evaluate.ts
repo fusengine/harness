@@ -2,6 +2,7 @@ import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
 import { matchPatterns, GIT_BLOCKED, GIT_ASK, RALPH_SAFE, isRalphMode } from "./patterns";
 import { runGuards } from "./guards";
+import { isSingleCommand, buildNeverApprovalPrompt } from "./never-approval";
 import type { PolicyContext, PolicyResult } from "./interfaces/types";
 
 export type { PolicyContext, PolicyResult } from "./interfaces/types";
@@ -19,6 +20,16 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
   // commands are NOT in RALPH_SAFE, so force-push / reset --hard stay blocked.
   const cmd = ctx.command;
   const ralphSafe = !!cmd && isRalphMode() && RALPH_SAFE.some((s) => cmd.startsWith(s));
+  // Codex `approval_policy=never` has no ask channel: for the narrow RALPH_SAFE
+  // subset, never destructive (GIT_BLOCKED) and never chained (isSingleCommand —
+  // `git commit -m x && git push --force` must NOT slip through), auto-approve
+  // with a visible `warn` instead of falling through to GIT_ASK's normal `ask`.
+  // RALPH_MODE takes priority (ralphSafe already silent-allows above this).
+  const neverExempt = !ralphSafe && !!ctx.neverApproval && !!cmd && !matchPatterns(cmd, GIT_BLOCKED) && isSingleCommand(cmd) && RALPH_SAFE.some((s) => cmd.startsWith(s));
+  if (neverExempt && cmd) {
+    const prompt = buildNeverApprovalPrompt(cmd);
+    return { decision: "warn", message: prompt.reason, prompt };
+  }
   if (!ralphSafe && ctx.command && matchPatterns(ctx.command, GIT_BLOCKED)) {
     const reason = `Destructive git command: ${ctx.command}`;
     return {

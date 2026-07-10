@@ -16,6 +16,11 @@ export const PROTECTED_FRAGMENTS: readonly string[] = [
   ".claude/apex/",
   ".harness/track",
   ".harness/memory/state",
+  // Precondition of the neverApproval exemption (evaluate.ts): blocks a Codex
+  // agent from self-elevating via its own allow rule — sandbox_mode never
+  // covers the user's ~/.codex/, only a project-local one.
+  ".codex/config.toml",
+  ".codex/rules/",
 ];
 
 /**

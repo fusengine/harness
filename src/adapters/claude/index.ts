@@ -1,7 +1,4 @@
-/**
- * Claude Code adapter — the thin Claude-only shim over the portable policy core.
- * Reads the hook stdin payload and emits hookSpecificOutput responses.
- */
+/** Claude Code adapter — the thin Claude-only shim over the portable policy core; reads the hook stdin payload and emits hookSpecificOutput responses. */
 import { evaluate } from "../../policy/evaluate";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { readStdin } from "../../util/runtime-io";
@@ -13,6 +10,7 @@ export interface ClaudeHookInput {
   tool_name?: string;
   tool_input?: { file_path?: string; content?: string; new_string?: string; command?: string | string[] };
   cwd?: string;
+  /** Shared Claude/Codex hook field — Codex maps approval_policy=never to "bypassPermissions" (adapters/codex/permission-mode.ts). */ permission_mode?: string;
 }
 
 /** Read & parse the Claude hook payload from stdin (empty object on bad input). */
