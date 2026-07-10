@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.64] - 10-07-2026
+
+### Added
+
+- Every deny/ask gate outcome now carries a user-visible `systemMessage` (`✘ <gate title>` / `? <gate title>` via the `figures` package — text-presentation symbols, Windows fallbacks, never emoji) on claude-code/codex, deduped across the ~11 sibling-plugin fan-out (`onceExclusive`, 2s burst window, re-emission after the window proven by test). All THREE deny return points in handle-pre.ts are covered (designGate, applyPatchGate, main gate) — the owner watched agents obey blocks that were invisible in the TUI since 0.1.57 equipped only the allow path. The agent channel (`permissionDecision`/`permissionDecisionReason`) is byte-identical (stdin-proven on all three paths); cursor/hermes/cline pass through untouched (cursor already emits its native `user_message`); notice attachment is fail-open — any FS error still ships the untouched deny decision.
+
 ## [0.1.63] - 10-07-2026
 
 ### Fixed

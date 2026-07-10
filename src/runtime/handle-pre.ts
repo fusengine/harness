@@ -1,9 +1,11 @@
+import { dirname } from "node:path";
 import { loadRefs } from "../refs/loader";
 import { gate } from "./gate";
 import { MCP_TTL_MS, mcpPreIntercept } from "./mcp";
 import type { NormalizedEvent } from "./normalize";
 import { recordActivity } from "./record";
 import { respond } from "./respond";
+import { withDenyNotice } from "./deny-notice";
 import { designGate } from "./design";
 import { taskContext } from "./inject-context";
 import { securityAdvisory } from "./lifecycle/security/check-skill";
@@ -39,7 +41,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   }
 
   const designBlock = designGate(payload, event, mcpDir, opts.cwd);
-  if (designBlock) return { stdout: respond(id, designBlock), exit: 0 };
+  if (designBlock) return { stdout: withDenyNotice(id, respond(id, designBlock), designBlock, event.sessionId, dirname(file), opts.now), exit: 0 };
 
   // Security scope is advisory-only (ports check-security-skill.py): emit the
   // non-blocking advisory when the skill is unread, else allow — NEVER run the
@@ -69,7 +71,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // tool/harness, so the single-file gate() below is unchanged there.
   if (event.files && event.files.length > 0) {
     const patchPrompt = applyPatchGate(event.files, opts.cwd);
-    if (patchPrompt) return { stdout: respond(id, patchPrompt), exit: 0 };
+    if (patchPrompt) return { stdout: withDenyNotice(id, respond(id, patchPrompt), patchPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   }
 
   const prompt = await gate({
@@ -89,7 +91,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     trackFile: file,
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
   });
-  if (prompt) return { stdout: respond(id, prompt), exit: 0 };
+  if (prompt) return { stdout: withDenyNotice(id, respond(id, prompt), prompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
   // decision-time lesson + evidence-fresh notice). A deny/ask already returned
   // above, so nothing it emits can block nor override a decision.
