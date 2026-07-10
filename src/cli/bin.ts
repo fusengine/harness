@@ -19,17 +19,22 @@ import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 import { runDoctor, runningVersion, versionBanner } from "./doctor";
 
+// Inline trace (no new import, to dodge Bun's stdin-init-order bug oven-sh/bun#25320) — stderr-only, on only under FUSE_HARNESS_DEBUG=1 (set by test/sim/exec.ts).
+const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1";
+function traceHook(label: string, data: unknown): void {
+  if (hookDebug) process.stderr.write(`[hook-debug] ${label}: ${typeof data === "string" ? data : JSON.stringify(data)}\n`);
+}
+
 async function readStdin(): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   for await (const c of process.stdin) chunks.push(c as Buffer);
   const text = Buffer.concat(chunks).toString("utf8").trim();
+  traceHook("stdin-text-length", text.length);
   if (!text) return {};
   try {
     const parsed: unknown = JSON.parse(text);
     return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
+  } catch (e) { traceHook("stdin-parse-error", e instanceof Error ? e.message : String(e)); return {}; }
 }
 
 const cmd = process.argv[2];
@@ -49,7 +54,12 @@ if (cmd === "--version" || cmd === "-v") {
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
   const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
   const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
-  const outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
+  traceHook("args", { id, scope });
+  let outcome: Awaited<ReturnType<typeof handleHook>>;
+  try {
+    outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
+  } catch (e) { traceHook("handleHook-threw", e instanceof Error ? `${e.message}\n${e.stack}` : String(e)); throw e; }
+  traceHook("outcome", { stdoutLength: outcome.stdout.length, exit: outcome.exit });
   if (outcome.stdout) process.stdout.write(outcome.stdout);
   process.exit(outcome.exit);
 } else if (cmd === "init") {
