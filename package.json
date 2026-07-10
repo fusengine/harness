@@ -152,5 +152,8 @@
     "tsdown": "^0.22.3",
     "typedoc": "^0.28.19",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "figures": "^6.1.0"
   }
 }

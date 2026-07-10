@@ -2,6 +2,7 @@ import { test, expect } from "bun:test";
 import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
+import figures from "figures";
 import { parseApplyPatch } from "../src/adapters/codex/apply-patch";
 import { guard, toCodexResponse } from "../src/adapters/codex";
 import { normalizeEvent } from "../src/runtime/normalize";
@@ -41,6 +42,9 @@ test("NEGATIVE: apply_patch adding a 150-line file triggers the SOLID deny (was 
   const out = await handleHook("codex", hook(wrap(addFile("huge.ts", 150))), { now: 1000, cwd: root() });
   expect(deny(out.stdout)).toBe("deny");
   expect(out.stdout).toContain("max");
+  // The patchPrompt deny path (handle-pre.ts's applyPatchGate branch) now also
+  // carries the human-visible notice, same as the main gate() deny path.
+  expect((JSON.parse(out.stdout) as { systemMessage?: string }).systemMessage).toBe(`${figures.cross} SOLID file-size limit`);
 });
 
 test("apply_patch: small add allowed; one oversized hunk among many blocks the whole patch (OR)", async () => {
