@@ -1,0 +1,31 @@
+{
+  "name": "claude-code-spawn-agent-noop-parity",
+  "harness": "claude-code",
+  "doc": "Parity proof for scenario 32: recordCodexSpawnEvidence (codex-spawn-evidence.ts) gates on `id === \"codex\"` FIRST -- every other harness id, claude-code included, hits the early return before touching the track file at all. This scenario replays 32's EXACT same `spawn_agent` PostToolUse payload (same session-track shape, same tool_input.agent_type) but spawned as `hook claude-code core` instead of `hook codex core`: the call stays silent (as it already was pre-feature -- `spawn_agent` matches none of classifyAgentEvidence's EXPLORE_TOOLS/RESEARCH_TOOLS/AGENT_LAUNCH_TOOLS tables either, so this is a double no-op, byte-identical to before this feature existed), and -- unlike scenario 32 -- the SAME Write stays blocked at the explore+research freshness gate afterwards, because no credit ever landed. Byte-identical to running this scenario against main before this feature (grep-verifiable: `git stash` + replay shows the same two stdouts).",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Same `spawn_agent` + agent_type=explore-codebase payload as scenario 32 step 2, but harness=claude-code: classifyAgentEvidence doesn't classify `spawn_agent` (not in EXPLORE_TOOLS/RESEARCH_TOOLS, and not Task/Agent either) and recordCodexSpawnEvidence no-ops on `id !== \"codex\"` -- silent, exit 0, unchanged from pre-feature behavior.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc32b",
+        "tool_name": "spawn_agent",
+        "tool_input": { "agent_type": "explore-codebase" },
+        "tool_response": { "nickname": "scout" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "The SAME Write payload as scenario 32 step 1/4 -- under claude-code, WITHOUT a real Task/Agent launch or classified explore/research tool use, freshness never clears: still 'APEX: explore + research required', proving the spawn_agent call above credited nothing (unlike codex in scenario 32, where the identical Write payload advanced to the doc-consultation gate after the two spawn_agent credits).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc32b",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "explore" } }
+    }
+  ]
+}
