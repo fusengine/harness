@@ -2,6 +2,20 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.69] - 11-07-2026
+
+### Added
+
+- Codex functional parity — the harness now governs Codex like Claude Code, all new behavior gated `id === "codex"` (claude-code/cursor/hermes byte-identical, proven by the 36 pre-existing sim scenarios replayed unchanged against the dist binary):
+  - **apply_patch fan-out** (`post-fanout.ts`): PostToolUse reaches the post-handlers per patched file (add→Write, update→Edit, delete/move no-op); `normalize.ts` stops force-phasing apply_patch to "pre" so PostToolUse events route to handlePost. Non-apply_patch tools keep strict event identity.
+  - **Lifecycle**: Stop dispatched per scope (`stop-core.ts`, the Codex path lacking SessionEnd/TaskCompleted); `designLifecycle` extended to codex; SessionStart resync of agent/command TOMLs under codex (`codex-resync/`, O_EXCL `wx` lock, sha256 fingerprint idempotence, fail-open, writes only under `$CODEX_HOME`).
+  - **Tracking/security**: Codex PostToolUse failures classified (`codex-post-failure.ts`); shell reads of refs credited (cat/head/tail/sed/rg/less/more/bat incl. `sh -c`, `sed -i` excluded); `securityAdvisory` fans out per patched file and returns `additionalContext` only (never a bare `permissionDecision:"allow"`, which Codex rejects).
+- **Notification sounds** — portable, on by default (`FUSE_HARNESS_SOUND=0` to mute), bundled in `assets/song/` (finish/permission-need/need-human), resolved by package walk-up (works from src and flattened dist chunks) with `FUSE_HARNESS_SOUND_STOP/PERMISSION/HUMAN` overrides and a `$CLAUDE_PLUGIN_ROOT/song` fallback; absolute fail-open. Wired only where events reach the harness (Stop=Codex path, TeammateIdle) — Claude keeps its native afplay hooks, no double-sound.
+
+### Changed
+
+- `evaluate.ts` split: the two git gates extracted verbatim into `git-gates.ts` (SRP, evaluate.ts back under 100 lines) — byte-identical prompts. Clears the 0.1.68 line-count debt.
+
 ## [0.1.68] - 11-07-2026
 
 ### Fixed
