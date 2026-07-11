@@ -25,7 +25,7 @@ function isMemoryTool(tool: string): boolean {
  */
 export async function dispatchMemory(event: string, payload: Record<string, unknown>, cwd: string, now: number): Promise<string | null> {
   if (event === "SessionStart") return recallOnSession(cwd, now);
-  if (event === "SubagentStop") {
+  if (event === "SubagentStop" || event === "Stop") {
     await captureAgentLesson(payload, now);
     return "";
   }

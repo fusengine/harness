@@ -11,6 +11,7 @@ import { lifecycleStdout } from "./lifecycle-bridge";
 import { handlePre } from "./handle-pre";
 import { handlePost } from "./handle-post";
 import { asyncScopeStdout } from "./handle-scope-async";
+import { resyncCodexAgents } from "./lifecycle/codex-resync/resync";
 import { resetFragmentRegistry } from "./fragment-registry";
 import { attachBudgetRecap } from "./inject-budget-recap";
 import type { PluginScope } from "./lifecycle";
@@ -56,12 +57,19 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const framework = detectFramework(event.filePath ?? "", event.content ?? "");
 
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
-  // Claude-Code-only: `agent_type`/`agent_id`/Subagent hooks are Claude's Agent SDK
-  // vocabulary — Codex/Cursor/etc. have no equivalent, so this is gated explicitly
-  // rather than relying on those fields being merely absent from other harnesses.
-  if (id === "claude-code" && designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) {
+  // claude-code + codex only: verified against openai/codex's OWN generated hook schemas
+  // (codex-rs/hooks/schema/generated/subagent-{start,stop}.command.input.schema.json @ 385c0a93,
+  // superseding the stale 44918ea1 Cargo.toml-only bump) — `agent_id`/`agent_type` are REQUIRED
+  // on both events, unconditional on `hide_spawn_agent_metadata` (that flag only reshapes the
+  // spawn_agent tool RESULT, not the hook payload). `payload.prompt` (design-mode "component"
+  // detection below) is absent from Codex's schema — degrades to detectMode's default, not a
+  // break. Cursor/Gemini/Cline/Hermes remain unverified — NOT added without the same proof.
+  if ((id === "claude-code" || id === "codex") && designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) {
     return { stdout: "", exit: 0 };
   }
+
+  // Codex-only, fail-open: refresh the plugin agents/commands cache on SessionStart when its fingerprint changed (strict no-op on every other harness).
+  if (id === "codex" && rawEventName(payload) === "SessionStart") resyncCodexAgents();
 
   // Async per-scope lifecycle (aipilot cache handlers + memory-neural Graphiti).
   const asyncOut = await asyncScopeStdout(opts.scope, rawEventName(payload), payload, opts.cwd, opts.now);

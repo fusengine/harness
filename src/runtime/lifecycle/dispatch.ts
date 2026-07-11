@@ -14,6 +14,7 @@ import { validateTaskSolid } from "./task-completed";
 import { cartoSessionStart } from "./cartographer/session-start";
 import { dispatchLessons } from "./lessons/dispatch";
 import { withSnapshot } from "./snapshot";
+import { stopCore } from "./stop-core";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
 export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss";
@@ -58,7 +59,8 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now);
       return subagentCacheContext(input.payload.session_id);
     case "Stop":
-      return input.scope === "lessons" ? dispatchLessons("Stop", input.payload, input.cwd, input.now) : null;
+      if (input.scope === "lessons") return dispatchLessons("Stop", input.payload, input.cwd, input.now);
+      return input.scope === "core" ? stopCore(input.payload, input.cwd, input.now) : null;
     case "SubagentStop":
       if (input.scope === "aipilot") return "";
       // Retroactively harvest the finishing sub-agent's transcript into the session

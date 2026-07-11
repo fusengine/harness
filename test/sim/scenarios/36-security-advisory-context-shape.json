@@ -1,0 +1,45 @@
+{
+  "name": "security-advisory-context-shape",
+  "doc": "check-skill.ts's securityAdvisory (PreToolUse, scope=security) used to hand-roll its OWN JSON with `permissionDecision: \"allow\"` ALONGSIDE `additionalContext` -- unlike every other non-blocking advisory in the codebase, which renders through the shared adapters/claude contextResponse builder (`additionalContext` only, no `permissionDecision`). Codex's own hook shape (adapters/codex/index.ts) never emits a `permissionDecision` for a non-blocking inform -- this scenario proves the fix: a fresh session's first Write to a code file under scope=security still gets the SECURITY advisory (non-blocking, exit 0), but the rendered JSON now carries `additionalContext` WITHOUT any `permissionDecision` field at all.",
+  "steps": [
+    {
+      "scope": "security",
+      "doc": "Fresh session (no security-state file yet under $TMP/.claude/logs/00-security/), Write on a .ts file -> the advisory fires: stdout contains the SECURITY nudge, is valid additionalContext JSON, and carries NO `permissionDecision` field (the exact regression this scenario guards).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc36",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "export const x = 1;\n" }
+      },
+      "expect": {
+        "exit": 0,
+        "stdout": { "contains": "SECURITY" }
+      }
+    },
+    {
+      "scope": "security",
+      "doc": "Same event again: the rendered JSON must not contain `permissionDecision` anywhere (regex asserts the substring never occurs across the whole stdout).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc36",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "export const x = 1;\n" }
+      },
+      "expect": {
+        "exit": 0,
+        "stdout": { "regex": "^(?:(?!permissionDecision).)*$" }
+      }
+    },
+    {
+      "scope": "security",
+      "doc": "A non-code file (.md) never triggers the advisory at all -- unaffected by the fix, still a silent allow.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc36",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/README.md", "content": "# hello\n" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

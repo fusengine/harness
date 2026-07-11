@@ -2,7 +2,7 @@
 
 Améliorations futures (hors parité Python, déjà faite). Une case = une tâche.
 
-> État au **2026-07-07** · version publiée **0.1.61** (npm).
+> État au **2026-07-11** · version publiée **0.1.68** (npm).
 > Légende : `[x]` livré et vérifié · `[~]` partiel/assumé · `[ ]` à faire. Chaque ligne est ancrée sur `fichier:ligne`.
 
 ---
@@ -19,12 +19,21 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 - [ ] hermes/cline/gemini : prouver le deny par scénario sim dédié (invariant compat)
 
 ### 🐛 Bug live confirmé — faux positif git flags
-- [ ] **`GIT_BLOCKED` non ancré** — `/git push.*-f/`, `/git branch.*-D/` matchent `-f`/`-D` en **sous-chaîne** (ex. `fix/api-keys-fossil` → deny à tort) — `src/policy/patterns.ts:8`, `evaluate.ts:22`. Fix : ancrer les flags destructifs sur frontière de token. **Aucun test ne couvre le cas.**
-- [ ] scénario sim `27-*` : nom de branche/fichier avec `-f`/`-D` collés → attendu **allow**
+- [x] **`GIT_BLOCKED` non ancré** — livré 0.1.62 : flags destructifs ancrés sur frontière de token (`src/policy/patterns.ts`), `fix/api-keys-fossil` et consorts ne matchent plus.
+- [x] scénario sim `27-git-guard-flag-anchoring.json` : noms avec `-f`/`-D` collés → **allow**, livré 0.1.62.
 
 ### 🐛 Bug live confirmé — RALPH inline ignoré + sur-match motif (Codex, 2026-07-08)
 - [ ] **Préfixe inline `RALPH_MODE=1 <cmd>` non honoré** — le guard lit `process.env.RALPH_MODE` (`src/policy/patterns.ts:52`), il ne parse **jamais** un préfixe env collé dans la commande jugée. Donc `RALPH_MODE=1 git add -A` reste OFF côté hook → hard-deny malgré l'autorisation utilisateur. Le hook s'exécute **avant** le shell, il ne voit pas l'assignation inline. **UX piège** : le prompt « Authorize: RALPH_MODE=1 … » laisse croire que ça débloque, mais le guard re-bloque derrière. Fix : réutiliser le skip de préfixes `VAR=value` déjà présent (`src/freshness/explore-tools.ts:61`) pour détecter `RALPH_MODE` en tête de commande, OU documenter que RALPH ne s'active QUE via l'env du process (jamais inline). **Aucun test.**
 - [ ] **Sur-match motif-dans-texte** — une recherche texte contenant l'expression (`grep "git add"`, body de PR, message citant un motif) est interceptée comme opération git/mutator. Même classe que les faux positifs LESSON (`jq …apply-patch…`, `env sed` inline, `gh pr create --body "…"`). Fix : matcher le motif en **position de commande réelle** (frontière de token / premier exécutable), pas en sous-chaîne. Scénario sim dédié à ajouter.
+
+### ⚡ Crédit synchrone des gates — friction n°1 des agents (postmortem 2026-07-11 : 3 acteurs, ~25 tentatives perdues sur UN fichier)
+> Racine : le crédit refsRead est **transcript-first** (`reconcileRefReadsFromTranscript` puis journal, `src/runtime/gate.ts:73-76`) or le transcript est flushé en **fin de tour** (lag ~230s > TTL 2-4min) → les Reads d'un tour long n'existent pas pour les gates du même tour. S'ajoutent : exigences de refs **rotatives** (le set demandé change à chaque block), et compteur `[REPEAT]`/deny-loop qui ne se réinitialise **pas** quand la cause du deny est corrigée (constaté « identical attempt #5 » après lectures complètes).
+- [ ] **Journal-first** : inverser l'ordre de reconcile — le journal append-only (`ref-journal.ts:51`, déjà O_APPEND atomique) devient la source PRIMAIRE, le transcript le fallback historique. Clé : le PostToolUse d'un Read s'exécute AVANT le PreToolUse du tool suivant → crédit écrit en PostToolUse + lu en PreToolUse = **synchrone par construction**, le lag disparaît.
+- [ ] **Couverture totale du journal** : écrire l'entrée journal au PostToolUse de CHAQUE contexte — lead, teammates, ET lectures shell (`shell-read-refs.ts` du chantier parité) — aujourd'hui le lead dépend encore du transcript.
+- [ ] **Set de refs requis DÉTERMINISTE** par (fichier, framework), figé pour la session — fin de la rotation : l'agent sait exactement quoi lire, une fois. Le message de block liste TOUJOURS le même set tant qu'il n'est pas satisfait.
+- [ ] **Deny-loop conscient de la cause** : clé du compteur = (tool, file, contenu, RAISON du deny) + invalidation du compteur quand un crédit requis vient d'atterrir — fin des `[REPEAT]` sur tentative corrigée. `src/runtime/deny-loop-store.ts`.
+- [ ] **Warning version au SessionStart** : le harness déployé compare sa version au npm latest (cache 24h) et affiche `⚠ deployed harness N versions behind` — aurait évité le mur du 2026-07-11 (déployé 6 versions en retard).
+- [ ] Télémétrie : compter les « deny évitables » (deny suivi d'un allow sur contenu identique après crédit) pour mesurer le gain réel.
 
 ### 🔒 `ask` sur Codex — déléguer au canal natif `rules` au lieu du deny dur (recherche doc, 2026-07-08)
 > Doc Codex vérifiée en intégral : un hook `PreToolUse` **ne peut PAS** demander de confirmation interactive. `permissionDecision:"ask"` existe dans le schéma mais est **« parsed but not supported yet »** et **fail-OPEN** (le hook échoue, la commande passe quand même) → l'émettre serait PIRE que deny. `PermissionRequest` (allow/deny only) ne peut pas *créer* un prompt, juste trancher un prompt déjà déclenché par la config statique. Issues openai/codex #15311 + #16301 fermées sans valeur `ask`.
@@ -130,7 +139,7 @@ Améliorations futures (hors parité Python, déjà faite). Une case = une tâch
 ## Écarts volontaires (assumés — à revoir si clone strict souhaité)
 
 - interface-separation déclenche sur Edit (Python: Write seul)
-- Edit sur fichier surdimensionné bloqué (Python: Edit exempté)
+- Edit sur fichier surdimensionné : depuis 0.1.68 jugé sur le RÉSULTAT calculé (`policy/edit-outcome.ts`) — réduction/mise en conformité autorisée, croissance bloquée (ferme aussi le trou grow-via-Edit que le Python avait). Écart assumé et durci vs Python (Edit exempté côté source).
 - doc gate exige `context7` ET `exa` (parité stricte) OU un fallback web (WebSearch/WebFetch/
   fuse-browser) seul — le fallback web-seul est une addition TS délibérée (fast-path documenté),
   pas une divergence de rigueur comme l'était l'ancien `context7 OU exa OU web` pur (corrigé)

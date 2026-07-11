@@ -16,6 +16,7 @@ import { contextResponse } from "../../adapters/claude";
 import { loadSessionState, sanitizeSessionId } from "../home-state";
 import { oncePerWindow } from "../inject-dedup";
 import { defaultStateDir } from "../paths";
+import { notify } from "../notifications";
 import { validateTeammateOutput } from "./teammate-idle";
 
 /** Re-warn about the same idle teammate at most once per 30s (fan-out + retries). */
@@ -62,5 +63,9 @@ export function teammateIdleContext(data: Record<string, unknown>, cwd: string, 
     }
   }
   const merged = [sniper, notice].filter(Boolean).join("\n\n");
-  return merged ? contextResponse("TeammateIdle", merged) : "";
+  if (!merged) return "";
+  // An actionable idle signal (false-done or sniper suggestion) warrants human
+  // attention — voice the "human" sound (fire-and-forget, fail-open no-op).
+  notify("human");
+  return contextResponse("TeammateIdle", merged);
 }

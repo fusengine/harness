@@ -30,6 +30,17 @@ float / `<= 0` all fall back to the default.
 | `FUSE_MCP_TTL_SEC` | `172800` (48h) | Context7/Exa cache freshness (`runtime/mcp-key.ts`) |
 | `FUSE_WEBFETCH_TTL_SEC` | `86400` (24h) | WebFetch cache freshness — pages stale faster than docs |
 | `RALPH_MODE` | _(off)_ | opt-in autonomous mode — exempts safe git commands (`add`/`commit`/`checkout -b`/`status`/`diff`/`log`) from the confirmation ask and auto-approves project installs; destructive git and system installs still gate (`policy/patterns.ts`) |
+| `FUSE_HARNESS_SOUND` | _(on)_ | set to `0` to disable every lifecycle notification sound (`runtime/notifications.ts`) |
+| `FUSE_HARNESS_SOUND_STOP` | _(bundled `assets/song/finish.mp3`)_ | override path for the Codex-`Stop` sound |
+| `FUSE_HARNESS_SOUND_PERMISSION` | _(bundled `assets/song/permission-need.mp3`)_ | override path reserved for a permission-prompt sound (no current call site — permission prompts stay native-only, `runtime/notification-sound.ts`) |
+| `FUSE_HARNESS_SOUND_HUMAN` | _(bundled `assets/song/need-human.mp3`)_ | override path for the `TeammateIdle` "needs a human" sound |
+
+Sound resolution cascade (`resolveSound` in `runtime/notification-sound.ts`):
+the per-kind override above (if it exists on disk) → the package's own
+`assets/song/<file>.mp3` → `$CLAUDE_PLUGIN_ROOT/song/<file>.mp3` → silent
+no-op. Playback is native per platform (`afplay`/`paplay`/PowerShell
+`SoundPlayer`) and absolutely fail-open — a missing binary or undecodable file
+never breaks the hook (`runtime/notifications.ts`).
 
 ```ts
 const max = resolveMaxLines();                       // process.env

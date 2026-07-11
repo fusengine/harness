@@ -11,11 +11,11 @@ import { trackWatchResearch } from "../src/runtime/lifecycle/changelog-research"
 const NOW = Date.UTC(2026, 5, 25, 12, 0, 0);
 const home = (): string => mkdtempSync(join(tmpdir(), "fh-sec-"));
 
-test("securityAdvisory: allow + advisory for code file with no state", () => {
+test("securityAdvisory: additionalContext advisory for code file with no state, NEVER a naked permissionDecision:allow (Codex rejects it)", () => {
   const h = home();
   const out = securityAdvisory("Write", "foo.ts", NOW, h);
-  const parsed = JSON.parse(out) as { hookSpecificOutput: { permissionDecision: string; additionalContext: string } };
-  expect(parsed.hookSpecificOutput.permissionDecision).toBe("allow");
+  const parsed = JSON.parse(out) as { hookSpecificOutput: { permissionDecision?: string; additionalContext: string } };
+  expect(parsed.hookSpecificOutput.permissionDecision).toBeUndefined();
   expect(parsed.hookSpecificOutput.additionalContext).toContain("SECURITY:");
 });
 

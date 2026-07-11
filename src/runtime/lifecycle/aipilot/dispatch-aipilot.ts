@@ -33,8 +33,7 @@ function contextTextOf(response: string): string {
 
 /**
  * Combine N SubagentStart responses into one (Claude concatenates every hook's
- * additionalContext; collapsing the matcher-"" + type-specific scripts into one
- * dispatch call must do that join itself). Returns "" when all are empty.
+ * additionalContext; this single dispatch call must do that join itself). "" when all empty.
  */
 function combineContext(...responses: string[]): string {
   const parts = responses.map(contextTextOf).filter(Boolean);
@@ -56,10 +55,9 @@ async function typeSpecificCache(agent: string, cwd: string, now: number): Promi
 }
 
 /**
- * SubagentStart routing. Parity with the Python ai-pilot hooks: the two
- * matcher-"" entries (APEX context + lessons "known issues") fire for EVERY
- * sub-agent, then the type-specific cache (explore/doc/test) is concatenated on
- * top. Sniper must still receive the lessons block — hence no early return.
+ * SubagentStart routing (parity with the Python ai-pilot hooks): the two matcher-""
+ * entries (APEX context + lessons) fire for EVERY sub-agent, then the type-specific
+ * cache is concatenated on top — sniper too, hence no early return.
  */
 async function onSubagentStart(payload: Record<string, unknown>, cwd: string, now: number): Promise<string> {
   const agent = agentTypeOf(payload);
@@ -88,7 +86,8 @@ async function onSubagentStop(payload: Record<string, unknown>, cwd: string): Pr
 export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number): Promise<string | null> {
   if (event === "SubagentStart") return onSubagentStart(payload, cwd, now);
   if (event === "SubagentStop") return onSubagentStop(payload, cwd);
-  if (event === "SessionEnd") { await cacheAnalyticsSave(undefined, now); return ""; }
+  // Stop too: Codex emits no SessionEnd, so its ai-pilot hooks.json wires Stop here as the sole analytics-flush trigger — reusing the SessionEnd handler verbatim (codex-plugins/docs/reference/hooks.md).
+  if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(undefined, now); return ""; }
   if (event === "PreToolUse") return docCacheGate(payload, cwd, now);
   return null;
 }

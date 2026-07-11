@@ -2,6 +2,7 @@ import type { Activity } from "./record";
 import type { AgentQuality } from "../tracking/session-state";
 import { classifyExplore } from "../freshness/explore-tools";
 import { docFramework } from "../freshness/query-framework";
+import { shellReadRefPaths } from "../policy/shell-read-refs";
 
 /** A live tool-use, already normalized to `tool` + `input` by the adapter. */
 export interface ToolEvent {
@@ -85,6 +86,14 @@ export function activityFor(event: ToolEvent): Activity[] {
     // `refsReadAt` (SOLID read TTL, parity track-solid-reads.py); `record.ts`
     // forwards it as `recordRefRead(track, path, ts)`.
     if (path.endsWith(".md")) out.push({ kind: "ref", path, ts: event.now });
+  }
+  // Codex teammates often read a skill/SOLID `.md` reference via a shell
+  // command (`cat`, `head`, …) instead of a native Read — independent of the
+  // classification above (a Bash call can ALSO be classified as `explore`
+  // evidence by classifyExplore), so every detected path is credited as its
+  // own `ref` activity (see shell-read-refs.ts for the read-only whitelist).
+  if (event.tool === "Bash") {
+    for (const path of shellReadRefPaths(event.input?.command)) out.push({ kind: "ref", path, ts: event.now });
   }
   return out;
 }

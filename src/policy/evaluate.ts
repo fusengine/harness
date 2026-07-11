@@ -2,9 +2,10 @@ import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
 import { computeEditResultLines } from "./edit-outcome";
 import { resolveMaxLines } from "../config/limits";
-import { matchPatterns, GIT_BLOCKED, GIT_ASK, RALPH_SAFE, isRalphMode } from "./patterns";
+import { matchPatterns, GIT_BLOCKED, RALPH_SAFE, isRalphMode } from "./patterns";
 import { runGuards } from "./guards";
 import { isSingleCommand, buildNeverApprovalPrompt, NEVER_SAFE, isSafePushForm } from "./never-approval";
+import { evaluateGitGates } from "./git-gates";
 import type { PolicyContext, PolicyResult } from "./interfaces/types";
 
 export type { PolicyContext, PolicyResult } from "./interfaces/types";
@@ -36,31 +37,8 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
     const prompt = buildNeverApprovalPrompt(cmd);
     return { decision: "warn", message: prompt.reason, prompt };
   }
-  if (!ralphSafe && ctx.command && matchPatterns(ctx.command, GIT_BLOCKED)) {
-    const reason = `Destructive git command: ${ctx.command}`;
-    return {
-      decision: "deny",
-      message: reason,
-      prompt: {
-        kind: "block",
-        title: "Destructive git command",
-        reason,
-        actions: ["Use a non-destructive alternative (e.g. --force-with-lease; avoid --hard / -D)"],
-      },
-    };
-  }
-  if (!ralphSafe && ctx.command && matchPatterns(ctx.command, GIT_ASK)) {
-    return {
-      decision: "deny",
-      message: `Git operation requires confirmation: ${ctx.command}`,
-      prompt: {
-        kind: "ask",
-        title: "Confirm git operation",
-        reason: `Authorize: ${ctx.command.trim()}`,
-        actions: ["Approve if this git operation is intended"],
-      },
-    };
-  }
+  const gitGate = evaluateGitGates(ctx.command, ralphSafe);
+  if (gitGate) return gitGate;
   if (ctx.filePath && isFileSizeScoped(ctx.filePath) && ctx.agentType !== "Explore" && ctx.agentType !== "Plan") {
     const incoming = ctx.content !== undefined ? countLines(ctx.content) : 0;
     const existing = ctx.existingLines ?? 0;
