@@ -125,7 +125,7 @@ also works elsewhere.
 | Harness | PreToolUse coverage | Lifecycle (Session/Subagent/Stop/Compact/…) | Known limit |
 |---|---|---|---|
 | **claude-code** | Full: `evaluate` + APEX gates via `handleHook` (`src/adapters/claude/index.ts`) | 14 event types implemented (`dispatch.ts`) — fires once wired into `.claude/settings.json` beyond the `init` default | None found; richer lifecycle needs manual/marketplace wiring (see Quickstart) |
-| **codex** | Bash gated reliably; **`apply_patch` edits are now gated too** — the patch text is parsed per file (`adapters/codex/apply-patch.ts`), each hunk runs the file gates and ONE violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenario 22 incl. the multi-file smuggling case). `ask` prompts are **downgraded to explicit deny** (`respond.ts`, sim scenario 23) because Codex fails open on unsupported shapes. | Not wired by `harness init codex` (PreToolUse `Bash\|apply_patch` + PostToolUse only, `src/init/templates.ts:29-38`) | Upstream caveat: Codex itself does not always enforce a correct `apply_patch` deny (openai/codex#27833) — we emit the right verdict; enforcement is theirs. No interactive `ask`. |
+| **codex** | Bash gated reliably; **`apply_patch` edits are now gated too** — the patch text is parsed per file (`adapters/codex/apply-patch.ts`), each hunk runs the file gates and ONE violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenario 22 incl. the multi-file smuggling case). `ask` prompts are **downgraded to explicit deny** (`respond.ts`, sim scenario 23) because Codex fails open on unsupported shapes. On the PostToolUse side, an allowed patch is fanned into one synthetic per-file event so the SOLID/tracking/post-edit handlers see every touched file (`runtime/post-fanout.ts`), and a non-blocking security advisory fires on the first qualifying file (`securityAdvisoryForPatch`). | Not wired by `harness init codex` (PreToolUse `Bash\|apply_patch` + PostToolUse only, `src/init/templates.ts:29-38`) — `Stop` (session cleanup + the SOLID/receipt completion check, since Codex never emits `SessionEnd`/`TaskCompleted`, `runtime/lifecycle/stop-core.ts`) and `SessionStart` (plugin agents/commands cache resync, `runtime/lifecycle/codex-resync/`) ARE implemented but, same caveat as claude-code's extra lifecycle above, only fire once the codex-plugins marketplace's own `hooks.json` wires them. | Upstream caveat: Codex itself does not always enforce a correct `apply_patch` deny (openai/codex#27833) — we emit the right verdict; enforcement is theirs. No interactive `ask`. Codex has no native `PostToolUseFailure`; a failure is inferred from the ordinary `PostToolUse` result shape (non-zero exit or an explicit error field only — never a guess) and journaled into the one-shot failure tally (`src/tracking/codex-post-failure.ts`). |
 | **cursor** | `beforeShellExecution` can deny/ask (shell only, `cursor/index.ts:16-21`) | none | File edits are **advisory only**: `afterFileEdit` always returns `allow` + a `user_message` correction on violation — a `deny` there has no proven effect (hook was "informational only" at launch, and Cursor's deny-enforcement for file ops is confirmed broken upstream, forum.cursor.com/t/154377). Human sees the message; the model is never re-informed. Platform ceiling, documented in `cursor/index.ts`. |
 | **gemini-cli** | `BeforeTool` denies via `{decision:"deny",reason}` (`gemini/index.ts:22-36`) | none | Thin stateless adapter — no session track, no APEX gates wired through it. |
 | **cline** | `PreToolUse` only; block → `{cancel:true}`, non-block → `contextModification` (`cline/index.ts:24-36`) | none | Same as gemini-cli: stateless guard only. |
@@ -198,6 +198,72 @@ Features shipped since 0.1.44, each with its own test:
 - **Hook simulator** — 18 end-to-end scenarios (payload in, expected verdict out)
   replayed against the real CLI in both `src` and built `dist` modes in CI
   (`test/sim/README.md`, `test/sim/scenarios/`).
+- **Codex `multi_agent_v2` custom-agent evidence** — a `spawn_agent` call
+  carrying `tool_input.agent_type` is recorded as `subagent-<agent_type>` in the
+  same SessionTrack as Claude Task evidence, so a Codex explore-codebase/sniper
+  satisfies the APEX freshness gates exactly like a Claude subagent
+  (`src/tracking/session-state.ts`, sim scenario 32b).
+- **File-size gate judges the real Edit outcome, not the on-disk count** — an
+  Edit on a file already over `FUSE_SOLID_MAX_LINES` used to be denied
+  unconditionally (the on-disk count always won); the gate now computes the
+  actual post-edit line count and allows a shrinking Edit while still denying a
+  computable growth past the limit (`src/policy/file-size.ts`, sim scenario 33).
+- **Codex `apply_patch` fan-out to post-handlers** — each file in a patch
+  envelope becomes a synthetic per-file PostToolUse event (`add`→`Write`,
+  `update`→`Edit`, `delete` no-ops on the Write/Edit-only handlers) instead of
+  the whole-patch shape whose own `filePath`/`content` are always undefined
+  (`src/runtime/post-fanout.ts`, `test/apply-patch-post.test.ts`).
+- **Non-blocking multi-file security advisory** — the same PreToolUse "read the
+  security skill" nudge a single Write/Edit gets is now evaluated per file
+  across a Codex `apply_patch` envelope, firing on the first qualifying
+  add/update code file (delete ignored outright) — `additionalContext` only,
+  never a deny (`src/runtime/lifecycle/security/check-skill.ts::securityAdvisoryForPatch`,
+  `test/security-advisory-patch.test.ts`).
+- **Codex SessionStart agent/command resync** — the plugin agents/commands
+  cache under `~/.codex/{agents,prompts}` is re-materialized only when its
+  sha256 fingerprint changed (or a command symlink dangles) since the last
+  apply, otherwise a cheap no-op; agents are copied (Codex won't load
+  symlinked TOMLs), commands are symlinked; a best-effort inter-process lock
+  avoids a torn cache under concurrent session starts (`src/runtime/lifecycle/codex-resync/`,
+  `test/resync-agents.test.ts`).
+- **Codex failure tracking inferred from PostToolUse** — Codex reports every
+  outcome, success or failure, on the same `PostToolUse` event; a failure is
+  classified from an explicit signal only (non-zero exit, an error field —
+  never "can't tell") and journaled into the existing one-shot failure tally
+  (`src/tracking/codex-post-failure.ts`, `test/codex-post-failure.test.ts`).
+- **Shell-credited ref reads** — a `.md` SOLID/skill reference read through a
+  read-only shell command (`cat`/`head`/`tail`/`sed`/`rg`/`less`/`more`/`bat`,
+  including inside a `sh -c` wrapper) now credits the same ref-read evidence a
+  native `Read` would, so a Codex teammate's shell-first consultation still
+  satisfies `solidReadGate`; `sed -i`/`--in-place` and any non-whitelisted
+  command are never credited (`src/policy/shell-read-refs.ts`,
+  `test/shell-read-refs.test.ts`).
+
+### Notification sounds
+
+A native OS sound plays on two lifecycle events: the core-scope `Stop` under
+Codex (`stopCore`, since Claude Code already voices its own turn-end via a
+native `afplay` hook — this harness deliberately does not double it) and
+`TeammateIdle` under Claude Code when there's an actionable notice (a missing
+deliverable or a sniper reminder). **On by default**; opt out entirely with
+`FUSE_HARNESS_SOUND=0`.
+
+Resolution per event kind (`stop`/`permission`/`human`) cascades: (1) a
+per-kind env override path (`FUSE_HARNESS_SOUND_STOP` / `_PERMISSION` /
+`_HUMAN`) if it exists on disk; (2) the package's own bundled
+`assets/song/{finish,permission-need,need-human}.mp3` (located by walking up
+to the running `package.json`, so it survives the flat/hashed `dist/` build);
+(3) `$CLAUDE_PLUGIN_ROOT/song/<file>.mp3` as a last-resort fallback. No file
+resolves → silent no-op. The `permission` kind and its `.mp3`/env var exist in
+the module for symmetry but have no current call site — permission prompts
+stay native-only on every harness today.
+
+Playback is native per platform (`afplay` on darwin, `paplay` on linux,
+PowerShell's `SoundPlayer` on win32) and **absolutely fail-open**: an
+unsupported platform, a missing player binary, an undecodable file, or a
+non-zero exit is swallowed — a broken or absent player can never break a hook
+(`src/runtime/notifications.ts`, `src/runtime/notification-sound.ts`,
+`test/notifications.test.ts`).
 
 ### Environment
 
@@ -214,6 +280,8 @@ Features shipped since 0.1.44, each with its own test:
 | `FUSE_WEBFETCH_TTL_SEC` | WebFetch cache freshness, seconds (default 24h — pages stale faster than docs). |
 | `RALPH_MODE` | **Opt-in (default off).** Exempts safe git commands (`add`/`commit`/`checkout -b`/`status`/`diff`/`log`) from the confirmation ask and auto-approves project installs. Destructive git (force-push, `reset --hard`) and system installs still gate. |
 | `CLAUDE_PROJECT_DIR` | Overrides the project root used to hash the out-of-tree state dir (`src/runtime/paths.ts:20`). |
+| `FUSE_HARNESS_SOUND` | **On by default.** Set to `0` to disable every lifecycle notification sound. |
+| `FUSE_HARNESS_SOUND_STOP` / `_PERMISSION` / `_HUMAN` | Per-kind override: an absolute path to a sound file to play instead of the bundled `assets/song/*.mp3` for that kind (see [Notification sounds](#notification-sounds)). |
 
 ## Library usage
 
@@ -286,9 +354,10 @@ Run `bun run docs:api` for the generated typedoc API reference.
 
 ## Known limitations
 
-- **Codex file edits are not gated.** The SOLID/file-size gate keys off
-  `tool_input.file_path`, which Codex's `apply_patch` call never supplies — only
-  Bash is reliably gated on Codex today (see [Compatibility](#compatibility)).
+- **Codex `apply_patch` enforcement depends on Codex itself.** The harness
+  parses the patch and emits the right verdict per file, but Codex does not
+  always enforce a correct deny on its end (openai/codex#27833, see
+  [Compatibility](#compatibility)) — enforcement beyond the verdict is theirs.
 - **Cursor file edits are advisory-only.** `afterFileEdit` fires after the edit
   already happened — a platform limit, not something this harness can work around.
 - **Hook fan-out is mitigated, not eliminated.** The ~11-sibling-plugin burst is
@@ -306,7 +375,7 @@ Run `bun run docs:api` for the generated typedoc API reference.
 ## Develop
 
 ```sh
-bun test            # 484 tests (94 files)
+bun test            # 662 tests (120 files)
 bunx tsc --noEmit   # typecheck (isolatedDeclarations)
 bun run build       # dist + .d.mts via tsdown (for Node/bundler consumers)
 bun run docs:api    # generate the typedoc API reference
