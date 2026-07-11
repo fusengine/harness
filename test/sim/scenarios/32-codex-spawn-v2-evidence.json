@@ -1,0 +1,54 @@
+{
+  "name": "codex-spawn-v2-evidence",
+  "harness": "codex",
+  "doc": "Codex `multi_agent_v2` custom-agent spawns (openai/codex@44918ea1, rust-v0.144.1) are a `spawn_agent` TOOL CALL inside the SAME session -- Codex has no SubagentStart/SubagentStop lifecycle for them, so the harness used to see nothing but a generic tool call. codex-spawn-evidence.ts now credits the SAME session-track store agent-evidence-record.ts already reads (agentsFreshInTrack), from PostToolUse `spawn_agent`/`{namespace}spawn_agent` alone. This scenario reuses the exact 'unblocks freshness' proof of 07-evidence-harvest-unblocks-freshness.json: a code Write is first denied by the explore+research freshness gate, two `spawn_agent` PostToolUse calls credit `agent_type=explore-codebase` (bare tool name) and `agent_type=research-expert` (namespace-prefixed `fusengine_agentsspawn_agent`, no separator -- the multi_agent_v2 namespace_tools form), and the SAME Write then advances past freshness to the next gate (Check-1 doc consultation) -- the observable, file-level proof the credit landed in the store the freshness gate actually reads. Parity (same payload, `id !== \"codex\"`, unaffected) is proven in the companion scenario 32b.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Fresh session, no evidence -> freshnessGate blocks (same as 07-evidence-harvest-unblocks-freshness.json step 1).",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc32",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "explore" } }
+    },
+    {
+      "scope": "core",
+      "doc": "PostToolUse `spawn_agent` (bare tool name, hide_spawn_agent_metadata=false) with agent_type=explore-codebase -> credited into track-sc32.json as `subagent-explore-codebase` (handle-post.ts -> recordCodexSpawnEvidence). Silent: no stdout, exit 0 -- identical shape to a Task/Agent launch or any other classified evidence call.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc32",
+        "tool_name": "spawn_agent",
+        "tool_input": { "agent_type": "explore-codebase" },
+        "tool_response": { "nickname": "scout" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "PostToolUse namespace-prefixed spawn (`fusengine_agentsspawn_agent`, the namespace_tools capability form -- `tool_name.endsWith(\"spawn_agent\")`) with agent_type=research-expert -> credited as `subagent-research-expert`. Also silent.",
+      "event": {
+        "hook_event_name": "PostToolUse",
+        "session_id": "sc32",
+        "tool_name": "fusengine_agentsspawn_agent",
+        "tool_input": { "agent_type": "research-expert" },
+        "tool_response": { "nickname": "scholar" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "The SAME Write (step 1's identical payload) now clears freshnessGate -- both required agents are fresh in track-sc32.json via the two spawn_agent credits above -- and hits the NEXT gate, Check-1 doc consultation ('APEX: react documentation required'). The block moving from explore->documentation is the file-level proof the spawn_agent credit reached the SAME store agentsFreshInTrack reads.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc32",
+        "tool_name": "Write",
+        "tool_input": { "file_path": "$TMP/src/widget.ts", "content": "a\nb\nc\nd\ne\nf" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "documentation" } }
+    }
+  ]
+}

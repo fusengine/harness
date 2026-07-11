@@ -9,6 +9,7 @@ import { postTrackingSideEffects } from "./lifecycle/post-tracking";
 import { aipilotPostToolUse, checkFileSize, validateTailwind } from "./lifecycle";
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-evidence-record";
+import { recordCodexSpawnEvidence } from "../freshness/codex-spawn-evidence";
 import { captureReceipt } from "../tracking/receipts";
 import { designPassNotice } from "../policy/design/gates";
 import { attachSystemMessage } from "../adapters/claude";
@@ -36,6 +37,9 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // carry the LEAD's session_id — Task/Agent launches excluded (credited above).
   const evidence = classifyAgentEvidence(event.tool, event.input, response);
   if (evidence) await recordAgentEvidence(file, evidence, opts.now, typeof payload.agent_id === "string" ? payload.agent_id : undefined);
+  // Codex multi_agent_v2 `spawn_agent` -> same session track (no-op for every
+  // other harness / non-spawn tool / missing `agent_type`; see module doc).
+  await recordCodexSpawnEvidence(file, id, event.tool, event.input, opts.now);
   // Verification receipts: a Bash `tsc`/`bun test` run is parsed (exit code +
   // pass/fail counts) into a signed receipt the TaskCompleted gate later demands.
   if (event.tool === "Bash" && event.command) {

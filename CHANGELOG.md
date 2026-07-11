@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.67] - 11-07-2026
+
+### Added
+
+- Codex multi_agent_v2 custom agents now count as agent evidence: on PostToolUse under Codex, a `spawn_agent` call carrying `tool_input.agent_type` (exposed when `hide_spawn_agent_metadata=false`) is recorded as `subagent-<agent_type>` in the SAME SessionTrack as Claude Task evidence — APEX freshness gates see a Codex explore-codebase/sniper exactly like a Claude subagent. Detection covers both proven tool-name forms (openai/codex@44918ea1): canonical `spawn_agent` and the no-separator `{namespace}spawn_agent` concatenation (`fusengine_agentsspawn_agent`). Triple gate against false credits (codex id + spawn form + non-empty agent_type); claude-code/cursor/cline/gemini paths byte-identical (sim parity scenario 32b, stash-replay proven).
+
 ## [0.1.66] - 10-07-2026
 
 ### Added
