@@ -56,10 +56,10 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   // Hook-managed paths: absolute deny on ALL extensions, BEFORE the code-ext/exempt filters (parity enforce-apex-phases.ts:48-52 — isApexScoped never routes a non-code/exempt path to the guard).
   const protectedDeny = protectedPathGate(input.tool, input.filePath);
   if (protectedDeny) return protectedDeny;
-  const { raw: existingLines, code: existingCodeLines } = existingLineCounts(input.filePath);
+  const { raw: existingLines, code: existingCodeLines, content: existingContent } = existingLineCounts(input.filePath);
   let quick: PolicyResult;
   try {
-    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines, neverApproval: input.neverApproval });
+    quick = evaluate({ tool: input.tool, filePath: input.filePath, content: input.content, command: input.command, agentType: input.agentType, existingLines, existingContent, oldString: input.oldString, isReplaceAll: input.isReplaceAll, neverApproval: input.neverApproval });
   } catch {
     return FAIL_CLOSED;
   }
