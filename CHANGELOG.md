@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.70] - 12-07-2026
+
+### Added
+
+- **`--sound <kind>` CLI short-circuit** (`hook-sound.ts`): the `hook` command now accepts `--sound stop|permission|human` (as `--sound X` or `--sound=X`), plays the embedded sound via `notify(kind)` and exits 0 without reading stdin or entering `handleHook`. This lets a plugin's hooks.json route every notification sound through the harness **exclusively** (single sound source) instead of native `afplay` — Claude already routes by `matcher`, so each hook line passes the sound explicitly (`PermissionRequest`/`permission_prompt`→permission, `idle_prompt`/`elicitation_dialog`→human). Fail-closed on absent/unknown kind (falls through to the normal flow); harness-agnostic (no `id` gate → codex/cursor/hermes call it identically). Creates the previously-missing `notify("permission")` call site. `bin.ts` gains one logic line (97 l., < 100); `dispatchLifecycle`/`notifications.ts`/`notification-sound.ts` untouched. 11 new tests; full suite 672 pass / 0 fail, `tsc --noEmit` clean.
+
 ## [0.1.69] - 11-07-2026
 
 ### Added
