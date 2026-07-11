@@ -19,6 +19,7 @@ import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 import { runDoctor, runningVersion, versionBanner } from "./doctor";
 import { readStdin as readRawStdin } from "../util/runtime-io";
+import { maybePlaySound } from "./hook-sound";
 
 // Inline trace helper (kept in this file, not a separate module) — stderr-only, on only under FUSE_HARNESS_DEBUG=1 (set by test/sim/exec.ts).
 const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1";
@@ -51,6 +52,7 @@ if (cmd === "--version" || cmd === "-v") {
   const scopeArg = process.argv[4];
   const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory", "tailwindcss"]);
   const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
+  if (maybePlaySound(process.argv)) process.exit(0);
   const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
   const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
   traceHook("args", { id, scope });
