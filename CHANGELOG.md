@@ -2,6 +2,16 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.68] - 11-07-2026
+
+### Fixed
+
+- File-size gate remediation deadlock: an Edit on a file already over `FUSE_SOLID_MAX_LINES` was ALWAYS denied (the gate judged `Math.max(new_string, on-disk)` — the on-disk count won every time), so an oversized file could never be shrunk or split via Edit. The gate now computes the REAL post-edit line count (`existing − old_string + new_string`, scaled by occurrences under `replace_all`, fail-closed when `old_string` doesn't match): a shrinking Edit of an oversized file is allowed (monotonic convergence — growth stays impossible), and a computable violation is denied on the real outcome, which also closes the historical grow-via-Edit hole (a compliant 95-line file pushed to 106 by an Edit used to pass unseen). Write and apply_patch behavior unchanged. 8 invariant regression tests + sim scenario 33 on the real binary.
+
+### Known debt (accepted)
+
+- `src/policy/evaluate.ts` temporarily at 103 lines (> 100): the compacted version + SRP git-gates extraction are ready but blocked by the deployed harness's own Edit deadlock — the exact bug this release fixes. Follow-up lands right after the deployed harness syncs to this version.
+
 ## [0.1.67] - 11-07-2026
 
 ### Added

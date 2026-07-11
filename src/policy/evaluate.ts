@@ -1,5 +1,7 @@
 import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
+import { computeEditResultLines } from "./edit-outcome";
+import { resolveMaxLines } from "../config/limits";
 import { matchPatterns, GIT_BLOCKED, GIT_ASK, RALPH_SAFE, isRalphMode } from "./patterns";
 import { runGuards } from "./guards";
 import { isSingleCommand, buildNeverApprovalPrompt, NEVER_SAFE, isSafePushForm } from "./never-approval";
@@ -61,15 +63,28 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
   }
   if (ctx.filePath && isFileSizeScoped(ctx.filePath) && ctx.agentType !== "Explore" && ctx.agentType !== "Plan") {
     const incoming = ctx.content !== undefined ? countLines(ctx.content) : 0;
-    // Write provides the full new content → judge it. Edit is partial → judge the on-disk file.
-    const lines = ctx.tool === "Edit" ? Math.max(incoming, ctx.existingLines ?? 0) : incoming || (ctx.existingLines ?? 0);
+    const existing = ctx.existingLines ?? 0;
+    const max = ctx.maxLines ?? resolveMaxLines();
+    // A computable Edit outcome bypasses the on-disk-only ceiling below: either
+    // the result itself is compliant, or the file was already oversized and
+    // this Edit strictly shrinks it (see policy/edit-outcome.ts). Fails closed
+    // to the ceiling whenever the outcome isn't computable.
+    const editResult = ctx.tool === "Edit" && ctx.existingContent !== undefined && ctx.content !== undefined
+      ? computeEditResultLines(ctx.existingContent, ctx.oldString, ctx.content, ctx.isReplaceAll === true)
+      : null;
+    if (editResult !== null && (editResult <= max || editResult < existing)) {
+      return { decision: "allow", message: null };
+    }
+    // Write provides the full new content → judge it. Edit judges the computed
+    // outcome when known (closes the old grow-via-Edit hole), else the on-disk file.
+    const lines = ctx.tool === "Edit" ? (editResult ?? Math.max(incoming, existing)) : incoming || existing;
     const framework = resolveSolidRefFramework(ctx.filePath);
     // Python parity (enforce-file-size.py:44-57): the block message always
     // reports the pre-existing on-disk count, even for a Write whose new
     // content is itself over the limit — the incoming count only ever gates
     // an early "shrunk to compliant" allow, it's never what gets displayed.
     const displayLines = ctx.tool === "Write" ? ctx.existingLines ?? lines : lines;
-    const verdict = evaluateFileSize(lines, ctx.maxLines, ctx.filePath, framework, displayLines);
+    const verdict = evaluateFileSize(lines, max, ctx.filePath, framework, displayLines);
     if (lines > 0 && !verdict.ok) {
       return {
         decision: "deny",

@@ -1,0 +1,42 @@
+{
+  "name": "edit-file-size-outcome",
+  "doc": "Edit-outcome file-size gate (policy/evaluate.ts + policy/edit-outcome.ts). Before this fix, evaluate() judged an Edit by Math.max(incoming new_string lines, on-disk lines) — so ANY Edit on a file already over FUSE_SOLID_MAX_LINES (default 100) was denied, even one that would shrink it. The fix computes the post-edit outcome (existingLines - countLines(old_string) + countLines(new_string)) and allows when the result is itself compliant OR strictly smaller than the current on-disk count. Setup materializes a 120-line file (over the 100-line default ceiling) at $TMP/big.ts.",
+  "setup": [
+    {
+      "path": "$TMP/big.ts",
+      "content": "const l1 = 1;\nconst l2 = 2;\nconst l3 = 3;\nconst l4 = 4;\nconst l5 = 5;\nconst l6 = 6;\nconst l7 = 7;\nconst l8 = 8;\nconst l9 = 9;\nconst l10 = 10;\nconst l11 = 11;\nconst l12 = 12;\nconst l13 = 13;\nconst l14 = 14;\nconst l15 = 15;\nconst l16 = 16;\nconst l17 = 17;\nconst l18 = 18;\nconst l19 = 19;\nconst l20 = 20;\nconst l21 = 21;\nconst l22 = 22;\nconst l23 = 23;\nconst l24 = 24;\nconst l25 = 25;\nconst l26 = 26;\nconst l27 = 27;\nconst l28 = 28;\nconst l29 = 29;\nconst l30 = 30;\nconst l31 = 31;\nconst l32 = 32;\nconst l33 = 33;\nconst l34 = 34;\nconst l35 = 35;\nconst l36 = 36;\nconst l37 = 37;\nconst l38 = 38;\nconst l39 = 39;\nconst l40 = 40;\nconst l41 = 41;\nconst l42 = 42;\nconst l43 = 43;\nconst l44 = 44;\nconst l45 = 45;\nconst l46 = 46;\nconst l47 = 47;\nconst l48 = 48;\nconst l49 = 49;\nconst l50 = 50;\nconst l51 = 51;\nconst l52 = 52;\nconst l53 = 53;\nconst l54 = 54;\nconst l55 = 55;\nconst l56 = 56;\nconst l57 = 57;\nconst l58 = 58;\nconst l59 = 59;\nconst l60 = 60;\nconst l61 = 61;\nconst l62 = 62;\nconst l63 = 63;\nconst l64 = 64;\nconst l65 = 65;\nconst l66 = 66;\nconst l67 = 67;\nconst l68 = 68;\nconst l69 = 69;\nconst l70 = 70;\nconst l71 = 71;\nconst l72 = 72;\nconst l73 = 73;\nconst l74 = 74;\nconst l75 = 75;\nconst l76 = 76;\nconst l77 = 77;\nconst l78 = 78;\nconst l79 = 79;\nconst l80 = 80;\nconst l81 = 81;\nconst l82 = 82;\nconst l83 = 83;\nconst l84 = 84;\nconst l85 = 85;\nconst l86 = 86;\nconst l87 = 87;\nconst l88 = 88;\nconst l89 = 89;\nconst l90 = 90;\nconst l91 = 91;\nconst l92 = 92;\nconst l93 = 93;\nconst l94 = 94;\nconst l95 = 95;\nconst l96 = 96;\nconst l97 = 97;\nconst l98 = 98;\nconst l99 = 99;\nconst l100 = 100;\nconst l101 = 101;\nconst l102 = 102;\nconst l103 = 103;\nconst l104 = 104;\nconst l105 = 105;\nconst l106 = 106;\nconst l107 = 107;\nconst l108 = 108;\nconst l109 = 109;\nconst l110 = 110;\nconst l111 = 111;\nconst l112 = 112;\nconst l113 = 113;\nconst l114 = 114;\nconst l115 = 115;\nconst l116 = 116;\nconst l117 = 117;\nconst l118 = 118;\nconst l119 = 119;\nconst l120 = 120;\n"
+    }
+  ],
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "big.ts is 120 lines (> 100 default). Edit replaces the 40-line prefix (l1..l40, old_string) with a single line (new_string) → resultLines = 120 - 40 + 1 = 81 <= 100 → allow (empty stdout), NOT denied on the stale 120-line on-disk count.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc33",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "$TMP/big.ts",
+          "old_string": "const l1 = 1;\nconst l2 = 2;\nconst l3 = 3;\nconst l4 = 4;\nconst l5 = 5;\nconst l6 = 6;\nconst l7 = 7;\nconst l8 = 8;\nconst l9 = 9;\nconst l10 = 10;\nconst l11 = 11;\nconst l12 = 12;\nconst l13 = 13;\nconst l14 = 14;\nconst l15 = 15;\nconst l16 = 16;\nconst l17 = 17;\nconst l18 = 18;\nconst l19 = 19;\nconst l20 = 20;\nconst l21 = 21;\nconst l22 = 22;\nconst l23 = 23;\nconst l24 = 24;\nconst l25 = 25;\nconst l26 = 26;\nconst l27 = 27;\nconst l28 = 28;\nconst l29 = 29;\nconst l30 = 30;\nconst l31 = 31;\nconst l32 = 32;\nconst l33 = 33;\nconst l34 = 34;\nconst l35 = 35;\nconst l36 = 36;\nconst l37 = 37;\nconst l38 = 38;\nconst l39 = 39;\nconst l40 = 40;\n",
+          "new_string": "const merged = true;\n"
+        }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "Same big.ts (still 120 lines on disk — the sim never applies the real edit). This Edit replaces just line 41 (1-line old_string) with a 200-line new_string → resultLines = 120 - 1 + 200 = 319 > 100 and NOT smaller than 120 → deny, SOLID file-size block.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc33",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "$TMP/big.ts",
+          "old_string": "const l41 = 41;\n",
+          "new_string": "const g1 = 1;\nconst g2 = 2;\nconst g3 = 3;\nconst g4 = 4;\nconst g5 = 5;\nconst g6 = 6;\nconst g7 = 7;\nconst g8 = 8;\nconst g9 = 9;\nconst g10 = 10;\nconst g11 = 11;\nconst g12 = 12;\nconst g13 = 13;\nconst g14 = 14;\nconst g15 = 15;\nconst g16 = 16;\nconst g17 = 17;\nconst g18 = 18;\nconst g19 = 19;\nconst g20 = 20;\nconst g21 = 21;\nconst g22 = 22;\nconst g23 = 23;\nconst g24 = 24;\nconst g25 = 25;\nconst g26 = 26;\nconst g27 = 27;\nconst g28 = 28;\nconst g29 = 29;\nconst g30 = 30;\nconst g31 = 31;\nconst g32 = 32;\nconst g33 = 33;\nconst g34 = 34;\nconst g35 = 35;\nconst g36 = 36;\nconst g37 = 37;\nconst g38 = 38;\nconst g39 = 39;\nconst g40 = 40;\nconst g41 = 41;\nconst g42 = 42;\nconst g43 = 43;\nconst g44 = 44;\nconst g45 = 45;\nconst g46 = 46;\nconst g47 = 47;\nconst g48 = 48;\nconst g49 = 49;\nconst g50 = 50;\nconst g51 = 51;\nconst g52 = 52;\nconst g53 = 53;\nconst g54 = 54;\nconst g55 = 55;\nconst g56 = 56;\nconst g57 = 57;\nconst g58 = 58;\nconst g59 = 59;\nconst g60 = 60;\nconst g61 = 61;\nconst g62 = 62;\nconst g63 = 63;\nconst g64 = 64;\nconst g65 = 65;\nconst g66 = 66;\nconst g67 = 67;\nconst g68 = 68;\nconst g69 = 69;\nconst g70 = 70;\nconst g71 = 71;\nconst g72 = 72;\nconst g73 = 73;\nconst g74 = 74;\nconst g75 = 75;\nconst g76 = 76;\nconst g77 = 77;\nconst g78 = 78;\nconst g79 = 79;\nconst g80 = 80;\nconst g81 = 81;\nconst g82 = 82;\nconst g83 = 83;\nconst g84 = 84;\nconst g85 = 85;\nconst g86 = 86;\nconst g87 = 87;\nconst g88 = 88;\nconst g89 = 89;\nconst g90 = 90;\nconst g91 = 91;\nconst g92 = 92;\nconst g93 = 93;\nconst g94 = 94;\nconst g95 = 95;\nconst g96 = 96;\nconst g97 = 97;\nconst g98 = 98;\nconst g99 = 99;\nconst g100 = 100;\nconst g101 = 101;\nconst g102 = 102;\nconst g103 = 103;\nconst g104 = 104;\nconst g105 = 105;\nconst g106 = 106;\nconst g107 = 107;\nconst g108 = 108;\nconst g109 = 109;\nconst g110 = 110;\nconst g111 = 111;\nconst g112 = 112;\nconst g113 = 113;\nconst g114 = 114;\nconst g115 = 115;\nconst g116 = 116;\nconst g117 = 117;\nconst g118 = 118;\nconst g119 = 119;\nconst g120 = 120;\nconst g121 = 121;\nconst g122 = 122;\nconst g123 = 123;\nconst g124 = 124;\nconst g125 = 125;\nconst g126 = 126;\nconst g127 = 127;\nconst g128 = 128;\nconst g129 = 129;\nconst g130 = 130;\nconst g131 = 131;\nconst g132 = 132;\nconst g133 = 133;\nconst g134 = 134;\nconst g135 = 135;\nconst g136 = 136;\nconst g137 = 137;\nconst g138 = 138;\nconst g139 = 139;\nconst g140 = 140;\nconst g141 = 141;\nconst g142 = 142;\nconst g143 = 143;\nconst g144 = 144;\nconst g145 = 145;\nconst g146 = 146;\nconst g147 = 147;\nconst g148 = 148;\nconst g149 = 149;\nconst g150 = 150;\nconst g151 = 151;\nconst g152 = 152;\nconst g153 = 153;\nconst g154 = 154;\nconst g155 = 155;\nconst g156 = 156;\nconst g157 = 157;\nconst g158 = 158;\nconst g159 = 159;\nconst g160 = 160;\nconst g161 = 161;\nconst g162 = 162;\nconst g163 = 163;\nconst g164 = 164;\nconst g165 = 165;\nconst g166 = 166;\nconst g167 = 167;\nconst g168 = 168;\nconst g169 = 169;\nconst g170 = 170;\nconst g171 = 171;\nconst g172 = 172;\nconst g173 = 173;\nconst g174 = 174;\nconst g175 = 175;\nconst g176 = 176;\nconst g177 = 177;\nconst g178 = 178;\nconst g179 = 179;\nconst g180 = 180;\nconst g181 = 181;\nconst g182 = 182;\nconst g183 = 183;\nconst g184 = 184;\nconst g185 = 185;\nconst g186 = 186;\nconst g187 = 187;\nconst g188 = 188;\nconst g189 = 189;\nconst g190 = 190;\nconst g191 = 191;\nconst g192 = 192;\nconst g193 = 193;\nconst g194 = 194;\nconst g195 = 195;\nconst g196 = 196;\nconst g197 = 197;\nconst g198 = 198;\nconst g199 = 199;\nconst g200 = 200;\n"
+        }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "SOLID file-size limit" } }
+    }
+  ]
+}

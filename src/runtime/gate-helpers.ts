@@ -31,6 +31,8 @@ export interface ExistingLineCounts {
   raw?: number;
   /** Code-only count (blank/comment lines excluded) — parity with the framework validators' `count_code_lines`, fed to `frameworkSkillGate`. */
   code?: number;
+  /** Full on-disk content, read once alongside the counts — fed to the Edit-outcome file-size gate (policy/edit-outcome.ts via evaluate.ts) so it can compute the exact post-edit line count without a second read. */
+  content?: string;
 }
 
 /**
@@ -43,7 +45,7 @@ export function existingLineCounts(path: string | undefined): ExistingLineCounts
   if (!path || !existsSync(path)) return {};
   try {
     const content = readFileSync(path, "utf8");
-    return { raw: countLines(content), code: countFrameworkCodeLines(content) };
+    return { raw: countLines(content), code: countFrameworkCodeLines(content), content };
   } catch {
     return {};
   }

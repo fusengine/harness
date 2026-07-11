@@ -16,6 +16,8 @@ export interface NormalizedEvent {
   sessionId: string;
   filePath?: string;
   content?: string;
+  /** Edit only: the tool_input.old_string being replaced — lets the file-size gate (policy/evaluate.ts + policy/edit-outcome.ts) compute the post-edit outcome instead of judging the stale on-disk count alone. Undefined for Write (no such field) and for cline/apply_patch (parsed separately, no equivalent field). */
+  oldString?: string;
   command?: string;
   /** Subagent type, if the tool-use came from one (Explore/Plan are file-size-exempt). */
   agentType?: string;
@@ -79,6 +81,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     ...base,
     filePath: str(input.file_path) ?? str(input.path) ?? str(payload.file_path),
     content: str(input.content) ?? str(input.new_string),
+    oldString: str(input.old_string),
     command: commandToString(input.command) ?? commandToString(payload.command),
   };
 }
