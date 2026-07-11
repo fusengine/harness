@@ -75,7 +75,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
   if (tool === "apply_patch") {
     const patch = str(input.command) ?? str(payload.command) ?? "";
     const files = parseApplyPatch(patch).map((f) => ({ filePath: f.path, content: f.content, op: f.op }));
-    return { ...base, phase: "pre", files: files.length > 0 ? files : undefined };
+    return { ...base, phase: base.phase, files: files.length > 0 ? files : undefined };
   }
   return {
     ...base,

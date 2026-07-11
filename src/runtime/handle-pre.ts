@@ -8,7 +8,7 @@ import { respond } from "./respond";
 import { withDenyNotice } from "./deny-notice";
 import { designGate } from "./design";
 import { taskContext } from "./inject-context";
-import { securityAdvisory } from "./lifecycle/security/check-skill";
+import { securityAdvisory, securityAdvisoryForPatch } from "./lifecycle/security/check-skill";
 import { validateSolidGate } from "./lifecycle";
 import { allowOutcome } from "./pre-allow";
 import { applyPatchGate } from "./apply-patch-gate";
@@ -46,7 +46,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // non-blocking advisory when the skill is unread, else allow — NEVER run the
   // core APEX/SOLID/file-size gate chain (the security plugin never did).
   if (opts.scope === "security") {
-    return { stdout: securityAdvisory(event.tool, event.filePath ?? "", opts.now), exit: 0 };
+    return { stdout: event.files?.length ? securityAdvisoryForPatch(event.files, opts.now) : securityAdvisory(event.tool, event.filePath ?? "", opts.now), exit: 0 };
   }
 
   // Solid scope mirrors security above: run ONLY the ported validate-solid

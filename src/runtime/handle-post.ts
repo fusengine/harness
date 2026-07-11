@@ -11,10 +11,12 @@ import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-evidence-record";
 import { recordCodexSpawnEvidence } from "../freshness/codex-spawn-evidence";
 import { captureReceipt } from "../tracking/receipts";
+import { recordCodexPostFailure } from "../tracking/codex-post-failure";
 import { designPassNotice } from "../policy/design/gates";
 import { attachSystemMessage } from "../adapters/claude";
 import { refCreditNoticeFor } from "./notices";
 import { defaultStateDir } from "./paths";
+import { fanOutFiles, firstFileMatch } from "./post-fanout";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
 import type { Prompt } from "../prompt/types";
@@ -22,7 +24,9 @@ import type { Prompt } from "../prompt/types";
 /**
  * Run the PostToolUse pipeline: store the MCP response, emit a design warning,
  * record the activity into the session track, apply per-scope side-effects (SEO
- * deny, aipilot task cache), then inject the post-edit context.
+ * deny, aipilot task cache), then inject the post-edit context. Codex
+ * `apply_patch` is fanned into per-file events ({@link fanOutFiles}) before the
+ * per-file gates (tracking, SOLID size, Tailwind, post-edit context) run.
  * @param ctx - The resolved context (same shape as the pre pipeline).
  * @returns The native hook outcome.
  */
@@ -48,22 +52,30 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
     const exit = Number(r?.exit_code ?? 0);
     await captureReceipt(file, event.command, out, Number.isFinite(exit) ? exit : 0, opts.now);
   }
-  postTrackingSideEffects(opts.scope ?? "core", event, event.input, opts.now, payload, opts.cwd);
+  if (id === "codex") recordCodexPostFailure(event.tool, payload.tool_result ?? response, { now: opts.now, dir: defaultStateDir(opts.cwd), sessionId: event.sessionId });
+  // Codex `apply_patch` fans into per-file events here; every other tool is a
+  // single-element identity array, so behavior below is unchanged for them.
+  const files = fanOutFiles(event);
+  for (const f of files) postTrackingSideEffects(opts.scope ?? "core", f, f.input, opts.now, payload, opts.cwd);
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
   if (seoDeny) return { stdout: seoDeny, exit: 0 };
-  if (opts.scope === "solid" && event.filePath) {
-    const solidWarn = checkFileSize(event.tool, event.filePath);
+  if (opts.scope === "solid") {
+    const solidWarn = firstFileMatch(files, checkFileSize);
     if (solidWarn) return { stdout: solidWarn, exit: 0 };
   }
-  if (opts.scope === "tailwindcss" && event.filePath) {
-    const tailwindWarn = validateTailwind(event.tool, event.filePath);
+  if (opts.scope === "tailwindcss") {
+    const tailwindWarn = firstFileMatch(files, validateTailwind);
     if (tailwindWarn) return { stdout: tailwindWarn, exit: 0 };
   }
   if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate" || event.tool === "Write" || event.tool === "Edit")) {
     const out = await aipilotPostToolUse(payload, opts.cwd);
     if (out) return { stdout: out, exit: 0 };
   }
-  const extra = await postEditContext(opts.scope ?? "core", event, opts.now);
+  let extra = "";
+  for (const f of files) {
+    extra = await postEditContext(opts.scope ?? "core", f, opts.now);
+    if (extra) break;
+  }
   // Python-parity `post_pass`: user-visible pass notice, merged into whatever else fires
   // (deny paths above returned already — a deny stays byte-identical).
   const notice = designPassNotice({

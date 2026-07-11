@@ -1,0 +1,45 @@
+{
+  "name": "apply-patch-parity",
+  "harness": "codex",
+  "doc": "apply_patch parity beyond scenario 22 (which covers add/delete/multi-file deny). Covers `Move to` (update+rename judged on the NEW path) and a malformed envelope's fail-open. NOTE (audit finding, out of this lot's file ownership): normalize.ts hardcodes `phase: \"pre\"` for every apply_patch event regardless of the real `hook_event_name`, so a genuine Codex `PostToolUse` apply_patch payload still routes to handlePre today, not handlePost — the new per-file Post fan-out (handle-post.ts + runtime/post-fanout.ts) is unit-tested directly in test/apply-patch-post.test.ts (bypassing handleHook) until that routing bug is fixed by whoever owns normalize.ts.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`*** Update File: old.ts` + `*** Move to: new.ts` with a 150-line hunk. parseApplyPatch renames the entry's path to the Move target (apply-patch.ts:76-78) BEFORE applyPatchGate judges it, so the SOLID deny names the NEW path, not the pre-move one.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc34a",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Update File: old.ts\n*** Move to: new.ts\n@@\n+const l1 = 1;\n+const l2 = 2;\n+const l3 = 3;\n+const l4 = 4;\n+const l5 = 5;\n+const l6 = 6;\n+const l7 = 7;\n+const l8 = 8;\n+const l9 = 9;\n+const l10 = 10;\n+const l11 = 11;\n+const l12 = 12;\n+const l13 = 13;\n+const l14 = 14;\n+const l15 = 15;\n+const l16 = 16;\n+const l17 = 17;\n+const l18 = 18;\n+const l19 = 19;\n+const l20 = 20;\n+const l21 = 21;\n+const l22 = 22;\n+const l23 = 23;\n+const l24 = 24;\n+const l25 = 25;\n+const l26 = 26;\n+const l27 = 27;\n+const l28 = 28;\n+const l29 = 29;\n+const l30 = 30;\n+const l31 = 31;\n+const l32 = 32;\n+const l33 = 33;\n+const l34 = 34;\n+const l35 = 35;\n+const l36 = 36;\n+const l37 = 37;\n+const l38 = 38;\n+const l39 = 39;\n+const l40 = 40;\n+const l41 = 41;\n+const l42 = 42;\n+const l43 = 43;\n+const l44 = 44;\n+const l45 = 45;\n+const l46 = 46;\n+const l47 = 47;\n+const l48 = 48;\n+const l49 = 49;\n+const l50 = 50;\n+const l51 = 51;\n+const l52 = 52;\n+const l53 = 53;\n+const l54 = 54;\n+const l55 = 55;\n+const l56 = 56;\n+const l57 = 57;\n+const l58 = 58;\n+const l59 = 59;\n+const l60 = 60;\n+const l61 = 61;\n+const l62 = 62;\n+const l63 = 63;\n+const l64 = 64;\n+const l65 = 65;\n+const l66 = 66;\n+const l67 = 67;\n+const l68 = 68;\n+const l69 = 69;\n+const l70 = 70;\n+const l71 = 71;\n+const l72 = 72;\n+const l73 = 73;\n+const l74 = 74;\n+const l75 = 75;\n+const l76 = 76;\n+const l77 = 77;\n+const l78 = 78;\n+const l79 = 79;\n+const l80 = 80;\n+const l81 = 81;\n+const l82 = 82;\n+const l83 = 83;\n+const l84 = 84;\n+const l85 = 85;\n+const l86 = 86;\n+const l87 = 87;\n+const l88 = 88;\n+const l89 = 89;\n+const l90 = 90;\n+const l91 = 91;\n+const l92 = 92;\n+const l93 = 93;\n+const l94 = 94;\n+const l95 = 95;\n+const l96 = 96;\n+const l97 = 97;\n+const l98 = 98;\n+const l99 = 99;\n+const l100 = 100;\n+const l101 = 101;\n+const l102 = 102;\n+const l103 = 103;\n+const l104 = 104;\n+const l105 = 105;\n*** End Patch"
+        }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "'new.ts'" } }
+    },
+    {
+      "scope": "core",
+      "doc": "One envelope carrying add+update+delete+move, ALL compliant → allow (empty stdout). Proves the fan-out doesn't blanket-deny a mixed-op patch when every hunk is clean, and that delete/move hunks contribute no content to judge.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc34b",
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: fresh.ts\n+const a = 1;\n*** Update File: keep.ts\n@@\n+const b = 2;\n*** Delete File: gone.ts\n*** Update File: renamed-old.ts\n*** Move to: renamed-new.ts\n@@\n+const c = 3;\n*** End Patch"
+        }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "Malformed apply_patch body (no recognizable `*** Begin/Add/Update/Delete` markers) → parseApplyPatch returns [] → normalize.ts leaves `files` undefined → the event carries no filePath/content/command at all. Fails OPEN: no crash, no deny, exit 0.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc34c",
+        "tool_name": "apply_patch",
+        "tool_input": { "command": "this is not a patch, just prose" }
+      },
+      "expect": { "exit": 0 }
+    }
+  ]
+}
