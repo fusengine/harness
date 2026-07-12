@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.71] - 12-07-2026
+
+### Fixed
+
+- **Dynamic project-aware framework detection** — the framework of an edited file is now resolved from the real project on disk intersected with the file's own signal, replacing the extension-only classifier that labelled every `.ts` file "react" (because `\.tsx?$` also matches `.ts`). A backend/test/script `.ts` no longer wrongly demands react SOLID refs. New `nearest-manifest.ts` (walk-up to the closest `package.json`/`composer.json`/`Package.swift` + `projectCaps` reading `dependencies`/`devDependencies`, reusing `detectProjectType` for non-JS langs); `detect-framework.ts` becomes `fileSignal` + `reconcile` (`.tsx`/`.jsx`→react/next only if the project is capable, `.ts`/`.js`→framework only when capable AND a content signal is present, else `generic`; non-JS extensions stay definitive; fail-open to `generic`). The twin `.ts`→react bug in `file-size-scope.ts` (`resolveSolidRefFramework`) routes through the same resolver. No new labels, no cache. `handle.ts` interfaces extracted to `handle-types.ts` to stay under 100 lines.
+
 ## [0.1.70] - 12-07-2026
 
 ### Added
