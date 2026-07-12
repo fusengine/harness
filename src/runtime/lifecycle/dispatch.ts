@@ -31,7 +31,7 @@ export interface LifecycleInput {
 /** SessionStart handler keyed on plugin scope. */
 function sessionStart(input: LifecycleInput): string {
   if (input.scope === "solid") return solidDetectStart();
-  if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd);
+  if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event);
   if (input.scope === "carto") return cartoSessionStart(input.cwd, input.now);
   if (input.scope === "lessons") return dispatchLessons("SessionStart", input.payload, input.cwd, input.now);
   const core = sessionStartCore(input.cwd, undefined, input.now);
@@ -52,9 +52,9 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "SessionStart":
       return sessionStart(input);
     case "UserPromptSubmit":
-      return input.scope === "rules" ? injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd) : null;
+      return input.scope === "rules" ? injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event) : null;
     case "SubagentStart":
-      if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd);
+      if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event);
       if (input.scope === "aipilot") return "";
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now);
       return subagentCacheContext(input.payload.session_id);

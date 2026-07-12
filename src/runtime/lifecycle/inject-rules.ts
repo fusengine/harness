@@ -23,14 +23,16 @@ export function readRules(rulesDir: string): string {
 }
 
 /**
- * Build the rules injection for claude-rules (SessionStart + UserPromptSubmit):
- * read `<pluginRoot>/rules/*.md` and emit as `additionalContext`, or "" when no
- * rules. Ports `claude-rules/scripts/inject-rules.py` (which always tags the
- * output `hookEventName: "SessionStart"`, even on UserPromptSubmit).
+ * Build the rules injection for claude-rules (SessionStart, UserPromptSubmit,
+ * SubagentStart): read `<pluginRoot>/rules/*.md` and emit as `additionalContext`,
+ * or "" when no rules. Tags the output with the *actual* `hookEventName` — the
+ * spec requires it to match the firing event (a hardcoded "SessionStart" is
+ * non-conforming and may be dropped on UserPromptSubmit/SubagentStart).
  * @param pluginRoot - `CLAUDE_PLUGIN_ROOT` of the claude-rules plugin.
+ * @param event - The firing hook event name (e.g. "SessionStart").
  * @returns The native hook stdout (possibly empty).
  */
-export function injectRules(pluginRoot: string): string {
+export function injectRules(pluginRoot: string, event: string): string {
   const content = readRules(join(pluginRoot, "rules"));
-  return content ? contextResponse("SessionStart", content) : "";
+  return content ? contextResponse(event, content) : "";
 }
