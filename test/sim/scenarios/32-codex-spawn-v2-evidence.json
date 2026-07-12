@@ -41,7 +41,7 @@
     },
     {
       "scope": "core",
-      "doc": "The SAME Write (step 1's identical payload) now clears freshnessGate -- both required agents are fresh in track-sc32.json via the two spawn_agent credits above -- and hits the NEXT gate, Check-1 doc consultation ('APEX: react documentation required'). The block moving from explore->documentation is the file-level proof the spawn_agent credit reached the SAME store agentsFreshInTrack reads.",
+      "doc": "The SAME Write (step 1's identical payload) now clears freshnessGate -- both required agents are fresh in track-sc32.json via the two spawn_agent credits above -- and hits the NEXT gate, Check-1 doc consultation ('APEX: generic documentation required'). The block moving from explore->documentation is the file-level proof the spawn_agent credit reached the SAME store agentsFreshInTrack reads.",
       "event": {
         "hook_event_name": "PreToolUse",
         "session_id": "sc32",
