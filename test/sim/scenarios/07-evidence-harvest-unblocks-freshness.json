@@ -5,7 +5,7 @@
   "steps": [
     {
       "scope": "core",
-      "doc": "Fresh session, no evidence → freshnessGate blocks (apex-gates.ts:68-77 \"APEX: explore + research required\"). react .ts (detect-framework.ts:6) with plain content reaches apexScopedGate (proven by test/handle.test.ts:34).",
+      "doc": "Fresh session, no evidence → freshnessGate blocks (apex-gates.ts:68-77 \"APEX: explore + research required\"). A plain .ts (detect-framework.ts: no react import/hook/JSX content signal, and $TMP has no react manifest → generic) reaches apexScopedGate (proven by test/handle.test.ts:34).",
       "event": {
         "hook_event_name": "PreToolUse",
         "session_id": "sc07",
@@ -27,7 +27,7 @@
     },
     {
       "scope": "core",
-      "doc": "The SAME Write now clears freshnessGate (harvested evidence) and hits Check-1 doc consultation → \"APEX: react documentation required\" (title contains 'documentation'). This Write repeats step 1's identical payload, so the anti-loop also prefixes [REPEAT] — harmless, the title substring 'documentation' still holds (deny-loop.ts:70 keeps the title).",
+      "doc": "The SAME Write now clears freshnessGate (harvested evidence) and hits Check-1 doc consultation → \"APEX: generic documentation required\" (title contains 'documentation'). This Write repeats step 1's identical payload, so the anti-loop also prefixes [REPEAT] — harmless, the title substring 'documentation' still holds (deny-loop.ts:70 keeps the title).",
       "event": {
         "hook_event_name": "PreToolUse",
         "session_id": "sc07",

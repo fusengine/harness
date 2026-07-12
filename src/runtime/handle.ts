@@ -14,29 +14,12 @@ import { asyncScopeStdout } from "./handle-scope-async";
 import { resyncCodexAgents } from "./lifecycle/codex-resync/resync";
 import { resetFragmentRegistry } from "./fragment-registry";
 import { attachBudgetRecap } from "./inject-budget-recap";
-import type { PluginScope } from "./lifecycle";
+import type { HandleOptions, HandleOutcome } from "./handle-types";
+export type { HandleOptions, HandleOutcome } from "./handle-types";
 
 /** Raw Claude hook event name from a payload (empty when absent). */
 function rawEventName(payload: Record<string, unknown>): string {
   return typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
-}
-
-/** Options for {@link handleHook} (caller supplies the clock + project root). */
-export interface HandleOptions {
-  now: number;
-  cwd: string;
-  /** Directory of SOLID reference `.md` files for `solidReadGate` (else inert). */
-  refsDir?: string;
-  /** APEX freshness window in ms (from `FUSE_ENFORCE_TTL_SEC`). */
-  windowMs?: number;
-  /** Which plugin's hooks.json invoked the harness (selects lifecycle behavior). */
-  scope?: PluginScope;
-}
-
-/** What the hook bin should print + exit with. */
-export interface HandleOutcome {
-  stdout: string;
-  exit: number;
 }
 
 /**
@@ -54,7 +37,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const layout = projectLayout(opts.cwd);
   const file = trackFile(event.sessionId, defaultStateDir(opts.cwd));
   const mcpDir = layout.cacheDir;
-  const framework = detectFramework(event.filePath ?? "", event.content ?? "");
+  const framework = detectFramework(event.filePath ?? "", event.content ?? "", opts.cwd);
 
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
   // claude-code + codex only: verified against openai/codex's OWN generated hook schemas

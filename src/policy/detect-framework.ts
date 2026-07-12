@@ -1,21 +1,68 @@
-/**
- * Detect the framework from a file path extension + content patterns.
- * Aligned with the fusengine require-solid-read detection (distinct from
- * {@link detectProjectType}, which scans config files on disk).
- */
-export function detectFramework(filePath: string, content: string): string {
-  if (/\.(tsx?|jsx?|vue|svelte)$/.test(filePath) || /from ['"]react|useState|className=/.test(content)) {
-    if (/(page|layout|loading|error|route|middleware)\.(ts|tsx)$/.test(filePath) || /use client|use server|NextRequest|NextResponse|from ['"]next|getServerSideProps|getStaticProps/.test(content)) {
-      return "nextjs";
-    }
-    return "react";
+import { dirname, resolve } from "node:path";
+import { nearestManifestDir, projectCaps, type Cap } from "./nearest-manifest";
+
+/** File-derived signal: a definitive non-JS framework, or a JS-family hint. */
+interface FileSignal {
+  /** Definitive framework from extension/content (non-JS) — wins outright. */
+  definitive?: string;
+  /** JS-family hint needing project caps to confirm (react/nextjs). */
+  jsHint?: "react" | "nextjs";
+}
+
+/** react markers in a plain .ts/.js file (avoids TS-generic false positives). */
+const REACT_CONTENT = /from ['"]react['"]|\buse(State|Effect|Context|Ref|Memo|Callback|Reducer|LayoutEffect)\b|className=/;
+/** next.js markers in content. */
+const NEXT_CONTENT = /use client|use server|NextRequest|NextResponse|from ['"]next|getServerSideProps|getStaticProps/;
+/** next.js route-file conventions. */
+const NEXT_ROUTE = /(page|layout|loading|error|route|middleware)\.(ts|tsx|js|jsx)$/;
+
+/** Derive the raw signal an extension + content carry (no filesystem access). */
+function fileSignal(filePath: string, content: string): FileSignal {
+  if (/\.swift$/.test(filePath)) return { definitive: "swift" };
+  if (/\.php$/.test(filePath)) return { definitive: "laravel" };
+  if (/\.java$/.test(filePath)) return { definitive: "java" };
+  if (/\.go$/.test(filePath)) return { definitive: "go" };
+  if (/\.rb$/.test(filePath)) return { definitive: "ruby" };
+  if (/\.rs$/.test(filePath)) return { definitive: "rust" };
+  if (/\.css$/.test(filePath) || /@tailwind|@apply/.test(content)) return { definitive: "tailwind" };
+  const isNext = NEXT_ROUTE.test(filePath) || NEXT_CONTENT.test(content);
+  if (/\.(tsx|jsx)$/.test(filePath)) return { jsHint: isNext ? "nextjs" : "react" };
+  if (/\.(ts|js)$/.test(filePath)) {
+    if (isNext) return { jsHint: "nextjs" };
+    if (REACT_CONTENT.test(content)) return { jsHint: "react" };
   }
-  if (/\.swift$/.test(filePath)) return "swift";
-  if (/\.php$/.test(filePath)) return "laravel";
-  if (/\.java$/.test(filePath)) return "java";
-  if (/\.go$/.test(filePath)) return "go";
-  if (/\.rb$/.test(filePath)) return "ruby";
-  if (/\.rs$/.test(filePath)) return "rust";
-  if (/\.css$/.test(filePath) || /@tailwind|@apply/.test(content)) return "tailwind";
-  return "generic";
+  return {};
+}
+
+/** Reconcile the JS signal against the project's REAL capabilities. */
+function reconcile(caps: Set<Cap>, hint: "react" | "nextjs"): string {
+  const nextCap = caps.has("nextjs");
+  const reactCap = caps.has("react") || nextCap; // next always ships react at runtime
+  if (hint === "nextjs") return nextCap ? "nextjs" : reactCap ? "react" : "generic";
+  return reactCap ? "react" : "generic";
+}
+
+/**
+ * Detect a file's framework as the intersection of the REAL project (its nearest
+ * manifest's capabilities) and the file's own extension/content signal. A
+ * backend `.ts` in a react project is `generic` (no react signal) — fixing the
+ * old extension-only default that flagged every `.ts` as react. Fail-open: any
+ * error yields `"generic"`, never throws. Return values stay within the existing
+ * union ("react" | "nextjs" | "laravel" | "swift" | "tailwind" | "java" | "go" |
+ * "ruby" | "rust" | "generic") — no new labels.
+ * @param filePath - Path of the file being written/edited.
+ * @param content - Its (incoming) content, for JS content signals.
+ * @param cwd - Root to resolve a relative `filePath` against (default cwd).
+ * @returns A framework label from the existing union.
+ */
+export function detectFramework(filePath: string, content: string, cwd: string = process.cwd()): string {
+  try {
+    const sig = fileSignal(filePath, content);
+    if (sig.definitive) return sig.definitive;
+    if (!sig.jsHint) return "generic";
+    const caps = projectCaps(nearestManifestDir(dirname(resolve(cwd, filePath))));
+    return reconcile(caps, sig.jsHint);
+  } catch {
+    return "generic";
+  }
 }

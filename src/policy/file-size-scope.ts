@@ -1,5 +1,4 @@
-import { dirname, join } from "node:path";
-import { existsSync } from "node:fs";
+import { detectFramework } from "./detect-framework";
 
 /**
  * File-size gate scope — parity `enforce-file-size.py` CODE_EXT (both pre- and
@@ -17,26 +16,17 @@ export function isFileSizeScoped(filePath: string): boolean {
 }
 
 /**
- * Resolve the SOLID_REF framework key for a file — parity with Python
- * `enforce-file-size.py::get_solid_ref()` (NOT `detectFramework()`, which backs
- * the unrelated require-solid-read pipeline and keys off filename/content
- * heuristics that script never checks). Matches Python exactly:
- * - ts/tsx/js/jsx: "nextjs" only when `next.config.js`/`next.config.ts` sits in
- *   the SAME directory as the file (Python's literal `os.path.dirname(fp)`
- *   check, not a project-root search) — else "react".
- * - vue/svelte/py/go/rs/java/cpp/c/rb/kt/dart/astro: "generic" (Python's
- *   `SOLID_MAP.get(ext, 'generic/')` fallback — none of these are map keys).
- * - php: "laravel"; swift: "swift".
+ * Resolve the SOLID_REF framework key for a file — now project-real via
+ * {@link detectFramework} (nearest-manifest caps ∩ file signal), NOT the old
+ * extension-only default that mislabeled every `.ts` as react (the "twin bug" of
+ * the require-solid-read pipeline; it only escaped when `next.config` sat in the
+ * SAME dir). A backend `.ts` in a react project — or any `.ts` in this generic
+ * Bun repo — now resolves to "generic". Content is unavailable at this call site
+ * (evaluate.ts:59 passes only the path), so `.tsx`/`.jsx` still resolve via caps
+ * while `.ts`/`.js` lacking a content signal fall to "generic". Return values
+ * stay in the existing union; fail-open to "generic".
  * @param filePath - Absolute path of the file being written/edited.
  */
 export function resolveSolidRefFramework(filePath: string): string {
-  const ext = filePath.includes(".") ? filePath.slice(filePath.lastIndexOf(".") + 1) : "";
-  if (ext === "ts" || ext === "tsx" || ext === "js" || ext === "jsx") {
-    const dir = dirname(filePath);
-    const hasNextConfig = ["next.config.js", "next.config.ts"].some((c) => existsSync(join(dir, c)));
-    return hasNextConfig ? "nextjs" : "react";
-  }
-  if (ext === "php") return "laravel";
-  if (ext === "swift") return "swift";
-  return "generic";
+  return detectFramework(filePath, "");
 }
