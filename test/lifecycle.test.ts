@@ -39,10 +39,10 @@ test("readRules + injectRules: concatenates sorted *.md as additionalContext", (
   writeFileSync(join(rules, "01-a.md"), "ALPHA");
   writeFileSync(join(rules, "00-b.md"), "BETA");
   expect(readRules(rules)).toBe("BETA\n\nALPHA");
-  const parsed = JSON.parse(injectRules(pluginRoot));
+  const parsed = JSON.parse(injectRules(pluginRoot, "SessionStart"));
   expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
   expect(parsed.hookSpecificOutput.additionalContext).toBe("BETA\n\nALPHA");
-  expect(injectRules(root())).toBe("");
+  expect(injectRules(root(), "SessionStart")).toBe("");
 });
 
 test("dispatchLifecycle: SubagentStart scope 'rules' emits the rules bundle, scope 'core' keeps the cache fallback", () => {
