@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.72] - 12-07-2026
+
+### Fixed
+
+- **Real `hookEventName` in rules injection** — `injectRules()` hardcoded `contextResponse("SessionStart", …)` (a verbatim port of the Python original), so the `claude-rules` scope emitted `hookEventName:"SessionStart"` on `UserPromptSubmit` and `SubagentStart` too. Per the Claude Code hooks spec the field must match the actual event, and a mismatched value risks being dropped on those non-SessionStart events (the ones that carry rules persistence per prompt / per sub-agent). `injectRules(pluginRoot, event)` now emits `contextResponse(event, …)`, and `dispatch.ts` passes `input.event` at its three call sites. Research confirmed the hardcode is not load-bearing (persistence is decided by *when* the hook fires, not the label), so this is spec conformance with no behavioral regression; `SessionStart` output is unchanged.
+
 ## [0.1.71] - 12-07-2026
 
 ### Fixed
