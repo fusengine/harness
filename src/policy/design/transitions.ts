@@ -43,7 +43,7 @@ export function recordValidDesignSystem(state: DesignState): DesignState {
  */
 export function recordRead(state: DesignState, filePath: string): DesignState {
   const next: DesignState = { ...state };
-  if (filePath.includes("identity-system")) {
+  if (filePath.includes("design-system/SKILL.md")) {
     next.currentPhase = Math.max(state.currentPhase, 1);
     next.phasesCompleted = [...new Set([...state.phasesCompleted, "identity"])];
   }

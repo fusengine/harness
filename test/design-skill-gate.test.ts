@@ -9,7 +9,7 @@ import { emptyTrack, recordDoc, recordRefRead } from "../src/tracking/session-st
 import { trackFile } from "../src/runtime/paths";
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), "fh-dsg-"));
-const SKILL = "~/.claude/plugins/marketplaces/x/plugins/react-expert/skills/solid-react/SKILL.md";
+const SKILL = "~/.claude/plugins/marketplaces/x/plugins/design-expert/skills/design-system/SKILL.md";
 const READY: DesignEvidence = { refsRead: [SKILL], docConsulted: true };
 
 test("isUiWrite: tsx/scss in UI path or with Tailwind, not .ts/.html/.css", () => {
@@ -25,7 +25,7 @@ test("isUiWrite: tsx/scss in UI path or with Tailwind, not .ts/.html/.css", () =
 
 test("designSkillRead: matches design skill ref paths", () => {
   expect(designSkillRead([SKILL])).toBe(true);
-  expect(designSkillRead(["skills/3-generating-components/SKILL.md"])).toBe(true);
+  expect(designSkillRead(["skills/design-web/SKILL.md"])).toBe(true);
   expect(designSkillRead(["skills/laravel-eloquent/SKILL.md"])).toBe(false);
   expect(designSkillRead([])).toBe(false);
 });

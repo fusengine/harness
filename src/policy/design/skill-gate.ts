@@ -21,7 +21,7 @@ const UI_PATH_RE = /(components|ui|styles|page|layout|content|view|feature|secti
 /** Tailwind utility usage in JSX `className` (ports the Python `has_jsx_tailwind`). */
 const TAILWIND_RE = /className\s*=.*(?:flex|grid|p-|m-|bg-|text-|rounded|shadow|border|gap-|w-|h-)/;
 /** A read reference path that counts as "a design skill was consulted". */
-const DESIGN_SKILL_RE = /skills\/([0-9]-)?(designing-systems|generating-components|solid-react|solid-nextjs|design|impeccable|frontend-design)/i;
+const DESIGN_SKILL_RE = /skills\/(design-method|design-system|design-web|design-webapp|design-motion|design-review|ux-copy|design-ios|design-android)/i;
 
 /** Session evidence the gate consumes: read references + whether docs were consulted. */
 export interface DesignEvidence {
@@ -58,7 +58,7 @@ export function uiDesignSkillGate(tool: string, filePath: string, content: strin
   if (!designSkillRead(ev.refsRead)) {
     return block(
       "BLOCKED: design skill not consulted before writing UI. Read a design SKILL.md "
-      + "(solid-react, generating-components, or designing-systems), then retry.",
+      + "(design-system, design-web, or design-motion), then retry.",
       "Read a design skill reference, then retry",
     );
   }
