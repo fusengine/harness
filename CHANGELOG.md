@@ -2,6 +2,13 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.73] - 13-07-2026
+
+### Fixed
+
+- **Design pipeline: purge dead references to renamed skills** — the design gates still pointed at old numbered skill folders (`0-identity-system`, `1-designing-systems`) that were renamed to `design-system` / `design-web`. `transitions.recordRead` matched the substring `identity-system`, which no live skill carries anymore, so `currentPhase` never advanced past 0 and `browserNavigateGate` **denied every `browser_navigate` / `browser_screenshot` call forever**. The phase detector now matches `design-system/SKILL.md` (tightened to avoid over-matching the generated `design-system.md` output file), and `skill-triggers.ts` `readFragment`s/labels + `skill-gate.ts` `DESIGN_SKILL_RE`/message are realigned to the 9 real skill names.
+- **Hermetic file-size tests** — 15 tests hardcoded ~150-line fixtures assuming the default 100-line ceiling, so they failed whenever `FUSE_SOLID_MAX_LINES` was overridden (e.g. `=200` from `~/.claude/.env`) and leaked into `bun test`. Fixtures now derive their size from the same exported `resolveMaxLines()` resolver the gate uses (`resolveMaxLines() + 50`); the suite is green for `FUSE_SOLID_MAX_LINES` = 100 / 200 / 300 / unset. No production code changed.
+
 ## [0.1.72] - 12-07-2026
 
 ### Fixed
