@@ -2,8 +2,11 @@ import { test, expect } from "bun:test";
 import { beforeShellExecution, afterFileEdit } from "../src/adapters/cursor";
 import { preToolUse } from "../src/adapters/cline";
 import { beforeTool } from "../src/adapters/gemini";
+import { resolveMaxLines } from "../src/config/limits";
 
-const oversized = "x\n".repeat(150);
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+// fixture stays oversized regardless of the ambient env override.
+const oversized = "x\n".repeat(resolveMaxLines() + 50);
 
 test("cursor: shell deny on git --force, allow safe; edit is advisory (user_message only)", () => {
   expect(beforeShellExecution({ command: "git push --force" }).permission).toBe("deny");

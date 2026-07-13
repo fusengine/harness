@@ -13,9 +13,13 @@ import { recordDeny } from "../src/runtime/deny-loop-store";
 import { recordOneShot } from "../src/tracking/one-shot";
 import { gate, type GateInput } from "../src/runtime/gate";
 import type { Prompt } from "../src/prompt/types";
+import { resolveMaxLines } from "../src/config/limits";
 
 const dir = (): string => mkdtempSync(join(tmpdir(), "fh-burst-"));
 const block: Prompt = { kind: "block", title: "SOLID file-size limit", reason: "too big" };
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+// fixture stays oversized regardless of the ambient env override.
+const L = resolveMaxLines();
 
 test("recordDeny: same hash+session within the burst window counts ONCE; a spaced retry counts again", () => {
   const o = { dir: dir(), windowMs: 120000, sessionId: "s1" };
@@ -37,7 +41,9 @@ test("recordDeny: two sessions, same hash, same instant → two independent coun
 
 test("gate: a 2nd identical deny WITHIN the burst window is NOT a false [REPEAT] (session-scoped)", async () => {
   const f = join(dir(), "t.json");
-  const g = (now: number): GateInput => ({ sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts", content: "x\n".repeat(150), now, trackFile: f, windowMs: 10000 });
+  // Oversized content sized off the resolved SOLID ceiling (`L`), not a bare
+  // literal, so the fixture stays over the limit under any `FUSE_SOLID_MAX_LINES`.
+  const g = (now: number): GateInput => ({ sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts", content: "x\n".repeat(L + 50), now, trackFile: f, windowMs: 10000 });
   expect((await gate(g(5000)))?.title).toBe("SOLID file-size limit");
   // A sibling hook for the SAME event, <2s later → folded into #1, no [REPEAT].
   expect((await gate(g(5300)))?.title).toBe("SOLID file-size limit");

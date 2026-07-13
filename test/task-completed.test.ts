@@ -8,20 +8,25 @@ import { trackFile } from "../src/runtime/paths";
 import { saveTrack } from "../src/tracking/store";
 import { recordReceipt } from "../src/tracking/receipts";
 import { emptyTrack } from "../src/tracking/session-state";
+import { resolveMaxLines } from "../src/config/limits";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-task-"));
 const T = 1_000_000_000_000;
+// Fixture size tracks the same resolver the gate uses (`FUSE_SOLID_MAX_LINES` ?? default),
+// so the file stays oversized regardless of the ambient env override.
+const L = resolveMaxLines();
 
 test("validateTaskSolid: flags a modified code file over the line ceiling", () => {
   const home = root();
   const big = join(root(), "huge.ts");
-  writeFileSync(big, "// line\n".repeat(150));
+  const n = L + 50;
+  writeFileSync(big, "// line\n".repeat(n));
   saveSessionState("s1", { changes: { modifiedFiles: [big] } }, home);
   const out = validateTaskSolid({ session_id: "s1", task_id: "t-1", task_subject: "Port" }, home);
   const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
   expect(ctx).toContain("SOLID VIOLATION");
-  expect(ctx).toContain("exceed 100 lines");
-  expect(ctx).toContain("huge.ts: 150 lines (max 100)");
+  expect(ctx).toContain(`exceed ${L} lines`);
+  expect(ctx).toContain(`huge.ts: ${n} lines (max ${L})`);
 });
 
 test("validateTaskSolid: compliant files but NO receipt → refusal (continue:false + message)", () => {

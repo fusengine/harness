@@ -7,6 +7,7 @@ import { recordActivity } from "../src/runtime/record";
 import { gate, type GateInput } from "../src/runtime/gate";
 import { loadTrack, saveTrack } from "../src/tracking/store";
 import { recordBrainstormRequired } from "../src/tracking/session-state";
+import { resolveMaxLines } from "../src/config/limits";
 
 const fresh = (): string => join(mkdtempSync(join(tmpdir(), "fh-rt-")), "t.json");
 
@@ -33,7 +34,9 @@ test("recordActivity: a ref read forwards its ts into refsReadAt (SOLID-read TTL
 });
 
 test("gate: stateless deny short-circuits (oversized file)", async () => {
-  const p = await gate({ sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts", content: "x\n".repeat(150), now: 5000, trackFile: fresh() });
+  // Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+  // fixture stays oversized regardless of the ambient env override.
+  const p = await gate({ sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts", content: "x\n".repeat(resolveMaxLines() + 50), now: 5000, trackFile: fresh() });
   expect(p?.title).toContain("file-size");
 });
 

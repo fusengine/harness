@@ -6,6 +6,7 @@ import { denyHash, denyLoopCheck, enrichRepeatDeny } from "../src/policy/deny-lo
 import { recordDeny, withDenyLoop } from "../src/runtime/deny-loop-store";
 import { gate, type GateInput } from "../src/runtime/gate";
 import type { Prompt } from "../src/prompt/types";
+import { resolveMaxLines } from "../src/config/limits";
 
 const dir = (): string => mkdtempSync(join(tmpdir(), "fh-deny-"));
 const block: Prompt = { kind: "block", title: "SOLID file-size limit", reason: "too big", actions: ["Split"] };
@@ -62,9 +63,11 @@ test("withDenyLoop: a repeated block is enriched; the first is not", () => {
 // Integration through gate(): the sidecar lands in dirname(trackFile), so reusing
 // the same track file across calls shares the deny map. (Burst dedup coverage
 // lives in burst-dedup.test.ts.)
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+// fixture stays oversized regardless of the ambient env override.
 const oversized = (trackFile: string): GateInput => ({
   sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts",
-  content: "x\n".repeat(150), now: 5000, trackFile, windowMs: 10000,
+  content: "x\n".repeat(resolveMaxLines() + 50), now: 5000, trackFile, windowMs: 10000,
 });
 
 test("gate: 1st deny is normal; an identical retry becomes [REPEAT] with a research action", async () => {
@@ -81,7 +84,8 @@ test("gate: 1st deny is normal; an identical retry becomes [REPEAT] with a resea
 test("gate: a modified input (different content) is a fresh deny, not a repeat", async () => {
   const f = join(dir(), "t.json");
   await gate(oversized(f));
-  const changed = await gate({ ...oversized(f), content: "y\n".repeat(150), now: 6000 });
+  // Different content, still oversized (tracks the same resolver as `oversized`).
+  const changed = await gate({ ...oversized(f), content: "y\n".repeat(resolveMaxLines() + 50), now: 6000 });
   expect(changed?.title).toBe("SOLID file-size limit");
 });
 

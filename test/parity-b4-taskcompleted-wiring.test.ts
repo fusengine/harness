@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { dispatchLifecycle } from "../src/runtime/lifecycle";
 import { saveSessionState } from "../src/runtime/home-state";
 import { validateTaskSolid } from "../src/runtime/lifecycle/task-completed";
+import { resolveMaxLines } from "../src/config/limits";
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), "fh-b4-taskcompleted-"));
 
@@ -30,7 +31,9 @@ test("validateTaskSolid: oversized tracked file yields a TaskCompleted additiona
   // hookSpecificOutput context (adapter-rendered, not hardcoded in the gate).
   const home = tmp();
   const big = join(tmp(), "huge.ts");
-  writeFileSync(big, "// line\n".repeat(120));
+  // Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+  // fixture stays oversized regardless of the ambient env override.
+  writeFileSync(big, "// line\n".repeat(resolveMaxLines() + 50));
   saveSessionState("b4s", { changes: { modifiedFiles: [big] } }, home);
   const out = validateTaskSolid({ session_id: "b4s", task_id: "t-b4", task_subject: "wire" }, home);
   const parsed = JSON.parse(out) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
