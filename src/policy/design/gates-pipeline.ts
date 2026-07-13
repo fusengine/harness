@@ -16,7 +16,7 @@ export function designSystemWriteGate(filePath: string, state: DesignState): Pro
   if (state.currentPhase < 2) {
     return deny(
       `BLOCKED: Cannot write design-system.md at phase ${state.currentPhase}. ` +
-        "RECOVERY: 1) Read identity templates from skills/0-identity-system/ " +
+        "RECOVERY: 1) Read identity templates from skills/design-system/ " +
         "2) Read design-inspiration.md 3) Browse and screenshot sites 4) Then write design-system.md",
     );
   }
@@ -53,11 +53,11 @@ export function geminiCreateGate(state: DesignState): Prompt | null {
 /** Gate fuse-browser navigate: phase >= 1, inspiration read, URL in the catalog. */
 export function browserNavigateGate(state: DesignState, url: string): Prompt | null {
   if (state.currentPhase < 1) {
-    return deny(`BLOCKED: Phase 0 not done. READ: ${SKILLS}/0-identity-system/SKILL.md first.`);
+    return deny(`BLOCKED: Phase 0 not done. READ: ${SKILLS}/design-system/SKILL.md first.`);
   }
   if (!state.inspirationRead) {
     return deny(
-      `BLOCKED: Read inspiration catalog first. READ: ${SKILLS}/1-designing-systems/references/design-inspiration.md + design-inspiration-urls.md`,
+      `BLOCKED: Read inspiration catalog first. READ: ${SKILLS}/design-web/references/design-inspiration.md + design-inspiration-urls.md`,
     );
   }
   if (url && !KNOWN_DOMAINS.some((d) => url.includes(d))) {

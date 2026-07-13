@@ -7,10 +7,14 @@ import { parseApplyPatch } from "../src/adapters/codex/apply-patch";
 import { guard, toCodexResponse } from "../src/adapters/codex";
 import { normalizeEvent } from "../src/runtime/normalize";
 import { handleHook } from "../src/runtime/handle";
+import { resolveMaxLines } from "../src/config/limits";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-ap-"));
 const wrap = (body: string): string => `*** Begin Patch\n${body}*** End Patch\n`;
 const addFile = (path: string, n: number): string => `*** Add File: ${path}\n${"+x\n".repeat(n)}`;
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so the
+// "huge" fixtures below stay oversized regardless of the ambient env override.
+const OVERSIZED_N = resolveMaxLines() + 50;
 const hook = (command: string) => ({ hook_event_name: "PreToolUse", tool_name: "apply_patch", session_id: "s1", tool_input: { command } });
 const deny = (stdout: string): string | undefined => (JSON.parse(stdout) as { hookSpecificOutput?: { permissionDecision?: string } }).hookSpecificOutput?.permissionDecision;
 
@@ -39,7 +43,7 @@ test("normalizeEvent: apply_patch fans into event.files; no filePath leaks to th
 });
 
 test("NEGATIVE: apply_patch adding a 150-line file triggers the SOLID deny (was 0% enforcement)", async () => {
-  const out = await handleHook("codex", hook(wrap(addFile("huge.ts", 150))), { now: 1000, cwd: root() });
+  const out = await handleHook("codex", hook(wrap(addFile("huge.ts", OVERSIZED_N))), { now: 1000, cwd: root() });
   expect(deny(out.stdout)).toBe("deny");
   expect(out.stdout).toContain("max");
   // The patchPrompt deny path (handle-pre.ts's applyPatchGate branch) now also
@@ -50,12 +54,12 @@ test("NEGATIVE: apply_patch adding a 150-line file triggers the SOLID deny (was 
 test("apply_patch: small add allowed; one oversized hunk among many blocks the whole patch (OR)", async () => {
   const ok = await handleHook("codex", hook(wrap(addFile("small.ts", 3))), { now: 1000, cwd: root() });
   expect(ok.stdout).not.toContain('"deny"');
-  const mixed = await handleHook("codex", hook(wrap(`${addFile("small.ts", 3)}${addFile("huge.ts", 150)}`)), { now: 1000, cwd: root() });
+  const mixed = await handleHook("codex", hook(wrap(`${addFile("small.ts", 3)}${addFile("huge.ts", OVERSIZED_N)}`)), { now: 1000, cwd: root() });
   expect(deny(mixed.stdout)).toBe("deny");
 });
 
 test("codex guard: 150-line apply_patch add → deny; ask (git push) → explicit deny with honest prefix", () => {
-  expect(deny(guard(hook(wrap(addFile("huge.ts", 150))) as never)!)).toBe("deny");
+  expect(deny(guard(hook(wrap(addFile("huge.ts", OVERSIZED_N))) as never)!)).toBe("deny");
   const askDeny = guard({ tool_name: "Bash", tool_input: { command: "git push origin main" } });
   expect(askDeny).not.toBeNull();
   const reason = (JSON.parse(askDeny!) as { hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string } }).hookSpecificOutput;

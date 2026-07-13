@@ -45,7 +45,7 @@ test("designPassNotice: navigate pass carries check-inspiration-read + pipeline-
 test("designPassNotice: check-design-skill pass fires for ANY agent; inert outside design context otherwise", () => {
   const cache = tmp(); // no active design flag
   const ui = designPassNotice({ agentId: "", tool: "Write", filePath: "src/components/Button.tsx", content: 'className="flex p-2"', url: "", phase: "pre" }, cache);
-  expect(ui?.userMessage).toBe("check-design-skill: pass (domain: 3-generating-components)");
+  expect(ui?.userMessage).toBe("check-design-skill: pass (domain: design-web)");
   expect(designPassNotice({ agentId: "", tool: "Write", filePath: "a.ts", content: "x", url: "", phase: "pre" }, cache)).toBeNull();
 });
 

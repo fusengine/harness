@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { dryGate } from "../src/runtime/dry";
 import { frameworkSkillGate } from "../src/runtime/framework-skill-gate";
 import type { GateInput } from "../src/runtime/gate-input";
+// Single source of truth for the SOLID line ceiling (`FUSE_SOLID_MAX_LINES` ?? default) — reused by fixtures below.
+import { resolveMaxLines } from "../src/config/limits";
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), "fh-del-"));
 const SYMBOL = "aVeryUniqueLongSymbolName";
@@ -64,8 +66,11 @@ const base: GateInput = {
 };
 
 test("frameworkSkillGate: nextjs applies existingCodeLines full-file max, react does not", () => {
-  expect(frameworkSkillGate({ ...base, framework: "react" }, [], 150)).toBeNull();
-  const p = frameworkSkillGate({ ...base, framework: "nextjs" }, [], 150);
+  // Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+  // fixture stays oversized regardless of the ambient env override.
+  const oversizedLines = resolveMaxLines() + 50;
+  expect(frameworkSkillGate({ ...base, framework: "react" }, [], oversizedLines)).toBeNull();
+  const p = frameworkSkillGate({ ...base, framework: "nextjs" }, [], oversizedLines);
   expect(p?.kind).toBe("block");
   expect(p?.title).toBe("SOLID violation");
 });

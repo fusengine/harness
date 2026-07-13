@@ -7,6 +7,8 @@ import { oneShotSummary, recordOneShot } from "../src/tracking/one-shot";
 import { trackFile, defaultStateDir } from "../src/runtime/paths";
 import { gate, type GateInput } from "../src/runtime/gate";
 import type { Prompt } from "../src/prompt/types";
+// Single source of truth for the SOLID line ceiling (`FUSE_SOLID_MAX_LINES` ?? default).
+import { resolveMaxLines } from "../src/config/limits";
 
 const dir = (): string => mkdtempSync(join(tmpdir(), "fh-oneshot-"));
 const block: Prompt = { kind: "block", title: "SOLID file-size limit", reason: "too big" };
@@ -80,9 +82,11 @@ test("oneShotSummary: '' for a project with no state written yet", () => {
   expect(oneShotSummary(dir())).toBe("");
 });
 
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+// fixture stays oversized regardless of the ambient env override.
 const oversized = (f: string, now: number): GateInput => ({
   sessionId: "s1", framework: "generic", tool: "Write", filePath: "a.ts",
-  content: "x\n".repeat(150), now, trackFile: f, windowMs: 10000,
+  content: "x\n".repeat(resolveMaxLines() + 50), now, trackFile: f, windowMs: 10000,
 });
 
 test("gate cycle via oneShotSummary(cwd): deny->fix is found (regression) AND a clean edit is one-shot", async () => {

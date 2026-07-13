@@ -16,11 +16,17 @@ import { join } from "node:path";
 import { dispatchAipilot, aipilotPostToolUse } from "../src/runtime/lifecycle/aipilot/dispatch-aipilot";
 import { cacheDirFor } from "../src/runtime/lifecycle/aipilot/cache-base";
 import type { LessonEntry } from "../src/runtime/lifecycle/aipilot/types";
+import { resolveMaxLines } from "../src/config/limits";
 
-/** Write an oversized (>100 code lines) .ts file and return its path. */
+/**
+ * Write an oversized .ts file and return its path. Line count tracks the
+ * gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this stays over
+ * the ceiling regardless of the ambient env override.
+ */
 function bigTsFile(dir: string, name = "big.ts"): string {
   const path = join(dir, name);
-  writeFileSync(path, Array.from({ length: 110 }, (_, i) => `export const v${i} = ${i};`).join("\n"));
+  const n = resolveMaxLines() + 50;
+  writeFileSync(path, Array.from({ length: n }, (_, i) => `export const v${i} = ${i};`).join("\n"));
   return path;
 }
 

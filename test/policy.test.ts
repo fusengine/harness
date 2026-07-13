@@ -6,6 +6,7 @@ import { detectProjectType, isApexCommand, DEV_KEYWORDS } from "../src/policy/de
 import { countLines, evaluateFileSize } from "../src/policy/file-size";
 import { GIT_BLOCKED, GIT_ASK, PROJECT_INSTALL, matchPatterns } from "../src/policy/patterns";
 import { fileSizeGuard } from "../src/adapters/claude";
+import { resolveMaxLines } from "../src/config/limits";
 
 test("detectProjectType: generic then nextjs", () => {
   const dir = mkdtempSync(join(tmpdir(), "fh-proj-"));
@@ -42,7 +43,9 @@ test("git guard patterns", () => {
 test("claude fileSizeGuard: allows small, denies oversized code", () => {
   const small = fileSizeGuard({ hook_event_name: "PreToolUse", tool_input: { file_path: "a.ts", content: "x\ny" } });
   expect(small).toBeNull();
-  const big = "x\n".repeat(150);
+  // Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+  // fixture stays oversized regardless of the ambient env override.
+  const big = "x\n".repeat(resolveMaxLines() + 50);
   const denied = fileSizeGuard({ hook_event_name: "PreToolUse", tool_input: { file_path: "a.ts", content: big } });
   expect(denied).toContain("permissionDecision");
   expect(denied).toContain("deny");

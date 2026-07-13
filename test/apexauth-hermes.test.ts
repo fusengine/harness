@@ -5,8 +5,11 @@ import { join } from "node:path";
 import { HOME_DIR, envCandidates, loadDotenv } from "../src/config/dotenv";
 import { detectHarness, modeFor } from "../src/detect/harness";
 import { guard, toHermesResponse } from "../src/adapters/hermes";
+import { resolveMaxLines } from "../src/config/limits";
 
-const oversized = "x\n".repeat(150);
+// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
+// fixture stays oversized regardless of the ambient env override.
+const oversized = "x\n".repeat(resolveMaxLines() + 50);
 
 test("dotenv: hermes home dir is ~/.hermes (ROADMAP item)", () => {
   expect(HOME_DIR.hermes).toBe(".hermes");
