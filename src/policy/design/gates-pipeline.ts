@@ -60,7 +60,7 @@ export function browserNavigateGate(state: DesignState, url: string): Prompt | n
       `BLOCKED: Read inspiration catalog first. READ: ${SKILLS}/design-web/references/design-inspiration.md + design-inspiration-urls.md`,
     );
   }
-  if (url && !KNOWN_DOMAINS.some((d) => url.includes(d))) {
+  if (state.currentPhase === 1 && url && !KNOWN_DOMAINS.some((d) => url.includes(d))) {
     return deny(`BLOCKED: '${url}' not in catalog. Use URLs from design-inspiration-urls.md. Domains: ${KNOWN_DOMAINS.join(", ")}`);
   }
   return null;

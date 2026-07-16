@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
-import { tmpdir, homedir } from "node:os";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { promoteGlobalLessons } from "../src/runtime/lifecycle/aipilot/promote-global-lessons";
 import { dispatchAipilot } from "../src/runtime/lifecycle/aipilot/dispatch-aipilot";
@@ -37,21 +37,23 @@ test("promoteGlobalLessons: count < 3 writes nothing", async () => {
 });
 
 test("dispatchAipilot SubagentStart sniper: receives lessons 'known issues' block", async () => {
-  // `dispatchAipilot` threads the real `homedir()` (os.homedir ignores $HOME on
-  // macOS/Bun), so seed the lesson under the real cache for this unique project
-  // hash, then clean it up.
+  // `dispatchAipilot` now takes an injectable `home` (5th arg), so both the
+  // per-project local cache AND the machine-wide `_global` lessons cache are
+  // isolated under a throwaway home — no bleed from this machine's real
+  // accumulated lessons (which would otherwise crowd out this test's single
+  // low-count entry once merged + sorted by count).
   const project = mkdtempSync(join(tmpdir(), "fh-snipproj-"));
+  const home = mkdtempSync(join(tmpdir(), "fh-sniphome-"));
   const prevProjDir = process.env.CLAUDE_PROJECT_DIR;
   process.env.CLAUDE_PROJECT_DIR = project;
-  const cacheDir = cacheDirFor("lessons", project, homedir());
+  const cacheDir = cacheDirFor("lessons", project, home);
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(join(cacheDir, "a.json"), JSON.stringify(lessonFile("a known sniper issue")));
   try {
-    const out = await dispatchAipilot("SubagentStart", { agent_type: "sniper" }, project, Date.now());
+    const out = await dispatchAipilot("SubagentStart", { agent_type: "sniper" }, project, Date.now(), home);
     expect(out).toContain("KNOWN PROJECT ISSUES");
     expect(out).toContain("a known sniper issue");
   } finally {
-    rmSync(cacheDir, { recursive: true, force: true });
     if (prevProjDir === undefined) delete process.env.CLAUDE_PROJECT_DIR;
     else process.env.CLAUDE_PROJECT_DIR = prevProjDir;
   }

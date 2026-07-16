@@ -2,6 +2,7 @@
  * ai-pilot scope dispatcher: routes Claude lifecycle events to the ported
  * cache/injection handlers by (event, agent_type matcher).
  */
+import { homedir } from "node:os";
 import { injectApexSubagentContext } from "./inject-apex";
 import { injectExploreCache } from "./inject-explore";
 import { injectDocCache } from "./inject-doc";
@@ -47,10 +48,10 @@ function transcriptOf(payload: Record<string, unknown>): string | undefined {
 }
 
 /** Type-specific SubagentStart cache for an agent, or "" when none applies. */
-async function typeSpecificCache(agent: string, cwd: string, now: number): Promise<string> {
-  if (agent.includes("explore-codebase")) return injectExploreCache(cwd, undefined, now);
-  if (agent.includes("research-expert")) return injectDocCache(cwd, undefined, now);
-  if (agent.includes("sniper")) return injectTestCache(cwd, undefined, now);
+async function typeSpecificCache(agent: string, cwd: string, now: number, home: string): Promise<string> {
+  if (agent.includes("explore-codebase")) return injectExploreCache(cwd, home, now);
+  if (agent.includes("research-expert")) return injectDocCache(cwd, home, now);
+  if (agent.includes("sniper")) return injectTestCache(cwd, home, now);
   return "";
 }
 
@@ -59,22 +60,22 @@ async function typeSpecificCache(agent: string, cwd: string, now: number): Promi
  * entries (APEX context + lessons) fire for EVERY sub-agent, then the type-specific
  * cache is concatenated on top — sniper too, hence no early return.
  */
-async function onSubagentStart(payload: Record<string, unknown>, cwd: string, now: number): Promise<string> {
+async function onSubagentStart(payload: Record<string, unknown>, cwd: string, now: number, home: string): Promise<string> {
   const agent = agentTypeOf(payload);
-  const apex = await injectApexSubagentContext(cwd);
-  const lessons = await injectLessonsCache(cwd, undefined, now);
-  const typeSpecific = await typeSpecificCache(agent, cwd, now);
+  const apex = await injectApexSubagentContext(cwd, home);
+  const lessons = await injectLessonsCache(cwd, home, now);
+  const typeSpecific = await typeSpecificCache(agent, cwd, now, home);
   return combineContext(apex, lessons, typeSpecific);
 }
 
 /** SubagentStop routing: transcript-driven cache writers, then the universal SOLID check. */
-async function onSubagentStop(payload: Record<string, unknown>, cwd: string): Promise<string> {
+async function onSubagentStop(payload: Record<string, unknown>, cwd: string, home: string): Promise<string> {
   const agent = agentTypeOf(payload);
   const transcript = transcriptOf(payload);
-  if (agent.includes("research-expert")) await cacheDocFromTranscript(transcript, cwd);
+  if (agent.includes("research-expert")) await cacheDocFromTranscript(transcript, cwd, home);
   if (agent.includes("sniper")) {
-    await cacheSniperLessons(transcript, cwd);
-    await cacheTestResults(transcript, cwd);
+    await cacheSniperLessons(transcript, cwd, home);
+    await cacheTestResults(transcript, cwd, home);
   }
   return checkSolidFromTranscript(transcript);
 }
@@ -82,13 +83,14 @@ async function onSubagentStop(payload: Record<string, unknown>, cwd: string): Pr
 /**
  * Dispatch an ai-pilot-scope lifecycle event. Returns the native stdout, or
  * `null` when unhandled (caller falls through to the default pipeline).
+ * @param home - Home dir for cache resolution (defaults to `~`; injectable for test isolation).
  */
-export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number): Promise<string | null> {
-  if (event === "SubagentStart") return onSubagentStart(payload, cwd, now);
-  if (event === "SubagentStop") return onSubagentStop(payload, cwd);
+export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number, home: string = homedir()): Promise<string | null> {
+  if (event === "SubagentStart") return onSubagentStart(payload, cwd, now, home);
+  if (event === "SubagentStop") return onSubagentStop(payload, cwd, home);
   // Stop too: Codex emits no SessionEnd, so its ai-pilot hooks.json wires Stop here as the sole analytics-flush trigger — reusing the SessionEnd handler verbatim (codex-plugins/docs/reference/hooks.md).
-  if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(undefined, now); return ""; }
-  if (event === "PreToolUse") return docCacheGate(payload, cwd, now);
+  if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(home, now); return ""; }
+  if (event === "PreToolUse") return docCacheGate(payload, cwd, now, home);
   return null;
 }
 
