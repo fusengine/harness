@@ -2,6 +2,13 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.74] - 16-07-2026
+
+### Fixed
+
+- **`browserNavigateGate` no longer blocks localhost/file:// in phase >=2** — the `KNOWN_DOMAINS` catalog check now applies only during `state.currentPhase === 1` (inspiration browsing). It previously denied every `browser_navigate`/`browser_screenshot` call outside the catalog regardless of phase, which blocked design-review's visual pass (localhost/file:// URLs) in later phases.
+- **`dispatchAipilot` cache home is now injectable** — new 5th param `home: string = homedir()`, threaded through the SubagentStart/SubagentStop cache handlers. Backward compatible (the sole prod call site relies on the default); lets tests isolate the lessons cache under a throwaway home dir instead of reading/writing the real machine-wide cache.
+
 ## [0.1.73] - 13-07-2026
 
 ### Fixed
