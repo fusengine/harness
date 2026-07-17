@@ -1,5 +1,6 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
+import { moduleAwarePath } from "../module-layout";
 
 /** TS/JS component files: top-level `interface`/`type Foo`. */
 export const TS_DECL_RE: RegExp = /^\s*(export\s+)?(interface|type)\s+[A-Z]/m;
@@ -17,6 +18,8 @@ export const SWIFT_PROTO_RE: RegExp = /^\s*protocol\s+[A-Z]/m;
 export const GO_DECL_RE: RegExp = /^\s*type\s+[A-Z]\w*\s+interface\b/m;
 /** Java/Kotlin controllers/handlers: top-level `interface`/`record`. */
 export const JAVA_DECL_RE: RegExp = /^\s*(?:public\s+|private\s+|protected\s+|internal\s+)?(?:interface|record)\s+[A-Z]/m;
+/** Rust: top-level `trait Foo` declaration (captures the name for impl co-location). */
+export const RUST_DECL_RE: RegExp = /^\s*(?:pub(?:\(\w+\))?\s+)?trait\s+([A-Z]\w*)/m;
 
 /**
  * Blocks top-level interface/type/protocol declarations in component, view or
@@ -68,6 +71,14 @@ export function interfaceSeparationGuard(ctx: GuardContext): Prompt | null {
   }
   if (/\.swift$/.test(path) && inAny("View/", "Views/", "Component/", "Components/") && SWIFT_PROTO_RE.test(content)) {
     return blockWith("Protocol in view file. Move to Sources/Interfaces/", "Move the protocol to Sources/Interfaces/");
+  }
+  if (/\.rs$/.test(path) && !inAny("traits/", "interfaces/") && !path.endsWith("traits.rs")) {
+    const m = RUST_DECL_RE.exec(content);
+    const name = m?.[1];
+    if (name && new RegExp(`impl\\s+${name}\\s+for\\s+\\w+`).test(content)) {
+      const dest = moduleAwarePath(path, "traits.rs", "a dedicated traits.rs / interfaces module");
+      return blockWith(`Trait declared alongside its implementation. Move the trait to ${dest}`, `Move the trait to ${dest}`);
+    }
   }
   return null;
 }

@@ -3,8 +3,10 @@ import {
   isExcludedJsPath,
   isExcludedPhpPath,
   isExcludedSwiftPath,
+  isSelfGateSourcePath,
 } from "./framework-solid-exclude";
 import { laravelGate, nextGate, reactGate, swiftGate } from "./framework-solid-gates";
+import { goGate, rustGate } from "./framework-solid-gates-systems";
 
 /** Next.js detection: directive, runtime types, or a `next` import. */
 const NEXT_RE: RegExp = /(use client|use server|NextRequest|NextResponse|from ['"]next)/;
@@ -21,7 +23,7 @@ function block(filePath: string, violations: string[]): Prompt {
 
 /** Run the JS/TS gate (React or Next.js), honoring build-artifact exclusions. */
 function jsViolations(filePath: string, content: string, fileLines?: number): string[] {
-  if (isExcludedJsPath(filePath)) return [];
+  if (isExcludedJsPath(filePath) || isSelfGateSourcePath(filePath)) return [];
   return NEXT_RE.test(content)
     ? nextGate(filePath, content, fileLines)
     : reactGate(filePath, content, fileLines);
@@ -29,10 +31,11 @@ function jsViolations(filePath: string, content: string, fileLines?: number): st
 
 /**
  * Framework-specific SOLID gate. Dispatches by extension/path to the matching
- * validator (React, Next.js, Laravel, Swift) and returns a blocking
+ * validator (React, Next.js, Laravel, Swift, Go, Rust) and returns a blocking
  * {@link Prompt} when any BLOCKING rule fires, or `null` when clean. Excluded
  * build/dependency paths (node_modules, dist, build, .next, vendor, .build,
- * DerivedData, Pods) early-return `null` to avoid false positives.
+ * DerivedData, Pods) early-return `null` to avoid false positives. Go and Rust
+ * have no exclusion list yet (no vendor/target FPs reported) — additive only.
  * @param filePath - absolute path of the file being written/edited
  * @param content - the file (or new) content under validation
  * @param fileLines - full on-disk line count (set on Edit so a partial
@@ -50,6 +53,10 @@ export function frameworkSolidGate(filePath: string, content: string, fileLines?
     violations = swiftGate(filePath, content, fileLines);
   } else if (/\.(tsx|ts|jsx|js)$/.test(filePath)) {
     violations = jsViolations(filePath, content, fileLines);
+  } else if (filePath.endsWith(".go")) {
+    violations = goGate(filePath, content, fileLines);
+  } else if (filePath.endsWith(".rs")) {
+    violations = rustGate(filePath, content, fileLines);
   }
   return violations.length ? block(filePath, violations) : null;
 }

@@ -18,6 +18,8 @@ export const SOLID_REF: Record<string, string> = {
   nextjs: "nextjs-expert/skills/solid-nextjs/",
   laravel: "laravel-expert/skills/solid-php/",
   swift: "swift-apple-expert/skills/solid-swift/",
+  go: "solid/skills/solid-go/",
+  rust: "solid/skills/solid-rust/",
 };
 
 /** Verdict from {@link evaluateFileSize}. */
