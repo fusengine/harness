@@ -17,14 +17,18 @@ export function designSystemWriteGate(filePath: string, state: DesignState): Pro
     return deny(
       `BLOCKED: Cannot write design-system.md at phase ${state.currentPhase}. ` +
         "RECOVERY: 1) Read identity templates from skills/design-system/ " +
-        "2) Read design-inspiration.md 3) Browse and screenshot sites 4) Then write design-system.md",
+        "2) Read design-inspiration.md 3) Browse sites and take a screenshot with " +
+        "mcp__fuse-browser__browser_screenshot on a LIVE session " +
+        "(note: browser_shots_batch/browser_site_shots do NOT advance the phase) " +
+        "4) Then write design-system.md",
     );
   }
   const needed = MIN_SCREENSHOTS[state.mode];
   if (state.screenshotsCount < needed) {
     return deny(
       `BLOCKED: ${state.screenshotsCount}/${needed} screenshots for mode '${state.mode}'. ` +
-        `RECOVERY: 1) Take ${needed - state.screenshotsCount} more fuse-browser screenshots ` +
+        `RECOVERY: 1) Take ${needed - state.screenshotsCount} more screenshots with ` +
+        "mcp__fuse-browser__browser_screenshot (browser_shots_batch/browser_site_shots do NOT count) " +
         "2) Use browser_open + browser_navigate + browser_screenshot fullPage:true 3) Then write design-system.md",
     );
   }
