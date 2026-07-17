@@ -26,3 +26,29 @@ test("null without a top-level decl, on path/content mismatch, and non Write/Edi
   expect(interfaceSeparationGuard({ tool: "Write", filePath: "app/Http/Controllers/U.php", content: "export interface Foo { a: number }\n" })).toBeNull();
   expect(interfaceSeparationGuard({ tool: "Read", filePath: "src/components/Button.tsx", content: "export interface P { a: number }\n" })).toBeNull();
 });
+
+const RUST_TRAIT_IMPL =
+  "trait Storage {\n    fn get(&self) -> String;\n}\n\nimpl Storage for MyStore {\n    fn get(&self) -> String { String::new() }\n}\n";
+
+test("blocks a Rust trait declared alongside its impl (co-location)", () => {
+  expect(interfaceSeparationGuard({ tool: "Write", filePath: "src/store.rs", content: RUST_TRAIT_IMPL })?.kind).toBe("block");
+});
+
+test("Rust trait co-location under modules/<name>/ nests the destination", () => {
+  const p = interfaceSeparationGuard({ tool: "Write", filePath: "src/modules/billing/store.rs", content: RUST_TRAIT_IMPL });
+  expect(p?.kind).toBe("block");
+  expect(p?.actions?.[0]).toContain("modules/billing/traits.rs");
+});
+
+test("Rust trait in a traits/ or interfaces/ directory is exempt", () => {
+  expect(interfaceSeparationGuard({ tool: "Write", filePath: "src/traits/store.rs", content: RUST_TRAIT_IMPL })).toBeNull();
+  expect(interfaceSeparationGuard({ tool: "Write", filePath: "src/interfaces/store.rs", content: RUST_TRAIT_IMPL })).toBeNull();
+});
+
+test("Rust traits.rs file is exempt", () => {
+  expect(interfaceSeparationGuard({ tool: "Write", filePath: "src/traits.rs", content: RUST_TRAIT_IMPL })).toBeNull();
+});
+
+test("Rust trait with no co-located impl is allowed", () => {
+  expect(interfaceSeparationGuard({ tool: "Write", filePath: "src/store.rs", content: "trait Storage {\n    fn get(&self) -> String;\n}\n" })).toBeNull();
+});

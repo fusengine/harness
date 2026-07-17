@@ -29,3 +29,23 @@ export function isExcludedPhpPath(filePath: string): boolean {
 export function isExcludedSwiftPath(filePath: string): boolean {
   return SWIFT_EXCLUDE_RE.test(filePath);
 }
+
+/**
+ * This harness's own gate-detection source files. They hold the React/Next
+ * detection literals as regex source text (client-directive string, hook/
+ * event names) — scanning them as JS/TS would self-match the very heuristics
+ * they define. Exempt by exact filename, not by directory, so a genuine SOLID
+ * violation elsewhere in src/policy/ stays gated by the framework-agnostic
+ * line-size check in policy/evaluate.ts, untouched by this exemption.
+ */
+const SELF_GATE_EXCLUDE_RE: RegExp = /(^|\/)src\/policy\/framework-solid-gates(-systems)?\.ts$/;
+
+/**
+ * Whether a JS/TS file path is this harness's own gate-detection source —
+ * exempt from the pattern heuristics (not the line-size ceiling) to avoid
+ * self-blocking on regex literals that look like the code they detect.
+ * @param filePath - absolute path of the file under validation
+ */
+export function isSelfGateSourcePath(filePath: string): boolean {
+  return SELF_GATE_EXCLUDE_RE.test(filePath);
+}

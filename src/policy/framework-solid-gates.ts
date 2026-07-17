@@ -1,5 +1,6 @@
 import { resolveMaxLines } from "../config/limits";
 import { countFrameworkCodeLines } from "./file-size";
+import { moduleAwarePath } from "./module-layout";
 
 /** Custom hook export (React): `export function/const use[A-Z]`. */
 const HOOK_RE: RegExp = /^export (function|const) use[A-Z]/m;
@@ -20,8 +21,10 @@ export function reactGate(filePath: string, content: string, fileLines?: number)
   const max = resolveMaxLines();
   const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split to hooks/, components/, or utils/.`);
-  if (filePath.includes("/components/") && TS_DECL_RE.test(content))
-    v.push("Interface/type in component. Move to src/interfaces/ or src/types/.");
+  if (filePath.includes("/components/") && TS_DECL_RE.test(content)) {
+    const dest = moduleAwarePath(filePath, "src/interfaces/", "src/interfaces/ or src/types/");
+    v.push(`Interface/type in component. Move to ${dest}.`);
+  }
   if (HOOK_RE.test(content) && !filePath.includes("/hooks/"))
     v.push("Custom hook defined outside hooks/ directory. Move to hooks/.");
   return v;
@@ -33,8 +36,10 @@ export function nextGate(filePath: string, content: string, fileLines?: number):
   const max = /(page|layout|loading|error|not-found)\.(tsx|ts)$/.test(filePath) ? 150 : 100;
   const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split to lib/, hooks/, or components/.`);
-  if (/\/(app|components|modules)\//.test(filePath) && !filePath.includes("/interfaces/") && TS_DECL_RE.test(content))
-    v.push("Interface/type in component. Move to modules/[feature]/src/interfaces/.");
+  if (/\/(app|components|modules)\//.test(filePath) && !filePath.includes("/interfaces/") && TS_DECL_RE.test(content)) {
+    const dest = moduleAwarePath(filePath, "src/interfaces/", "src/interfaces/");
+    v.push(`Interface/type in component. Move to ${dest}.`);
+  }
   if (CLIENT_HOOK_RE.test(content)) {
     const head = content.split("\n").slice(0, 5).join("\n");
     if (!head.includes("'use client'") && !head.includes('"use client"'))
@@ -49,8 +54,10 @@ export function laravelGate(filePath: string, content: string, fileLines?: numbe
   const lines = fileLines ?? countFrameworkCodeLines(content);
   const max = resolveMaxLines();
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Split using Services, Actions, or Traits.`);
-  if (PHP_INTERFACE_RE.test(content) && !filePath.includes("/Contracts/"))
-    v.push("Interface defined outside Contracts/. Move to app/Contracts/ or FuseCore/{Module}/App/Contracts/.");
+  if (PHP_INTERFACE_RE.test(content) && !filePath.includes("/Contracts/")) {
+    const dest = moduleAwarePath(filePath, "Contracts/", "app/Contracts/ or FuseCore/{Module}/App/Contracts/");
+    v.push(`Interface defined outside Contracts/. Move to ${dest}.`);
+  }
   if (filePath.includes("/Controllers/") && lines > 80)
     v.push(`Fat controller (${lines} lines). Extract logic to Services or Actions.`);
   return v;
@@ -62,8 +69,10 @@ export function swiftGate(filePath: string, content: string, fileLines?: number)
   const max = /(View|Screen)\.swift$/.test(filePath) ? 150 : 100;
   const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) v.push(`File has ${lines} lines (limit: ${max}). Extract to ViewModels, Services, or subviews.`);
-  if (SWIFT_PROTOCOL_RE.test(content) && !filePath.includes("/Protocols/"))
-    v.push("Protocol defined outside Protocols/ directory.");
+  if (SWIFT_PROTOCOL_RE.test(content) && !filePath.includes("/Protocols/")) {
+    const dest = moduleAwarePath(filePath, "Protocols/", "Protocols/ directory");
+    v.push(`Protocol defined outside Protocols/ directory. Move to ${dest}.`);
+  }
   if (filePath.endsWith("ViewModel.swift") && !content.includes("@MainActor"))
     v.push("ViewModel missing @MainActor annotation.");
   if (SWIFT_TYPE_RE.test(content) && content.includes("async ") && !content.includes("Sendable"))

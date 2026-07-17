@@ -2,6 +2,17 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.75] - 17-07-2026
+
+### Added
+
+- **SOLID gates for Go and Rust** (`goGate`/`rustGate` in `framework-solid-gates-systems.ts`) — the framework-SOLID pipeline now covers systems languages alongside react/next/laravel/swift.
+- **Module-aware interface placement** (`module-layout.ts`) — when an edited path sits under `modules/<name>/`, the 6 gates (react/next/laravel/swift/go/rust) now suggest the idiomatic per-module subfolder (`interfaces/`, `Contracts/`, `Protocols/`) instead of the flat project-root convention.
+
+### Fixed
+
+- **Auto-gate self-block** — `isSelfGateSourcePath` exempts the gate's own 2 source files by exact filename, so the SOLID gate no longer blocks edits to itself while detection on real code (e.g. a `.tsx` with a top-level interface) stays intact.
+
 ## [0.1.74] - 16-07-2026
 
 ### Fixed
