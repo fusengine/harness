@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.76] - 17-07-2026
+
+### Fixed
+
+- **Design-system gate messages name the exact tool call** — the two `deny()` recovery messages in `designSystemWriteGate` now point explicitly at `mcp__fuse-browser__browser_screenshot` and note that `browser_shots_batch`/`browser_site_shots` do not count toward the screenshot quota nor advance the phase. Text-only; no change to gate logic, thresholds, or conditions.
+
 ## [0.1.75] - 17-07-2026
 
 ### Added
