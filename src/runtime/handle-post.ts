@@ -86,13 +86,13 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // PostToolUse call (dedup'd against the ×11 hook fan-out inside refCreditNoticeFor).
   const refNotice = refCreditNoticeFor(activities, event.sessionId, opts.now, defaultStateDir(opts.cwd));
   const userMessage = [notice?.userMessage, refNotice].filter(Boolean).join("\n") || undefined;
-  if (designWarn) return { stdout: respond(id, userMessage ? { ...designWarn, userMessage } : designWarn), exit: 0 };
+  if (designWarn) return { stdout: respond(id, userMessage ? { ...designWarn, userMessage } : designWarn, "PostToolUse"), exit: 0 };
   if (!userMessage) return { stdout: extra, exit: 0 };
   const withUserMessage: Prompt = notice ? { ...notice, userMessage } : { kind: "inform", title: "Compliance", reason: "", userMessage };
-  if (!extra) return { stdout: respond(id, withUserMessage), exit: 0 };
+  if (!extra) return { stdout: respond(id, withUserMessage, "PostToolUse"), exit: 0 };
   // `extra` is already-rendered Claude-shaped stdout (postEditContext): claude/codex get the
   // notice attached onto it; other harnesses cannot parse `extra` anyway, so the notice —
   // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra).
   if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, userMessage), exit: 0 };
-  return { stdout: respond(id, withUserMessage) || extra, exit: 0 };
+  return { stdout: respond(id, withUserMessage, "PostToolUse") || extra, exit: 0 };
 }

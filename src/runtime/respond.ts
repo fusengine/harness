@@ -30,26 +30,33 @@ import { toHermesResponse } from "../adapters/hermes";
  * - cline: NO user-visible channel (`cancel`/`contextModification`/
  *   `errorMessage`-on-cancel only) — the notice is dropped silently (a pure
  *   notice returns "" = plain allow).
+ * @param id - Harness id.
+ * @param prompt - The portable prompt to render.
+ * @param event - The firing hook event name for the claude-code/codex branch
+ * (defaults to `"PreToolUse"`, the only phase every existing caller but
+ * `handle-post.ts` renders) — a POST-phase caller MUST pass `"PostToolUse"`
+ * (or its real raw event name) so `hookEventName` matches the event that
+ * actually fired instead of a hardcoded, wrong `"PreToolUse"`.
  */
-export function respond(id: string, prompt: Prompt): string {
+export function respond(id: string, prompt: Prompt, event: string = "PreToolUse"): string {
   const message = formatPrompt(prompt);
   const { kind, userMessage, reason } = prompt;
   switch (id) {
     case "claude-code":
     case "codex":
-      if (kind === "block") return denyResponse("PreToolUse", message);
+      if (kind === "block") return denyResponse(event, message);
       if (kind === "inform") {
-        return userMessage ? informResponse("PreToolUse", userMessage, reason ? message : "") : contextResponse("PreToolUse", message);
+        return userMessage ? informResponse(event, userMessage, reason ? message : "") : contextResponse(event, message);
       }
       // Codex parses but NEVER honors `permissionDecision: "ask"` (deny-only) — an
       // `ask` would silently fail open. Downgrade it to an explicit deny so the
       // gate still bites; the reason is prefixed so the honest limit is visible.
       if (id === "codex") {
-        return denyResponse("PreToolUse", `[downgraded from ask — Codex has no interactive approval]\n${message}`);
+        return denyResponse(event, `[downgraded from ask — Codex has no interactive approval]\n${message}`);
       }
       return JSON.stringify({
         hookSpecificOutput: {
-          hookEventName: "PreToolUse",
+          hookEventName: event,
           permissionDecision: "ask",
           permissionDecisionReason: message,
         },

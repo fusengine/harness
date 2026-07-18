@@ -1,4 +1,4 @@
-import { contextResponse } from "../adapters/claude";
+import { attachSystemMessage, contextResponse } from "../adapters/claude";
 import { buildClaudeMdContext } from "../policy/claude-md-context";
 import { buildApexTaskInjection } from "../policy/apex-task-context";
 import { hashText } from "../util/json-io";
@@ -35,7 +35,7 @@ export function promptSubmitContext(prompt: string, cwd: string): string {
   const ctx = buildClaudeMdContext(prompt, cwd);
   if (!ctx) return "";
   if (!oncePerWindow(claudeMdKey(prompt, ctx), DEDUP_WINDOW_MS)) return "";
-  return contextResponse("UserPromptSubmit", ctx);
+  return attachSystemMessage(contextResponse("UserPromptSubmit", ctx), "CLAUDE.md injected");
 }
 
 /**

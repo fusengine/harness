@@ -1,7 +1,7 @@
 import { basename, extname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { contextResponse } from "../../adapters/claude";
+import { contextResponse, systemMessage } from "../../adapters/claude";
 import { resolveMaxLines } from "../../config/limits";
 import { resolveTtlSec } from "../../config/ttl";
 import { countLines } from "../../policy/file-size";
@@ -67,17 +67,10 @@ function collectViolations(files: string[], max: number): string[] {
 }
 
 /**
- * Handle TaskCompleted (ports `task-completed/validate-task-solid.py`, plus the
- * receipt gate). SOLID violations surface first as `SOLID VIOLATION`
- * additionalContext; once the files comply, {@link receiptGate} refuses a "done"
- * that has no fresh passing tsc/test receipt. Also reused verbatim from `Stop`
- * for Codex's core scope ({@link stopCore}): Codex never emits `TaskCompleted`
- * (codex-plugins/docs/reference/hooks.md) so this is its only completion check;
- * `event` lets that caller stamp the real hook name instead of a false one.
+ * Handle TaskCompleted (ports `task-completed/validate-task-solid.py` + the
+ * receipt gate); also reused verbatim for Codex's `Stop` via {@link stopCore}
+ * (Codex never emits `TaskCompleted`) — `event` stamps the real hook name.
  * @param payload - The TaskCompleted/Stop payload (`task_id`, `task_subject`, `session_id`).
- * @param home - Home dir (defaults to `~`).
- * @param now - Clock (defaults to `Date.now()`).
- * @param stateDir - Track base dir (defaults to the cwd-derived state dir; matches `handleHook`).
  * @param event - The hook event name to stamp on the SOLID-violation response (default `TaskCompleted`).
  * @returns The native hook stdout, or `""` when the session is clean.
  */
@@ -96,5 +89,6 @@ export function validateTaskSolid(payload: Record<string, unknown>, home: string
     `SOLID VIOLATION in task '${subject}' (${taskId}): ` +
     `${violations.length} file(s) exceed ${max} lines: ` +
     violations.slice(0, 5).join("; ");
-  return contextResponse(event, msg);
+  // TaskCompleted rejects `hookSpecificOutput` (same gap as TeammateIdle) — ride `systemMessage`; `Stop` keeps `additionalContext`, which it DOES accept.
+  return event === "TaskCompleted" ? systemMessage(msg) : contextResponse(event, msg);
 }

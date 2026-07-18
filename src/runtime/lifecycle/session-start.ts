@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { contextResponse } from "../../adapters/claude";
+import { attachSystemMessage, contextResponse } from "../../adapters/claude";
 import { claudeHome, fusengineCache, sessionsDir } from "../home-state";
 import { devContext } from "../dev-context";
 import { pruneEmptyDirs, purgeTtlTree, removeOldFiles, trimLogFile } from "../fs-cleanup";
@@ -45,5 +45,5 @@ export function sessionStartCore(cwd: string, home: string = homedir(), now: num
   const dev = devContext(cwd);
   runSessionStartCleanups(home, now);
   const ctx = [md, dev].filter(Boolean).join("\n");
-  return ctx ? contextResponse("SessionStart", ctx) : "";
+  return ctx ? attachSystemMessage(contextResponse("SessionStart", ctx), "CLAUDE.md injected") : "";
 }

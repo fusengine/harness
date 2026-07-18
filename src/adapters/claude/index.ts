@@ -57,17 +57,15 @@ export function informResponse(event: string, notice: string, context: string): 
   return JSON.stringify({ systemMessage: notice, hookSpecificOutput: { hookEventName: event, additionalContext: context } });
 }
 
-/** Attach a user-visible `systemMessage` onto an already-rendered hook stdout JSON ({@link systemMessage} alone when empty/unparseable). */
+/** Attach a `systemMessage`, MERGING it with any already present (`\n`-joined) instead of overwriting — several producers may each call this on the same stdout in one hook invocation. */
 export function attachSystemMessage(stdout: string, notice: string): string {
-  try { return JSON.stringify({ ...(JSON.parse(stdout) as Record<string, unknown>), systemMessage: notice }); } catch { return systemMessage(notice); }
+  try {
+    const parsed = JSON.parse(stdout) as Record<string, unknown>, prev = typeof parsed.systemMessage === "string" ? parsed.systemMessage : "";
+    return JSON.stringify({ ...parsed, systemMessage: prev ? `${prev}\n${notice}` : notice });
+  } catch { return systemMessage(notice); }
 }
 
-/**
- * Render a portable {@link Prompt} as a Claude Code hook response:
- * `block` → `permissionDecision: deny`, `ask` → `permissionDecision: ask`
- * (interactive confirm), `inform` → `additionalContext` — plus the user-visible
- * `systemMessage` channel when the prompt carries a `userMessage`.
- */
+/** Render a portable {@link Prompt} as a Claude Code hook response: `block` → deny, `ask` → interactive `permissionDecision`, `inform` → `additionalContext` (+ `systemMessage` when `userMessage` is set). */
 export function toClaudeResponse(event: string, prompt: Prompt): string {
   const reason = formatPrompt(prompt);
   if (prompt.kind === "block") return denyResponse(event, reason);
@@ -78,10 +76,7 @@ export function toClaudeResponse(event: string, prompt: Prompt): string {
   return contextResponse(event, reason);
 }
 
-/**
- * Run the bundled policy over a Claude payload and return the native response
- * string (deny/ask/additionalContext), or null to allow.
- */
+/** Run the bundled policy over a Claude payload and return the native response string (deny/ask/additionalContext), or null to allow. */
 export function guard(input: ClaudeHookInput): string | null {
   const result = evaluate({
     tool: input.tool_name ?? "Write",

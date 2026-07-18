@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { contextResponse } from "../../adapters/claude";
+import { attachSystemMessage, contextResponse } from "../../adapters/claude";
 
 /** Read & concatenate all `*.md` files (sorted) under `rulesDir`. */
 export function readRules(rulesDir: string): string {
@@ -34,5 +34,5 @@ export function readRules(rulesDir: string): string {
  */
 export function injectRules(pluginRoot: string, event: string): string {
   const content = readRules(join(pluginRoot, "rules"));
-  return content ? contextResponse(event, content) : "";
+  return content ? attachSystemMessage(contextResponse(event, content), "rules 00-08 injected") : "";
 }

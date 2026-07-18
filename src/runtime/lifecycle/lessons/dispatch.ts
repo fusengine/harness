@@ -56,13 +56,14 @@ function injectMemory(cwd: string, event: string, now: number): string {
   if (curated !== content) content = persistCuration(file, root, curated, archive, content);
   const body = capFragment("lessons", compressInjection(content));
   const ctx = `Project lessons — never reproduce these:\n${body}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
-  return report ? attachSystemMessage(contextResponse(event, ctx), `LESSON.md curation:\n${report}`) : contextResponse(event, ctx);
+  const withNotice = attachSystemMessage(contextResponse(event, ctx), "lessons injected");
+  return report ? attachSystemMessage(withNotice, `LESSON.md curation:\n${report}`) : withNotice;
 }
 
 /**
  * Route a fuse-lessons event to its handler. Returns the native stdout for
- * context-injecting events (SessionStart/SubagentStart/Stop) or "" for the
- * side-effect-only PostToolUse mark.
+ * context-injecting events (SessionStart/SubagentStart/UserPromptSubmit inject
+ * MEMORY/LESSON.md, Stop reminds) or "" for the side-effect-only PostToolUse mark.
  * @param event - The raw hook event name.
  * @param payload - The raw hook payload.
  * @param cwd - Project root for memory injection.
@@ -73,6 +74,7 @@ export function dispatchLessons(event: string, payload: Record<string, unknown>,
   switch (event) {
     case "SessionStart":
     case "SubagentStart":
+    case "UserPromptSubmit":
       return injectMemory(cwd, event, now);
     case "Stop":
       return remindWrite(payload, now);
