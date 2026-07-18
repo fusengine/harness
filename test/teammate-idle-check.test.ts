@@ -26,3 +26,14 @@ test("teammateIdleContext: silent about deliverables when all announced files ex
   const out = teammateIdleContext({ teammate_name: "tm", session_id: "s2" }, cwd, home, 1000);
   expect(out).not.toContain("not found on disk");
 });
+
+test("teammateIdleContext: advisory systemMessage only — TeammateIdle rejects hookSpecificOutput", () => {
+  const home = mkdtempSync(join(tmpdir(), "fh-home3-"));
+  const cwd = mkdtempSync(join(tmpdir(), "fh-cwd3-"));
+  const missing = join(cwd, "gone.ts");
+  saveSessionState("s3", { changes: { cumulativeCodeFiles: 1, modifiedFiles: [missing] } }, home);
+  const out = teammateIdleContext({ teammate_name: "tm", session_id: "s3" }, cwd, home, 1000);
+  const parsed = JSON.parse(out) as { systemMessage?: string; hookSpecificOutput?: unknown };
+  expect(parsed.hookSpecificOutput).toBeUndefined();
+  expect(parsed.systemMessage).toContain("gone.ts");
+});

@@ -26,6 +26,16 @@ test("respond: native block shape per harness", () => {
   expect(JSON.parse(respond("cursor", p)).permission).toBe("deny");
 });
 
+test("respond: hookEventName defaults to PreToolUse, a POST-phase caller stamps the real event (PostToolUse→PreToolUse fix)", () => {
+  const block = { kind: "block", title: "t", reason: "r" } as const;
+  expect(JSON.parse(respond("claude-code", block)).hookSpecificOutput.hookEventName).toBe("PreToolUse");
+  expect(JSON.parse(respond("claude-code", block, "PostToolUse")).hookSpecificOutput.hookEventName).toBe("PostToolUse");
+  const inform = { kind: "inform", title: "t", reason: "r", userMessage: "hi" } as const;
+  expect(JSON.parse(respond("claude-code", inform, "PostToolUse")).hookSpecificOutput.hookEventName).toBe("PostToolUse");
+  const ask = { kind: "ask", title: "t", reason: "r" } as const;
+  expect(JSON.parse(respond("claude-code", ask, "PostToolUse")).hookSpecificOutput.hookEventName).toBe("PostToolUse");
+});
+
 test("handleHook: full pre/post loop drives the gates", async () => {
   const cwd = root();
   const opts: HandleOptions = { now: 5000, cwd };

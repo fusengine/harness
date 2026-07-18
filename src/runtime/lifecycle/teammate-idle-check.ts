@@ -12,7 +12,7 @@
  */
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { contextResponse } from "../../adapters/claude";
+import { systemMessage } from "../../adapters/claude";
 import { loadSessionState, sanitizeSessionId } from "../home-state";
 import { oncePerWindow } from "../inject-dedup";
 import { defaultStateDir } from "../paths";
@@ -31,20 +31,12 @@ function missingDeliverables(sessionId: string, home: string): string[] {
   return (changes?.modifiedFiles ?? []).filter((f) => typeof f === "string" && f !== "" && !existsSync(f));
 }
 
-/** Pull the `additionalContext` body out of a `contextResponse` stdout ("" when empty/unparseable). */
-function bodyOf(stdout: string): string {
-  if (!stdout) return "";
-  try {
-    return (JSON.parse(stdout) as { hookSpecificOutput?: { additionalContext?: string } }).hookSpecificOutput?.additionalContext ?? "";
-  } catch {
-    return "";
-  }
-}
-
 /**
  * Handle TeammateIdle: merge the existing sniper suggestion with a missing-
- * deliverable warning (deduped) into one `additionalContext` response, or "" when
- * neither fires.
+ * deliverable warning (deduped) into one advisory `systemMessage`, or "" when
+ * neither fires. TeammateIdle rejects `hookSpecificOutput` (no `additionalContext`
+ * channel) — `systemMessage` is the only user-visible, non-blocking channel it
+ * accepts.
  * @param data - The raw TeammateIdle payload (`teammate_name`, `session_id`).
  * @param cwd - Project root (state dir for the dedup sidecar).
  * @param home - Home dir (defaults to `~`).
@@ -52,7 +44,7 @@ function bodyOf(stdout: string): string {
  * @returns The native hook stdout, or "".
  */
 export function teammateIdleContext(data: Record<string, unknown>, cwd: string, home: string = homedir(), now: number = Date.now()): string {
-  const sniper = bodyOf(validateTeammateOutput(data, home));
+  const sniper = validateTeammateOutput(data, home);
   const sessionId = sanitizeSessionId(data.session_id);
   const teammate = String(data.teammate_name ?? data.team_name ?? "unknown");
   let notice = "";
@@ -67,5 +59,5 @@ export function teammateIdleContext(data: Record<string, unknown>, cwd: string, 
   // An actionable idle signal (false-done or sniper suggestion) warrants human
   // attention — voice the "human" sound (fire-and-forget, fail-open no-op).
   notify("human");
-  return contextResponse("TeammateIdle", merged);
+  return systemMessage(merged);
 }

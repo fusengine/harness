@@ -16,17 +16,18 @@ const T = 1_000_000_000_000;
 // so the file stays oversized regardless of the ambient env override.
 const L = resolveMaxLines();
 
-test("validateTaskSolid: flags a modified code file over the line ceiling", () => {
+test("validateTaskSolid: flags a modified code file over the line ceiling (advisory systemMessage — TaskCompleted rejects hookSpecificOutput)", () => {
   const home = root();
   const big = join(root(), "huge.ts");
   const n = L + 50;
   writeFileSync(big, "// line\n".repeat(n));
   saveSessionState("s1", { changes: { modifiedFiles: [big] } }, home);
   const out = validateTaskSolid({ session_id: "s1", task_id: "t-1", task_subject: "Port" }, home);
-  const ctx = JSON.parse(out).hookSpecificOutput.additionalContext;
-  expect(ctx).toContain("SOLID VIOLATION");
-  expect(ctx).toContain(`exceed ${L} lines`);
-  expect(ctx).toContain(`huge.ts: ${n} lines (max ${L})`);
+  const parsed = JSON.parse(out) as { systemMessage?: string; hookSpecificOutput?: unknown };
+  expect(parsed.hookSpecificOutput).toBeUndefined();
+  expect(parsed.systemMessage).toContain("SOLID VIOLATION");
+  expect(parsed.systemMessage).toContain(`exceed ${L} lines`);
+  expect(parsed.systemMessage).toContain(`huge.ts: ${n} lines (max ${L})`);
 });
 
 test("validateTaskSolid: compliant files but NO receipt → refusal (continue:false + message)", () => {

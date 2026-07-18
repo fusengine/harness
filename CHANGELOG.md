@@ -2,6 +2,14 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.77] - 18-07-2026
+
+### Fixed
+
+- **`TeammateIdle`/`TaskCompleted` "Invalid input" hook error** — both events reject `hookSpecificOutput` (contextResponse) on Claude Code 2.1.214; `teammate-idle-check.ts`, `teammate-idle.ts`, and `task-completed.ts` now ride the advisory, non-blocking `systemMessage` channel instead (the `Stop` path, which does accept `additionalContext`, is unchanged).
+- **`PostToolUse` hook stamped as `PreToolUse`** — `respond()` gains an `event` param (default `"PreToolUse"`) propagated to all 4 branches; `handle-post.ts` now passes `"PostToolUse"` so `hookEventName` in the rendered stdout matches the event that actually fired.
+- **Silent rules/context injection** — `attachSystemMessage` now merges (`\n`-joined) instead of overwriting when called more than once on the same stdout; `inject-rules.ts`, `inject-context.ts`, `session-start.ts`, and `lessons/dispatch.ts` (new `UserPromptSubmit` case) each attach a sober confirmation notice ("rules 00-08 injected", "CLAUDE.md injected", "lessons injected") so every prompt visibly confirms what was loaded.
+
 ## [0.1.76] - 17-07-2026
 
 ### Fixed
