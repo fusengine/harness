@@ -14,10 +14,11 @@ import type { PluginScope } from "./lifecycle";
  * @param payload - The raw hook payload.
  * @param cwd - Project root.
  * @param now - Clock.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native stdout when intercepted, or `null` to fall through.
  */
-export async function asyncScopeStdout(scope: PluginScope | undefined, event: string, payload: Record<string, unknown>, cwd: string, now: number): Promise<string | null> {
-  if (scope === "aipilot") return dispatchAipilot(event, payload, cwd, now);
+export async function asyncScopeStdout(scope: PluginScope | undefined, event: string, payload: Record<string, unknown>, cwd: string, now: number, id: string = "claude-code"): Promise<string | null> {
+  if (scope === "aipilot") return dispatchAipilot(event, payload, cwd, now, undefined, id);
   if (scope === "memory") return dispatchMemory(event, payload, cwd, now);
   return null;
 }

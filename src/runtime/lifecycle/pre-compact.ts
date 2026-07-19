@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { harnessHomeSegment } from "../../policy/apex-target";
 
 /** Two-digit zero-pad. */
 function pad(n: number): string {
@@ -13,14 +14,17 @@ function stamp(now: number): string {
 }
 
 /**
- * Handle PreCompact: back up `.claude/apex/task.json` to `backups/`, keep only
- * the 5 newest, and emit a confirmation. Ports `pre-compact/save-apex-state.py`.
+ * Handle PreCompact: back up the target apex `task.json` (`.claude/apex/`,
+ * `.codex/apex/`, ...) to `backups/`, keep only the 5 newest, and emit a
+ * confirmation. Ports `pre-compact/save-apex-state.py`.
  * @param cwd - Project root.
  * @param now - Clock (defaults to `Date.now()`).
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty when no task.json).
  */
-export function saveApexState(cwd: string, now: number = Date.now()): string {
-  const apexDir = join(cwd, ".claude", "apex");
+export function saveApexState(cwd: string, now: number = Date.now(), id: string = "claude-code"): string {
+  const seg = harnessHomeSegment(id);
+  const apexDir = join(cwd, seg, "apex");
   const stateFile = join(apexDir, "task.json");
   if (!existsSync(stateFile)) return "";
   const backupDir = join(apexDir, "backups");
@@ -30,5 +34,5 @@ export function saveApexState(cwd: string, now: number = Date.now()): string {
   for (const old of backups.slice(5)) {
     try { rmSync(join(backupDir, old), { force: true }); } catch { /* best effort */ }
   }
-  return JSON.stringify({ additionalContext: "APEX state saved before compaction. Previous task state preserved in .claude/apex/backups/" });
+  return JSON.stringify({ additionalContext: `APEX state saved before compaction. Previous task state preserved in ${seg}/apex/backups/` });
 }

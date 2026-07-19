@@ -10,6 +10,7 @@ import { readJsonFile } from "../../util/json-io";
 import { detectProjectType } from "../../policy/detect-project";
 import { projectRootOrNull } from "../../util/project-root";
 import { systemMessage } from "../../adapters/claude";
+import { harnessHomeSegment } from "../../policy/apex-target";
 import type { ApexTaskFile } from "./aipilot/types";
 
 /** Read-tool file paths worth auto-documenting. */
@@ -33,22 +34,25 @@ function docTypeOf(filePath: string): string {
 
 /**
  * Auto-document a Read of a SKILL.md/README/CLAUDE.md/docs/references file
- * into `.claude/apex/docs/task-<current>-<framework>.md` (skipped when the
- * file is already logged, or no project root is found from `filePath`).
+ * into the target apex docs dir (`.claude/apex/docs/`, `.codex/apex/docs/`,
+ * ...) as `task-<current>-<framework>.md` (skipped when the file is already
+ * logged, or no project root is found from `filePath`).
  * @param filePath - The path passed to the Read tool.
  * @param now - Clock (defaults to `Date.now()`).
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native `systemMessage` stdout, or "" when nothing was logged.
  */
-export async function autoDocumentRead(filePath: string, now: number = Date.now()): Promise<string> {
+export async function autoDocumentRead(filePath: string, now: number = Date.now(), id: string = "claude-code"): Promise<string> {
   if (!filePath || !DOC_PATTERNS.some((p) => p.test(filePath))) return "";
   const root = projectRootOrNull(dirname(filePath));
   if (!root) return "";
 
+  const seg = harnessHomeSegment(id);
   const framework = detectProjectType(root);
-  const taskData = await readJsonFile<ApexTaskFile>(join(root, ".claude", "apex", "task.json"));
+  const taskData = await readJsonFile<ApexTaskFile>(join(root, seg, "apex", "task.json"));
   const current = taskData?.current_task ?? "1";
 
-  const docDir = join(root, ".claude", "apex", "docs");
+  const docDir = join(root, seg, "apex", "docs");
   const docFile = join(docDir, `task-${current}-${framework}.md`);
   const ts = new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z");
   const fname = basename(filePath);

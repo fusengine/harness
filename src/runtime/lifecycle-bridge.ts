@@ -28,10 +28,11 @@ function additionalContextOf(stdout: string): string {
  * @param cwd - Project root.
  * @param scope - The invoking plugin scope (defaults to `core`).
  * @param now - Clock.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native stdout, or `null` when unhandled.
  */
-export function lifecycleStdout(payload: Record<string, unknown>, cwd: string, scope: PluginScope, now: number): string | null {
-  return dispatchLifecycle({ event: rawEvent(payload), payload, cwd, scope, now });
+export function lifecycleStdout(payload: Record<string, unknown>, cwd: string, scope: PluginScope, now: number, id: string = "claude-code"): string | null {
+  return dispatchLifecycle({ event: rawEvent(payload), payload, cwd, scope, now, id });
 }
 
 /**
@@ -44,11 +45,12 @@ export function lifecycleStdout(payload: Record<string, unknown>, cwd: string, s
  * @param scope - The invoking plugin scope.
  * @param event - The normalized event.
  * @param now - Clock.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The extra stdout (possibly empty).
  */
-export async function postEditContext(scope: PluginScope, event: NormalizedEvent, now: number): Promise<string> {
+export async function postEditContext(scope: PluginScope, event: NormalizedEvent, now: number, id: string = "claude-code"): Promise<string> {
   if (scope !== "core" || !event.filePath) return "";
-  if (event.tool === "Read") return autoDocumentRead(event.filePath, now);
+  if (event.tool === "Read") return autoDocumentRead(event.filePath, now, id);
   if (event.tool !== "Write" && event.tool !== "Edit") return "";
   const sniper = trackSessionChanges(event.sessionId, event.filePath, undefined, now);
   const lint = postEditTypescript(event.filePath);

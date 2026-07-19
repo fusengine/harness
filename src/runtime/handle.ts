@@ -55,11 +55,11 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   if (id === "codex" && rawEventName(payload) === "SessionStart") resyncCodexAgents();
 
   // Async per-scope lifecycle (aipilot cache handlers + memory-neural Graphiti).
-  const asyncOut = await asyncScopeStdout(opts.scope, rawEventName(payload), payload, opts.cwd, opts.now);
+  const asyncOut = await asyncScopeStdout(opts.scope, rawEventName(payload), payload, opts.cwd, opts.now, id);
   if (asyncOut !== null) return { stdout: asyncOut, exit: 0 };
 
   // Ported lifecycle/session/context hooks (SessionStart, SubagentStart/Stop, etc.).
-  const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now);
+  const life = lifecycleStdout(payload, opts.cwd, opts.scope ?? "core", opts.now, id);
   if (life !== null) {
     // Claude-Code-only: attachBudgetRecap's systemMessage envelope assumes the
     // Claude adapter's stdout shape (mirrors the designLifecycle gate above).
@@ -72,7 +72,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   if (userPrompt !== undefined) {
     const track = await loadTrack(file);
     await saveTrack(file, recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
-    return { stdout: promptSubmitContext(userPrompt, opts.cwd), exit: 0 };
+    return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
   }
 
   if (event.phase === "post") {

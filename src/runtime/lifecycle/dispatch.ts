@@ -26,6 +26,8 @@ export interface LifecycleInput {
   cwd: string;
   scope: PluginScope;
   now: number;
+  /** Harness target id (defaults to "claude-code" — zero-regression default). */
+  id?: string;
 }
 
 /** SessionStart handler keyed on plugin scope. */
@@ -78,7 +80,7 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "PostCompact":
       return input.scope === "core" ? postCompactContext(input.payload, input.cwd, import.meta.url, input.now) : "";
     case "PreCompact":
-      return saveApexState(input.cwd, input.now);
+      return saveApexState(input.cwd, input.now, input.id ?? "claude-code");
     case "SessionEnd":
       if (input.scope !== "aipilot") cleanupSession(undefined, input.now);
       return "";

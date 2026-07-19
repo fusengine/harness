@@ -9,7 +9,7 @@ const EXEMPT_PATTERNS: readonly RegExp[] = [
   /\.claude-plugin\//,
   /CHANGELOG\.md$/,
   /marketplace\.json$/,
-  /\/\.claude\/(apex|memory|logs|fusengine-cache)\//,
+  /\/\.(claude|codex)\/(apex|memory|logs|fusengine-cache)\//,
   /\/\.fuse-harness\//,
 ];
 
