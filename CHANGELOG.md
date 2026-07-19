@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.79] - 19-07-2026
+
+### Added
+
+- **`harness codex-rules` CLI command** — generates a Codex execpolicy Starlark `.rules` file (69 `prefix_rule` entries) derived from the exported guard constants in `src/policy/guards/security.ts` (`CRITICAL_PATTERNS` → `decision="forbidden"`, `ASK_PATTERNS` → `decision="prompt"`). Prints to stdout or writes to `--out <path>`. Includes a bidirectional anti-drift test (every source label covered by a rule or explicit skip-list entry, and every generated rule references an existing source label); the generated header documents irreducible gaps (fork bomb, raw disk redirect, `> /etc`, `curl | sh` installers) and assumed over-widths.
+
 ## [0.1.78] - 19-07-2026
 
 ### Added

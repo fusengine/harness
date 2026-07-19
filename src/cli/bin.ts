@@ -5,11 +5,14 @@
  *   harness init [id]      write the wiring file for a harness (defaults to the detected one)
  *   harness hook <id>      runtime: read a hook payload on stdin, route to the adapter, print the response
  *   harness changelog      fetch + diff the Claude Code changelog, print a JSON summary (changelog-watcher)
+ *   harness codex-rules    generate a Codex execpolicy .rules (Starlark) file from security.ts; stdout or --out <path>
  */
 import { detectHarness, type HarnessId } from "../detect/harness";
 import { initFor, writeInitFile } from "../init/run";
 import { scanChangelog } from "../changelog/fetch";
 import { runSecurityScan } from "../runtime/lifecycle/security/scan";
+import { buildCodexRules } from "../codex-rules";
+import { writeFileSync } from "node:fs";
 import { handleHook } from "../runtime/handle";
 import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
@@ -84,6 +87,17 @@ if (cmd === "--version" || cmd === "-v") {
 } else if (cmd === "scan") {
   const dir = process.argv[3] ?? process.cwd();
   process.stdout.write(JSON.stringify(runSecurityScan(dir), null, 2) + "\n");
+  process.exit(0);
+} else if (cmd === "codex-rules") {
+  const outIdx = process.argv.indexOf("--out");
+  const outPath = outIdx !== -1 ? process.argv[outIdx + 1] : undefined;
+  const rules = buildCodexRules();
+  if (outPath) {
+    writeFileSync(outPath, rules);
+    process.stderr.write(`harness: wrote Codex execpolicy rules -> ${outPath}\n`);
+  } else {
+    process.stdout.write(rules);
+  }
   process.exit(0);
 } else {
   const files = stagedFiles();
