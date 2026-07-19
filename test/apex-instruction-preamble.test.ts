@@ -24,3 +24,19 @@ test("buildApexInstruction: exact APEX preamble text (6 phases + honest tracking
   ]) expect(out).toContain(frag);
   expect(out.endsWith("**IMPORTANT**: Read .claude/apex/task.json to check documentation status before writing code.")).toBe(true);
 });
+
+test("buildApexInstruction: explicit id='claude-code' is byte-identical to the default (zero-regression)", () => {
+  expect(buildApexInstruction("nextjs", 100, "claude-code")).toBe(buildApexInstruction("nextjs", 100));
+});
+
+test("buildApexInstruction: codex target uses .codex + update_plan, never .claude/TaskCreate", () => {
+  const out = buildApexInstruction("nextjs", 100, "codex");
+  expect(out.startsWith("INSTRUCTION: This is a development task. Use APEX methodology:")).toBe(true);
+  for (const frag of [
+    "**TRACKING FILE**: [project]/.codex/apex/task.json — create it yourself via apex-methodology Step 0 (init-tracking) if missing",
+    "2. **PLAN**: Use update_plan to break down tasks (<100 lines per file)",
+  ]) expect(out).toContain(frag);
+  expect(out.endsWith("**IMPORTANT**: Read .codex/apex/task.json to check documentation status before writing code.")).toBe(true);
+  expect(out).not.toContain(".claude");
+  expect(out).not.toContain("TaskCreate");
+});

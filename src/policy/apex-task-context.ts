@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveMaxLines } from "../config/limits";
+import { harnessHomeSegment } from "./apex-target";
 
 /** Parsed task state injected into a Task sub-agent prompt. */
 export interface ApexTaskState {
@@ -42,33 +43,41 @@ export function loadApexTaskState(taskFile: string): ApexTaskState {
  * Build the APEX context string injected into a Task sub-agent prompt.
  * @param state - The parsed task state.
  * @param maxLines - SOLID per-file line ceiling.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The injection text.
  */
-export function buildApexTaskContext(state: ApexTaskState, maxLines: number): string {
+export function buildApexTaskContext(state: ApexTaskState, maxLines: number, id: string = "claude-code"): string {
+  const seg = harnessHomeSegment(id);
+  const isCodex = id === "codex";
+  const step3 = isCodex ? "update_plan → review the current plan" : "TaskList → see pending tasks";
+  const step4 = isCodex ? "update_plan → mark the active step in_progress before starting" : "TaskUpdate(in_progress) → before starting";
+  const step7 = isCodex ? "update_plan → mark the step completed when done" : "TaskUpdate(completed) → triggers auto-commit";
   return (
-    `⚠️ APEX MODE - Read .claude/apex/AGENTS.md for rules\n\n` +
+    `⚠️ APEX MODE - Read ${seg}/apex/AGENTS.md for rules\n\n` +
     `Current: Task #${state.id} - ${state.subject} (Phase: ${state.phase})\n` +
     `Docs consulted: ${state.docs}\n\n` +
     `Agent must:\n` +
     `1. Read task.json → find last 3 completed tasks\n` +
     `2. Read their notes in docs/ (task-{ID}-{subject}.md)\n` +
-    `3. TaskList → see pending tasks\n` +
-    `4. TaskUpdate(in_progress) → before starting\n` +
+    `3. ${step3}\n` +
+    `4. ${step4}\n` +
     `5. Apply SOLID (files < ${maxLines} lines)\n` +
     `6. Write notes to docs/task-{ID}-{subject}.md\n` +
-    `7. TaskUpdate(completed) → triggers auto-commit`
+    `7. ${step7}`
   );
 }
 
 /**
- * Build the PreToolUse Task injection, gated on the existence of the project's
- * `.claude/apex/` directory. Returns `null` when APEX is not active (no dir).
+ * Build the PreToolUse Task injection, gated on the existence of the
+ * project's target apex dir (`.claude/apex/`, `.codex/apex/`, ...). Returns
+ * `null` when APEX is not active (no dir).
  * @param projectRoot - `CLAUDE_PROJECT_DIR` or cwd.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The injection text, or `null` to emit nothing.
  */
-export function buildApexTaskInjection(projectRoot: string): string | null {
-  const apexDir = join(projectRoot, ".claude", "apex");
+export function buildApexTaskInjection(projectRoot: string, id: string = "claude-code"): string | null {
+  const apexDir = join(projectRoot, harnessHomeSegment(id), "apex");
   if (!existsSync(apexDir)) return null;
   const state = loadApexTaskState(join(apexDir, "task.json"));
-  return buildApexTaskContext(state, resolveMaxLines());
+  return buildApexTaskContext(state, resolveMaxLines(), id);
 }

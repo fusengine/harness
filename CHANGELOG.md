@@ -2,6 +2,12 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [0.1.78] - 19-07-2026
+
+### Added
+
+- **Target-aware APEX builders (Claude vs Codex)** — `buildApexInstruction`, `buildApexTaskContext`, and `buildClaudeMdContext` (plus their `.claude/apex` folder resolvers) now branch on harness `id` via `HOME_DIR[id]` instead of hardcoding `.claude`/`CLAUDE.md`/`TaskCreate`. Under Codex, output routes to `.codex/apex`, `AGENTS.md`, and `update_plan` (drops the "triggers auto-commit" line). Under Claude Code, output is byte-for-byte identical to before (default `id` param unchanged, verified via a default-vs-explicit-id probe). New `src/policy/apex-target.ts` (helpers) and `src/policy/detect-claude-md-project-type.ts` (SOLID split).
+
 ## [0.1.77] - 18-07-2026
 
 ### Fixed

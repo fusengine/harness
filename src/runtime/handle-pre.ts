@@ -58,9 +58,9 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     return { stdout: validateSolidGate(event.tool, event.filePath ?? "", event.content ?? ""), exit: 0 };
   }
 
-  // PreToolUse Task: inject APEX sub-agent context when .claude/apex/ exists.
+  // PreToolUse Task: inject APEX sub-agent context when the target apex dir exists.
   if (event.tool === "Task") {
-    const taskCtx = taskContext(opts.cwd);
+    const taskCtx = taskContext(opts.cwd, id);
     if (taskCtx) return { stdout: taskCtx, exit: 0 };
   }
 

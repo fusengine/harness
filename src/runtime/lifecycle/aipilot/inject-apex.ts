@@ -13,6 +13,7 @@ import { readText } from "../../../util/runtime-io";
 import { resolveMaxLines } from "../../../config/limits";
 import { contextResponse } from "../../../adapters/claude";
 import { capFragment } from "../../inject-budget";
+import { harnessHomeSegment } from "../../../policy/apex-target";
 import type { ApexTaskFile } from "./types";
 
 type TaskMap = ApexTaskFile["tasks"];
@@ -45,16 +46,17 @@ function cartographerContext(): string {
 }
 
 /**
- * Build the APEX sub-agent injection for SubagentStart, or "" when the project
- * has no `.claude/apex/` dir. Reads AGENTS.md (first 4KB) + task.json.
+ * Build the APEX sub-agent injection for SubagentStart, or "" when the project has no target apex dir (`.claude/apex/`, `.codex/apex/`, ...). Reads AGENTS.md (first 4KB) + task.json.
  * @param cwd - Fallback project root when `CLAUDE_PROJECT_DIR` is unset.
  * @param home - Home dir (unused placeholder; kept for symmetry/testing).
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty).
  */
-export async function injectApexSubagentContext(cwd: string, home: string = homedir()): Promise<string> {
+export async function injectApexSubagentContext(cwd: string, home: string = homedir(), id: string = "claude-code"): Promise<string> {
   void home;
   const projectRoot = process.env.CLAUDE_PROJECT_DIR ?? cwd;
-  const apexDir = join(projectRoot, ".claude", "apex");
+  const seg = harnessHomeSegment(id);
+  const apexDir = join(projectRoot, seg, "apex");
   if (!existsSync(apexDir)) return "";
 
   const agentsPath = join(apexDir, "AGENTS.md");
@@ -62,6 +64,9 @@ export async function injectApexSubagentContext(cwd: string, home: string = home
   const taskData = await readJsonFile<ApexTaskFile>(join(apexDir, "task.json"));
   const completed = taskData ? completedTasks(taskData.tasks) : "none";
   const pending = taskData ? pendingTasks(taskData.tasks) : "none";
+  const isCodex = id === "codex";
+  const beforeStart = isCodex ? "Use update_plan → mark the active step in_progress before starting" : "Use TaskUpdate(taskId, status: in_progress) before starting";
+  const whenDone = isCodex ? "update_plan → mark the step completed when done" : "TaskUpdate(taskId, status: completed) triggers auto-commit";
 
   const context = `## APEX Sub-Agent Instructions
 
@@ -75,20 +80,20 @@ ${agents}
 - Pending: ${pending}
 
 ### 3. Before Starting Work
-- Use TaskUpdate(taskId, status: in_progress) before starting
+- ${beforeStart}
 
 ### 4. SOLID Rules
 - Files < ${resolveMaxLines()} lines | Interfaces in src/interfaces/ | JSDoc/PHPDoc required
 
 ### 5. Research Before Code
-- Use Context7/Exa for docs | Write notes to .claude/apex/docs/
+- Use Context7/Exa for docs | Write notes to ${seg}/apex/docs/
 
 ### 6. Before Done (NEVER skip)
 - eLicit: self-review with a NAMED elicitation technique; fix findings first
 - Verify: run/functional-check your changes (references⇔declarations)
 
 ### 7. When Done
-- TaskUpdate(taskId, status: completed) triggers auto-commit${cartographerContext()}`;
+- ${whenDone}${cartographerContext()}`;
 
   return contextResponse("SubagentStart", capFragment("apex-subagent", context));
 }

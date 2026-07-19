@@ -68,12 +68,12 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
     if (tailwindWarn) return { stdout: tailwindWarn, exit: 0 };
   }
   if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate" || event.tool === "Write" || event.tool === "Edit")) {
-    const out = await aipilotPostToolUse(payload, opts.cwd);
+    const out = await aipilotPostToolUse(payload, opts.cwd, id);
     if (out) return { stdout: out, exit: 0 };
   }
   let extra = "";
   for (const f of files) {
-    extra = await postEditContext(opts.scope ?? "core", f, opts.now);
+    extra = await postEditContext(opts.scope ?? "core", f, opts.now, id);
     if (extra) break;
   }
   // Python-parity `post_pass`: user-visible pass notice, merged into whatever else fires

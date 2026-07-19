@@ -60,9 +60,9 @@ async function typeSpecificCache(agent: string, cwd: string, now: number, home: 
  * entries (APEX context + lessons) fire for EVERY sub-agent, then the type-specific
  * cache is concatenated on top — sniper too, hence no early return.
  */
-async function onSubagentStart(payload: Record<string, unknown>, cwd: string, now: number, home: string): Promise<string> {
+async function onSubagentStart(payload: Record<string, unknown>, cwd: string, now: number, home: string, id: string): Promise<string> {
   const agent = agentTypeOf(payload);
-  const apex = await injectApexSubagentContext(cwd, home);
+  const apex = await injectApexSubagentContext(cwd, home, id);
   const lessons = await injectLessonsCache(cwd, home, now);
   const typeSpecific = await typeSpecificCache(agent, cwd, now, home);
   return combineContext(apex, lessons, typeSpecific);
@@ -83,10 +83,10 @@ async function onSubagentStop(payload: Record<string, unknown>, cwd: string, hom
 /**
  * Dispatch an ai-pilot-scope lifecycle event. Returns the native stdout, or
  * `null` when unhandled (caller falls through to the default pipeline).
- * @param home - Home dir for cache resolution (defaults to `~`; injectable for test isolation).
+ * @param home - Home dir for cache resolution (defaults to `~`; injectable for test isolation); `id` selects the harness target (defaults to "claude-code").
  */
-export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number, home: string = homedir()): Promise<string | null> {
-  if (event === "SubagentStart") return onSubagentStart(payload, cwd, now, home);
+export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number, home: string = homedir(), id: string = "claude-code"): Promise<string | null> {
+  if (event === "SubagentStart") return onSubagentStart(payload, cwd, now, home, id);
   if (event === "SubagentStop") return onSubagentStop(payload, cwd, home);
   // Stop too: Codex emits no SessionEnd, so its ai-pilot hooks.json wires Stop here as the sole analytics-flush trigger — reusing the SessionEnd handler verbatim (codex-plugins/docs/reference/hooks.md).
   if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(home, now); return ""; }
@@ -94,7 +94,7 @@ export async function dispatchAipilot(event: string, payload: Record<string, unk
   return null;
 }
 
-/** PostToolUse (Write/Edit SOLID check, else TaskCreate/TaskUpdate sync) for the ai-pilot scope. */
-export async function aipilotPostToolUse(payload: Record<string, unknown>, cwd: string): Promise<string> {
-  return checkSolidCompliance(payload) || (await syncTaskTracking(payload, cwd));
+/** PostToolUse (Write/Edit SOLID check, else TaskCreate/TaskUpdate sync) for the ai-pilot scope; `id` selects the harness target (defaults to "claude-code"). */
+export async function aipilotPostToolUse(payload: Record<string, unknown>, cwd: string, id: string = "claude-code"): Promise<string> {
+  return checkSolidCompliance(payload) || (await syncTaskTracking(payload, cwd, id));
 }

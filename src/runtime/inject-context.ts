@@ -29,10 +29,11 @@ export function claudeMdKey(prompt: string, ctx: string): string {
  * is emitted on EVERY message" is thus preserved.
  * @param prompt - The raw user prompt.
  * @param cwd - Project root (for project-type detection).
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty).
  */
-export function promptSubmitContext(prompt: string, cwd: string): string {
-  const ctx = buildClaudeMdContext(prompt, cwd);
+export function promptSubmitContext(prompt: string, cwd: string, id: string = "claude-code"): string {
+  const ctx = buildClaudeMdContext(prompt, cwd, id);
   if (!ctx) return "";
   if (!oncePerWindow(claudeMdKey(prompt, ctx), DEDUP_WINDOW_MS)) return "";
   return attachSystemMessage(contextResponse("UserPromptSubmit", ctx), "CLAUDE.md injected");
@@ -44,9 +45,10 @@ export function promptSubmitContext(prompt: string, cwd: string): string {
  * Harness-produced (not owner CLAUDE.md content), so it is subject to the
  * per-fragment {@link capFragment} budget — unlike {@link promptSubmitContext}.
  * @param cwd - Fallback project root when `CLAUDE_PROJECT_DIR` is unset.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty).
  */
-export function taskContext(cwd: string): string {
-  const ctx = buildApexTaskInjection(process.env.CLAUDE_PROJECT_DIR ?? cwd);
+export function taskContext(cwd: string, id: string = "claude-code"): string {
+  const ctx = buildApexTaskInjection(process.env.CLAUDE_PROJECT_DIR ?? cwd, id);
   return ctx ? contextResponse("PreToolUse", capFragment("apex-task", ctx)) : "";
 }
