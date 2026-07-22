@@ -1,6 +1,7 @@
 import { formatPrompt, type Prompt } from "../prompt/types";
 import { denyResponse, contextResponse, informResponse } from "../adapters/claude";
 import { toHermesResponse } from "../adapters/hermes";
+import { toKimiResponse } from "../adapters/kimi";
 
 /**
  * Map a portable {@link Prompt} to a harness's native hook response, honoring
@@ -18,6 +19,12 @@ import { toHermesResponse } from "../adapters/hermes";
  * - hermes: delegated to the adapter's `toHermesResponse` — `block` ->
  *   `{decision:"block",reason}`; `ask`/`inform` degrade to non-blocking
  *   `{context}` (Hermes has no interactive "ask" state).
+ * - kimi: delegated to the adapter's `toKimiResponse` — `block`/`ask` ->
+ *   `hookSpecificOutput.permissionDecision:"deny"` (Kimi Code CLI's hooks
+ *   contract documents only "deny"; `ask` downgrades with a prefix, mirroring
+ *   the codex branch above), `inform` -> raw text on stdout (Kimi appends
+ *   stdout to context on exit 0 — no `hookSpecificOutput` envelope documented
+ *   for non-blocking context injection).
  *
  * User-visible pass notices (`prompt.userMessage`, Python `hook_output.allow_pass`
  * / `post_pass` parity), by harness:
@@ -78,6 +85,9 @@ export function respond(id: string, prompt: Prompt, event: string = "PreToolUse"
       // Single source of truth for the Hermes wire shape lives in the adapter
       // (same JSON.stringify contract as the inline cases above).
       return toHermesResponse(prompt);
+    case "kimi":
+      // Single source of truth for the Kimi wire shape lives in the adapter.
+      return toKimiResponse(prompt);
     case "cline":
       if (kind === "block") return JSON.stringify({ cancel: true, errorMessage: message });
       if (userMessage && !reason) return ""; // pure notice: no user-visible channel — silent allow

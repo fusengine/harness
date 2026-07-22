@@ -24,8 +24,8 @@ import { runDoctor, runningVersion, versionBanner } from "./doctor";
 import { readStdin as readRawStdin } from "../util/runtime-io";
 import { maybePlaySound } from "./hook-sound";
 
-// Inline trace helper (kept in this file, not a separate module) — stderr-only, on only under FUSE_HARNESS_DEBUG=1 (set by test/sim/exec.ts).
-const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1";
+// Inline trace helper (kept in this file, not a separate module) — stderr-only, active only when FUSE_HARNESS_DEBUG=1 AND CI=true (both set by test/sim/exec.ts; never in an interactive session).
+const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1" && process.env.CI === "true";
 function traceHook(label: string, data: unknown): void {
   if (hookDebug) process.stderr.write(`[hook-debug] ${label}: ${typeof data === "string" ? data : JSON.stringify(data)}\n`);
 }

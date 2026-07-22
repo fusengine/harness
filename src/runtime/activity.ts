@@ -57,7 +57,7 @@ function docSourceOf(tool: string): string | undefined {
  * Map a live tool-use to the activity to record, or null when nothing is
  * tracked. Works across harnesses — tool names are globally distinct:
  * - MCP doc calls (`context7` / `exa`, any separator) → `doc`
- * - `Task`/`Agent` + `subagent_type` (Claude/Cursor) → `agent` (bare agent name)
+ * - `Task`/`Agent`/`AgentSwarm` + `subagent_type` (Claude/Cursor/Kimi) → `agent` (bare agent name)
  * - direct exploration/research (Glob/Grep, explore Bash, web, MCP cache reads)
  *   → `agent` credited to the matching REQUIRED_AGENTS phase
  * - a read tool opening a `.md` reference → `ref`
@@ -71,7 +71,10 @@ export function activityFor(event: ToolEvent): Activity[] {
   const docSource = docSourceOf(event.tool);
   if (docSource) out.push({ kind: "doc", framework: docFramework(event.input, event.framework), sessionId: event.sessionId, source: docSource, ts: event.now });
 
-  if (event.tool === "Task" || event.tool === "Agent") {
+  // `AgentSwarm` is Kimi Code's batch sub-agent launcher: `subagent_type` applies
+  // to every spawned sub-agent (same identity field as Task/Agent), so it shares
+  // this branch rather than needing its own name-extraction logic.
+  if (event.tool === "Task" || event.tool === "Agent" || event.tool === "AgentSwarm") {
     const name = String(event.input?.subagent_type ?? event.input?.name ?? "").split(":").pop() ?? "";
     if (name) out.push(agentActivity(name, event.now, qualityFor(event.responseLength, AGENT_QUALITY_MIN)));
     return out;

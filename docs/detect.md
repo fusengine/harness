@@ -33,6 +33,8 @@ Shortcut for `detectHarness(env).mode`.
 | Cline | `CLINE` / `CLINE_AGENT` | hook |
 | Gemini CLI | `GEMINI_CLI` | hook |
 | opencode | `OPENCODE` | hook |
+| Hermes | `HERMES_SESSION_ID` | hook |
+| Kimi Code | no dedicated env var — `AGENT=kimi` / `AI_AGENT=kimi` only (verified live against kimi-code v0.27.0: a `config.toml` hook process gets no session marker, and neither `KIMI_CODE_HOME` nor `KIMI_PLUGIN_ROOT` — those reach plugin-declared hooks only) | hook |
 | Windsurf | `WINDSURF_AGENT` / `CODEIUM_AGENT` | cli |
 | Copilot | `COPILOT_AGENT` | cli |
 | Aider | `AIDER` | cli |

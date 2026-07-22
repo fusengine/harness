@@ -15,14 +15,14 @@ export const WEBFETCH_TTL_MS: number = parseEnvInt(process.env.FUSE_WEBFETCH_TTL
 /** WebFetch prompt slice folded into its cache key (parity with Python prompt[:500]). */
 const PROMPT_TRUNC = 500;
 
-/** True for the WebFetch tool (exact name). */
+/** True for the WebFetch tool (exact name) or Kimi Code CLI's `FetchURL` equivalent. */
 export function isWebFetch(tool: string): boolean {
-  return tool === "WebFetch";
+  return tool === "WebFetch" || tool === "FetchURL";
 }
 
-/** MCP doc tools + WebFetch whose calls are cached / verbosity-capped. */
+/** MCP doc tools + WebFetch/FetchURL whose calls are cached / verbosity-capped. */
 export function isMcpTool(tool: string): boolean {
-  return /context7|exa|webfetch|web_fetch/i.test(tool) || tool === "WebFetch";
+  return /context7|exa|webfetch|web_fetch/i.test(tool) || isWebFetch(tool);
 }
 
 /** The query/url that keys the cache. */

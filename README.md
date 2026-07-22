@@ -130,6 +130,7 @@ also works elsewhere.
 | **gemini-cli** | `BeforeTool` denies via `{decision:"deny",reason}` (`gemini/index.ts:22-36`) | none | Thin stateless adapter — no session track, no APEX gates wired through it. |
 | **cline** | `PreToolUse` only; block → `{cancel:true}`, non-block → `contextModification` (`cline/index.ts:24-36`) | none | Same as gemini-cli: stateless guard only. |
 | **hermes** | `pre_tool_call` proven: reuses the Claude stdin reader, blocks via `{decision:"block",reason}` (`hermes/index.ts:12-36`) | untested — no lifecycle dispatch wired for Hermes in this repo | `ask`/`inform` degrade to non-blocking `{context}` — Hermes "has no interactive ask state" (`hermes/index.ts:27-28`). |
+| **kimi** | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`; `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop` (`kimi/index.ts`). | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — copy the TOML snippet from [docs/adapters.md](docs/adapters.md#kimi-code--manual-wiring), and emit **no field** beyond `event`/`matcher`/`command`/`timeout` or the whole config fails to load. **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`; validate hand-written config with `kimi doctor`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
 
 ## What it enforces
 
@@ -191,6 +192,14 @@ Features shipped since 0.1.44, each with its own test:
   version + drift vs. npm, `.claude/BOARD.md`, and the one-shot summary, each
   collector isolated so one failure can't blank the rest
   (`src/runtime/lifecycle/snapshot/index.ts`, `test/snapshot.test.ts`).
+- **Target-aware root-doc injection** — `SessionStart` and `UserPromptSubmit`
+  inject the target's own root instructions doc, not a hardcoded `CLAUDE.md`:
+  `apexDocName(id)` + `harnessHomeSegment(id)` (`src/policy/apex-target.ts`)
+  resolve `AGENTS.md` under `.codex`/`.kimi-code` for Codex/Kimi, `CLAUDE.md`
+  under `.claude` for every other target (byte-identical to the pre-target-aware
+  default). The `systemMessage` label follows suit (`"AGENTS.md injected"`
+  under Codex/Kimi) (`src/runtime/lifecycle/session-start.ts`,
+  `src/runtime/inject-context.ts`).
 - **Injection budget cap** — harness-produced context fragments (lessons,
   snapshot, APEX task context) are capped at ~8000 chars each; owner-authored
   content (CLAUDE.md/rules) is never capped
@@ -202,7 +211,11 @@ Features shipped since 0.1.44, each with its own test:
   carrying `tool_input.agent_type` is recorded as `subagent-<agent_type>` in the
   same SessionTrack as Claude Task evidence, so a Codex explore-codebase/sniper
   satisfies the APEX freshness gates exactly like a Claude subagent
-  (`src/tracking/session-state.ts`, sim scenario 32b).
+  (`src/tracking/session-state.ts`, sim scenario 32b). Recognized
+  agent-launcher tools across targets: `Task` (Claude), `Agent`/`AgentSwarm`
+  (Kimi Code) — each credits its `subagent_type`/`agent_type` toward the same
+  freshness evidence (`src/runtime/activity.ts`,
+  `src/freshness/agent-evidence-record.ts`).
 - **File-size gate judges the real Edit outcome, not the on-disk count** — an
   Edit on a file already over `FUSE_SOLID_MAX_LINES` used to be denied
   unconditionally (the on-disk count always won); the gate now computes the

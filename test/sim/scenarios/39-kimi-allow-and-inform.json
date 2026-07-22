@@ -1,0 +1,34 @@
+{
+  "name": "kimi-allow-and-inform",
+  "harness": "kimi",
+  "doc": "Two Kimi allow-path shapes. Step 1: a plain read (`ls`) via `Bash` -> every gate allows and nothing fires on the allow-path assembly -> EMPTY stdout (never `{}`), same parity check as hermes scenario 20's step 3. Step 2: a `Read` matching a MEMORY/LESSON.md `[TRIGGERS tool:Read]` entry -> the decision-time lesson gate (lesson-gate.ts) returns a non-blocking `inform` Prompt on the allow path -> Kimi's `inform` case renders it as RAW TEXT on stdout (Kimi appends stdout to context on exit 0 — no `hookSpecificOutput` envelope is documented for non-blocking context injection), never the JSON deny envelope used for block/ask.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "setup": [
+    { "path": "$TMP/package.json", "content": "{}" },
+    { "path": "$TMP/MEMORY/LESSON.md", "content": "# LESSON.md\n\n- [2026-07-20 10:00] KIMIINFORMLESSON verify hook payload shapes against the real binary before shipping.\n[TRIGGERS tool:Read]\n" }
+  ],
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "A plain read via Bash -> allowed, and no lesson/notice fires (tool:Read trigger does not match tool_name:Bash) -> the `hook` allow-path assembly prints EMPTY stdout.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc39",
+        "tool_name": "Bash",
+        "tool_input": { "command": "ls -la $TMP" }
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    },
+    {
+      "scope": "core",
+      "doc": "A `Read` matches the LESSON.md `tool:Read` trigger -> allow-path emits the lesson as an `inform` Prompt -> Kimi renders it as raw `[NOTE] ...` text, anchored at the start of stdout — never the JSON block/ask envelope, which always starts with `{\"hookSpecificOutput\"`. (The lesson-gate cooldown is once-per-30min per project state dir, so this must be the only `Read` step in this scenario.)",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc39",
+        "tool_name": "Read",
+        "tool_input": { "file_path": "$TMP/README.md" }
+      },
+      "expect": { "exit": 0, "stdout": { "regex": "^\\[NOTE\\][\\s\\S]*KIMIINFORMLESSON" } }
+    }
+  ]
+}

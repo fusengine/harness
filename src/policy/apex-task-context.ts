@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveMaxLines } from "../config/limits";
 import { harnessHomeSegment } from "./apex-target";
+import { apexTaskSteps } from "./apex-target-steps";
 
 /** Parsed task state injected into a Task sub-agent prompt. */
 export interface ApexTaskState {
@@ -48,10 +49,7 @@ export function loadApexTaskState(taskFile: string): ApexTaskState {
  */
 export function buildApexTaskContext(state: ApexTaskState, maxLines: number, id: string = "claude-code"): string {
   const seg = harnessHomeSegment(id);
-  const isCodex = id === "codex";
-  const step3 = isCodex ? "update_plan → review the current plan" : "TaskList → see pending tasks";
-  const step4 = isCodex ? "update_plan → mark the active step in_progress before starting" : "TaskUpdate(in_progress) → before starting";
-  const step7 = isCodex ? "update_plan → mark the step completed when done" : "TaskUpdate(completed) → triggers auto-commit";
+  const { step3, step4, step7 } = apexTaskSteps(id);
   return (
     `⚠️ APEX MODE - Read ${seg}/apex/AGENTS.md for rules\n\n` +
     `Current: Task #${state.id} - ${state.subject} (Phase: ${state.phase})\n` +

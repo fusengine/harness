@@ -31,3 +31,16 @@ export interface PolicyResult {
   prompt?: Prompt;
   meta?: Record<string, unknown>;
 }
+
+/** Phrasing for the "view pending / mark in-progress / mark done" step trio (APEX task-context injection, steps 3/4/7). See `apex-target-steps.ts`. */
+export interface ApexTaskSteps {
+  step3: string;
+  step4: string;
+  step7: string;
+}
+
+/** Phrasing for the "before starting / when done" pair (APEX sub-agent injection, SubagentStart). See `apex-target-steps.ts`. */
+export interface ApexAgentSteps {
+  beforeStart: string;
+  whenDone: string;
+}

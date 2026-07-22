@@ -35,6 +35,7 @@ const RESEARCH_TOOLS = new Set([
   "mcp__exa__deep_researcher_start",
   "WebSearch",
   "WebFetch",
+  "FetchURL", // Kimi Code CLI's WebFetch-equivalent tool name (docs/reference/tools.html)
   "mcp__fuse-browser__browser_fetch",
   "mcp__fuse-browser__browser_fetch_batch",
   "mcp__fuse-browser__browser_crawl",

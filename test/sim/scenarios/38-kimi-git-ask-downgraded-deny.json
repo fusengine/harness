@@ -1,0 +1,30 @@
+{
+  "name": "kimi-git-ask-downgraded-deny",
+  "harness": "kimi",
+  "doc": "Kimi's hooks contract documents ONLY `permissionDecision:\"deny\"` — no \"ask\" value exists on the envelope (kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html). respond.ts's kimi case therefore downgrades every `ask` prompt to an explicit deny (mirrors the pre-existing codex downgrade in the same function), prefixed so the honest limit is visible instead of silently failing open. A plain `git push` (GIT_ASK, an `ask` on Claude Code — see scenario 11) lands as a DENY on Kimi, never a silent allow.",
+  "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "`git push origin main` matches GIT_ASK (not GIT_BLOCKED) -> an `ask` prompt. On Kimi the `ask` downgrades to `deny`. Assert the decision is `deny`.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc38",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin main" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "hookSpecificOutput.permissionDecision", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Same command, asserting the honest-limit prefix + harness name are present in the reason so the downgrade is visible.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc38",
+        "tool_name": "Bash",
+        "tool_input": { "command": "git push origin main" }
+      },
+      "expect": { "exit": 0, "stdout": { "contains": "[downgraded from ask — Kimi Code has no interactive approval]" } }
+    }
+  ]
+}

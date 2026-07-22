@@ -30,8 +30,11 @@ export function spawnEnv(fixtures: string, home: string, scenarioEnv?: Record<st
     FUSE_HARNESS_REFS: join(fixtures, "refs"),
     // Test-harness-only tracer (src/cli/bin.ts's inline traceHook) — never set
     // by real hook wiring. Lets a silent child (empty stdout/exit 0) leave a
-    // stderr trail instead of nothing.
+    // stderr trail instead of nothing. Both vars are required: bin.ts only
+    // traces when FUSE_HARNESS_DEBUG=1 AND CI=true.
     FUSE_HARNESS_DEBUG: "1",
+    // pairs with FUSE_HARNESS_DEBUG — bin.ts only traces when both are set
+    CI: "true",
     ...(scenarioEnv ?? {}),
   };
 }
