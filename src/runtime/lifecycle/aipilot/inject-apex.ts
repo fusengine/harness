@@ -14,6 +14,7 @@ import { resolveMaxLines } from "../../../config/limits";
 import { contextResponse } from "../../../adapters/claude";
 import { capFragment } from "../../inject-budget";
 import { harnessHomeSegment } from "../../../policy/apex-target";
+import { apexAgentSteps } from "../../../policy/apex-target-steps";
 import type { ApexTaskFile } from "./types";
 
 type TaskMap = ApexTaskFile["tasks"];
@@ -64,9 +65,7 @@ export async function injectApexSubagentContext(cwd: string, home: string = home
   const taskData = await readJsonFile<ApexTaskFile>(join(apexDir, "task.json"));
   const completed = taskData ? completedTasks(taskData.tasks) : "none";
   const pending = taskData ? pendingTasks(taskData.tasks) : "none";
-  const isCodex = id === "codex";
-  const beforeStart = isCodex ? "Use update_plan → mark the active step in_progress before starting" : "Use TaskUpdate(taskId, status: in_progress) before starting";
-  const whenDone = isCodex ? "update_plan → mark the step completed when done" : "TaskUpdate(taskId, status: completed) triggers auto-commit";
+  const { beforeStart, whenDone } = apexAgentSteps(id);
 
   const context = `## APEX Sub-Agent Instructions
 

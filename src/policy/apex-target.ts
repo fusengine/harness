@@ -22,23 +22,28 @@ export function harnessHomeSegment(id: string): string {
 }
 
 /**
- * Root instructions doc name for a harness target: "AGENTS.md" for Codex,
- * "CLAUDE.md" for every other target (including the default/unknown fallback).
+ * Root instructions doc name for a harness target: "AGENTS.md" for Codex and
+ * Kimi Code CLI (both documented conventions), "CLAUDE.md" for every other
+ * target (including the default/unknown fallback).
  * @param id - Harness id.
  * @returns The doc file name.
  */
 export function apexDocName(id: string): string {
-  return id === "codex" ? "AGENTS.md" : "CLAUDE.md";
+  return id === "codex" || id === "kimi" ? "AGENTS.md" : "CLAUDE.md";
 }
 
 /**
- * Native plan/track tool name for a harness target: Codex's `update_plan` vs
- * Claude's `TaskCreate`. Covers only the PLAN-step line — other Claude-only
- * tool references (`TaskList`, `TaskUpdate`) are branched inline by the
- * builders since their surrounding prose differs structurally, not just by token.
+ * Native plan/track tool name for a harness target: Codex's `update_plan`,
+ * Kimi Code CLI's `TodoList`, or Claude's `TaskCreate` (default). Covers only
+ * the PLAN-step line — other target-specific tool references (`TaskList`,
+ * `TaskUpdate`) are resolved via `apexTaskSteps`/`apexAgentSteps` in
+ * `apex-target-steps.ts` since their surrounding prose differs structurally,
+ * not just by token.
  * @param id - Harness id.
  * @returns The plan-tool name.
  */
 export function apexPlanTool(id: string): string {
-  return id === "codex" ? "update_plan" : "TaskCreate";
+  if (id === "codex") return "update_plan";
+  if (id === "kimi") return "TodoList";
+  return "TaskCreate";
 }

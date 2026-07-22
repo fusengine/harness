@@ -15,7 +15,7 @@ import type { Scenario, Step, StepExpect } from "./types";
  * {@link validateHarness} derives its allow-list from this same array (no
  * second hand-maintained list to drift).
  */
-export const SUPPORTED_HARNESSES: readonly HarnessId[] = ["claude-code", "codex", "cursor", "cline", "gemini-cli", "hermes"];
+export const SUPPORTED_HARNESSES: readonly HarnessId[] = ["claude-code", "codex", "cursor", "cline", "gemini-cli", "hermes", "kimi"];
 
 /** Assert `v` is a plain object, else throw a located error. */
 export function asObject(v: unknown, ctx: string): Record<string, unknown> {

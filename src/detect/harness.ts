@@ -16,6 +16,13 @@ const ENV_SIGNALS: ReadonlyArray<readonly [string, HarnessId]> = [
   ["WINDSURF_AGENT", "windsurf"], ["CODEIUM_AGENT", "windsurf"],
   ["COPILOT_AGENT", "copilot"], ["AIDER", "aider"], ["KIRO", "kiro"],
   ["GOOSE", "goose"], ["AMP", "amp"], ["HERMES_SESSION_ID", "hermes"],
+  // No documented session-marker env var for Kimi Code CLI (unlike CLAUDECODE,
+  // CURSOR_AGENT, ...). `KIMI_CODE_HOME`/`KIMI_PLUGIN_ROOT` are injected only
+  // into PLUGIN-declared hooks (customization/plugins.html: "The hook process
+  // receives two extra environment variables"), never into config.toml hooks —
+  // verified live against kimi-code v0.27.0: a config.toml hook process sees
+  // neither var, and no session marker at all. Detection therefore falls
+  // through to the `AGENT=kimi` / `AI_AGENT=kimi` standard above.
 ];
 
 /** `AGENT=<name>` / `AI_AGENT=<name>` standard value -> harness id. */
@@ -23,12 +30,12 @@ const STD_NAMES: Record<string, HarnessId> = {
   goose: "goose", amp: "amp", claude: "claude-code", "claude-code": "claude-code",
   cursor: "cursor", codex: "codex", cline: "cline", aider: "aider",
   opencode: "opencode", gemini: "gemini-cli", copilot: "copilot", kiro: "kiro",
-  hermes: "hermes",
+  hermes: "hermes", kimi: "kimi",
 };
 
 /** Harnesses exposing a native hook system (vs CLI-only integration). */
 const HOOK_CAPABLE: ReadonlySet<HarnessId> = new Set([
-  "claude-code", "codex", "cursor", "cline", "gemini-cli", "opencode", "hermes",
+  "claude-code", "codex", "cursor", "cline", "gemini-cli", "opencode", "hermes", "kimi",
 ]);
 
 /** Integration mode for a harness id. */

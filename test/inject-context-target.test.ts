@@ -38,3 +38,27 @@ test("buildApexTaskInjection: codex target resolves .codex/apex, not .claude/ape
   mkdirSync(join(b, ".claude", "apex"), { recursive: true });
   expect(buildApexTaskInjection(b, "codex")).toBeNull();
 });
+
+test("buildApexTaskContext: kimi target uses .kimi-code + TodoList (done, never TaskList/TaskUpdate/auto-commit)", () => {
+  const out = buildApexTaskContext({ id: "2", subject: "x", phase: "plan", docs: "none" }, 100, "kimi");
+  expect(out.startsWith("⚠️ APEX MODE - Read .kimi-code/apex/AGENTS.md for rules")).toBe(true);
+  expect(out).toContain("3. TodoList → review the current list (omit todos to query)");
+  expect(out).toContain("4. TodoList → mark the active item in_progress before starting");
+  expect(out.endsWith("7. TodoList → mark the item done when finished")).toBe(true);
+  expect(out).not.toContain(".claude");
+  expect(out).not.toContain(".codex");
+  expect(out).not.toContain("TaskUpdate");
+  expect(out).not.toContain("TaskList");
+  expect(out).not.toContain("auto-commit");
+});
+
+test("buildApexTaskInjection: kimi target resolves .kimi-code/apex, not .claude/apex", () => {
+  const a = root();
+  mkdirSync(join(a, ".kimi-code", "apex"), { recursive: true });
+  expect(buildApexTaskInjection(a, "kimi")).toContain("TodoList");
+  expect(buildApexTaskInjection(a, "kimi")).not.toContain(".claude");
+  // A .claude/apex-only project stays inert for the kimi target (no cross-target bleed).
+  const b = root();
+  mkdirSync(join(b, ".claude", "apex"), { recursive: true });
+  expect(buildApexTaskInjection(b, "kimi")).toBeNull();
+});

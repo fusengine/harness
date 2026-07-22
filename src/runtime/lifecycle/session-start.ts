@@ -5,13 +5,20 @@ import { attachSystemMessage, contextResponse } from "../../adapters/claude";
 import { claudeHome, fusengineCache, sessionsDir } from "../home-state";
 import { devContext } from "../dev-context";
 import { pruneEmptyDirs, purgeTtlTree, removeOldFiles, trimLogFile } from "../fs-cleanup";
+import { apexDocName, harnessHomeSegment } from "../../policy/apex-target";
 
 /** TTLs (seconds) for purgeable cache subtrees (cleanup-old-caches.py). */
 const PURGEABLE: Record<string, number> = { sessions: 48 * 3600, webfetch: 24 * 3600, doc: 48 * 3600, explore: 48 * 3600 };
 
-/** Read `~/.claude/CLAUDE.md`, or "" when missing/unreadable. */
-function claudeMd(home: string): string {
-  const path = join(claudeHome(home), "CLAUDE.md");
+/**
+ * Read the target's root instructions doc (`~/.claude/CLAUDE.md`,
+ * `~/.codex/AGENTS.md`, `~/.kimi-code/AGENTS.md`, ...), or "" when
+ * missing/unreadable.
+ * @param home - Home dir.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
+ */
+function claudeMd(home: string, id: string = "claude-code"): string {
+  const path = join(home, harnessHomeSegment(id), apexDocName(id));
   try {
     return existsSync(path) ? readFileSync(path, "utf-8") : "";
   } catch {
@@ -38,12 +45,13 @@ export function runSessionStartCleanups(home: string = homedir(), now: number = 
  * @param cwd - Project root for dev-context detection.
  * @param home - Home dir (defaults to `~`).
  * @param now - Clock for TTL cleanup (defaults to `Date.now()`).
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty).
  */
-export function sessionStartCore(cwd: string, home: string = homedir(), now: number = Date.now()): string {
-  const md = claudeMd(home);
+export function sessionStartCore(cwd: string, home: string = homedir(), now: number = Date.now(), id: string = "claude-code"): string {
+  const md = claudeMd(home, id);
   const dev = devContext(cwd);
   runSessionStartCleanups(home, now);
   const ctx = [md, dev].filter(Boolean).join("\n");
-  return ctx ? attachSystemMessage(contextResponse("SessionStart", ctx), "CLAUDE.md injected") : "";
+  return ctx ? attachSystemMessage(contextResponse("SessionStart", ctx), `${apexDocName(id)} injected`) : "";
 }

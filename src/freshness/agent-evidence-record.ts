@@ -17,8 +17,13 @@ export interface AgentEvidence {
   quality: AgentQuality;
 }
 
-/** Tools the existing Task tracking already credits as agent LAUNCHES. */
-const AGENT_LAUNCH_TOOLS = new Set(["Task", "Agent"]);
+/**
+ * Tools the existing Task tracking already credits as agent LAUNCHES.
+ * `AgentSwarm` is Kimi Code's batch launcher (`prompt_template` + `items`,
+ * one `subagent_type` applied to every spawned sub-agent) — same launch
+ * semantics as `Task`/`Agent`, so it is excluded here too (anti-double-count).
+ */
+const AGENT_LAUNCH_TOOLS = new Set(["Task", "Agent", "AgentSwarm"]);
 
 /**
  * `JSON.stringify` length of the raw `tool_response` OBJECT (parity Python
