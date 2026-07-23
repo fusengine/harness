@@ -18,38 +18,38 @@ test("locked RMW: mutation lands and track stays valid", async () => {
 });
 
 test("concurrency: 8 processes × 3 writes each — no write lost SILENTLY under the lock", async () => {
-  const d = dir();
-  const file = join(d, "track.json");
+  const d = dir(), home = dir(), file = join(d, "track.json");
   const storePath = join(new URL("..", import.meta.url).pathname, "src/tracking/store.ts");
-  // Each worker reports how many of its 3 writes were fail-open-skipped (withTrack -> false,
-  // see track-lock.ts's documented contention budget) via its OWN exit code, not stdout:
-  // buffering/flush timing across 8 concurrent child processes is not reliable on a loaded
-  // CI runner (observed: skip counts silently read back as 0), while the exit code is
-  // delivered by the kernel's waitpid and carries no such race. 99 is a crash sentinel,
-  // clearly outside the valid 0-3 skip range, so a real failure can't be folded into a skip.
-  const script = `import { withTrack } from ${JSON.stringify(storePath)};
+  // Hermetic HOME (CI flake fix): the parent froze HARNESS_DIR at import while
+  // neighbouring tests mutate process.env.HOME — workers signed under a home
+  // whose .key differed from the verifier's → verifyTrack rejected every write
+  // (landed=0, skipped=0). A 9th verifier worker shares the SAME pinned HOME.
+  const script = `import { withTrack, loadTrack } from ${JSON.stringify(storePath)};
 const file = ${JSON.stringify(file)}, id = process.env.WORKER_ID;
+if (id === "v") { process.stdout.write(JSON.stringify((await loadTrack(file)).refsRead ?? [])); process.exit(0); }
 let skipped = 0;
 try {
   for (let i = 0; i < 3; i++) { const ok = await withTrack(file, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })); if (!ok) skipped++; }
 } catch { process.exit(99); }
 process.exit(skipped);`;
-  const procs = Array.from({ length: 8 }, (_, i) => new Promise<{ code: number | null }>((done) => {
-    const p = spawn("bun", ["-e", script], { env: { ...process.env, WORKER_ID: `p${i}` } });
-    p.on("close", (code) => done({ code }));
-  }));
-  const results = await Promise.all(procs);
-  // No worker crashed (99) or was killed by a signal (null) — a real failure must fail the
-  // test loudly, never be silently folded into the skip tally.
+  const run = (id: string) => new Promise<{ code: number | null; out: string }>((done) => {
+    const p = spawn("bun", ["-e", script], { env: { ...process.env, HOME: home, WORKER_ID: id } });
+    let out = "";
+    p.stdout!.on("data", (c: Buffer) => (out += c.toString()));
+    p.on("close", (code) => done({ code, out }));
+  });
+  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => run(`p${i}`)));
+  // Exit code = skip count (kernel waitpid, race-free); 99 = crash sentinel.
   for (const r of results) { expect(r.code).not.toBeNull(); expect(r.code).not.toBe(99); }
-  const totalSkipped = results.reduce((sum, r) => sum + (r.code as number), 0);
-  const track = await loadTrack(file);
-  const landed = track.refsRead?.length ?? 0;
+  const totalSkipped = results.reduce<number>((sum, r) => sum + (r.code ?? 0), 0);
+  const v = await run("v");
+  expect(v.code).toBe(0);
+  const refs = JSON.parse(v.out) as string[];
+  const landed = refs.length;
   // Every attempted write either lands or is a named fail-open skip — never silently vanishes.
-  // A starved runner (few vCPUs, 8-way contention) can legitimately skip some; that is by design.
   expect(landed + totalSkipped).toBe(24);
   // No duplicate/corrupted entries: the lock must never let two writers land the same slot.
-  expect(new Set(track.refsRead ?? []).size).toBe(landed);
+  expect(new Set(refs).size).toBe(landed);
 });
 
 test("degradation: busy lock -> decision rendered without the write, stderr logged", async () => {
