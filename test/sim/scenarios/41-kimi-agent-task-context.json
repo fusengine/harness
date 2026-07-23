@@ -1,0 +1,36 @@
+{
+  "name": "kimi-agent-task-context",
+  "harness": "kimi",
+  "doc": "Kimi dispatches sub-agents via the `Agent` tool, not `Task` (isAgentTool, handle-pre.ts): with a .kimi-code/apex target present, a PreToolUse Agent call triggers the APEX sub-agent context injection — before the fix the branch tested `Task` only and never fired for kimi. Note: the envelope itself is still the legacy Claude-shaped contextResponse (kimi consumption of additionalContext is unverified upstream); this scenario locks the TRIGGER, not the envelope.",
+  "env": {
+    "FUSE_ENFORCE_TTL_SEC": "3600"
+  },
+  "setup": [
+    {
+      "path": "$TMP/.kimi-code/apex/AGENTS.md",
+      "content": "# APEX rules\nFollow the phases.\n"
+    }
+  ],
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "Agent tool with an apex target present -> isAgentTool matches -> taskContext emits the APEX sub-agent injection.",
+      "event": {
+        "hook_event_name": "PreToolUse",
+        "session_id": "sc41",
+        "tool_name": "Agent",
+        "tool_input": {
+          "prompt": "explore the repo",
+          "description": "explore",
+          "subagent_type": "explore"
+        }
+      },
+      "expect": {
+        "exit": 0,
+        "stdout": {
+          "contains": "APEX"
+        }
+      }
+    }
+  ]
+}

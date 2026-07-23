@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { harnessHome } from "./home-dir";
 import type { HarnessId } from "../detect/harness";
 
 /** Home config dir holding the `.env` for each harness (defaults to `.claude`). */
@@ -33,7 +34,7 @@ export function parseEnvFile(path: string): Record<string, string> {
 
 /** The `.env` paths probed for a harness: home `.env` then `<cwd>/.env`. */
 export function envCandidates(id: HarnessId, home: string = homedir(), cwd: string = process.cwd()): string[] {
-  return [join(home, HOME_DIR[id] ?? ".claude", ".env"), join(cwd, ".env")];
+  return [join(harnessHome(id, process.env, home), ".env"), join(cwd, ".env")];
 }
 
 /**

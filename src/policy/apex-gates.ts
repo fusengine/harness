@@ -63,7 +63,9 @@ export const solidReadGate: ApexGate = (ctx: ApexContext) => {
   if (missing.length === 0) return null;
   const optional = routed.optional.map((r) => r.meta.filePath);
   const reason = [
-    `Read these before editing ${ctx.filePath} (expires every ${ttl}):`,
+    // H2b: the credit needs the routed refs read — say ALL of them (the
+    // Optional line counts too) and that a retry is EXPECTED once read.
+    `Read ALL references below (including Optional), then retry — required before editing ${ctx.filePath} (expires every ${ttl}):`,
     ...(optional.length ? [`Optional: ${optional.join(", ")}`] : []),
     `Full skill: ${routed.skillPath}`,
   ].join("\n");

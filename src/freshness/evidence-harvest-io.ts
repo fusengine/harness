@@ -13,6 +13,8 @@ import { defaultStateDir, trackFile } from "../runtime/paths";
 import { emptyTrack, type SessionTrack } from "../tracking/session-state";
 import { signTrack, verifyTrack, writeLastNonce, type TrackEnvelope } from "../tracking/integrity";
 import { atomicWrite } from "../util/json-io";
+import { LOCK_FAILED, withTrackLockSync } from "../tracking/track-lock-sync";
+import { dirname } from "node:path";
 
 /** Load the current track synchronously; `emptyTrack()` when absent/corrupt (fail-closed read). */
 function loadTrackSync(file: string): SessionTrack {
@@ -39,12 +41,17 @@ export function harvestSubagentTrack(payload: Record<string, unknown>, cwd: stri
   if (!transcriptPath) return;
   const sessionId = typeof payload.session_id === "string" ? payload.session_id : "unknown";
   const file = trackFile(sessionId, baseDir);
-  const track = loadTrackSync(file);
-  const next = harvestAgentEvidence(transcriptPath, track, now);
-  if (next === track) return; // nothing harvested (or unreadable) → no rewrite
-  try {
-    const envelope = signTrack(next);
-    atomicWrite(file, JSON.stringify(envelope, null, 2));
-    writeLastNonce(envelope.nonce);
-  } catch { /* fail-open: a lifecycle hook must never throw */ }
+  // Locked RMW (sync variant — this path cannot float async work): on
+  // contention the harvest is skipped like any other write error, fail-open.
+  const ran = withTrackLockSync(dirname(file), () => {
+    const track = loadTrackSync(file);
+    const next = harvestAgentEvidence(transcriptPath, track, now);
+    if (next === track) return; // nothing harvested (or unreadable) → no rewrite
+    try {
+      const envelope = signTrack(next);
+      atomicWrite(file, JSON.stringify(envelope, null, 2));
+      writeLastNonce(envelope.nonce);
+    } catch { /* fail-open: a lifecycle hook must never throw */ }
+  });
+  if (ran === LOCK_FAILED) return;
 }

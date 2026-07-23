@@ -2,7 +2,7 @@ import { projectLayout } from "../config/layout";
 import { detectFramework } from "../policy/detect-framework";
 import { detectCreationIntent } from "../policy/creation-intent";
 import { recordBrainstormRequired } from "../tracking/session-state";
-import { loadTrack, saveTrack } from "../tracking/store";
+import { withTrack } from "../tracking/store";
 import { normalizeEvent } from "./normalize";
 import { defaultStateDir, trackFile } from "./paths";
 import { designLifecycle } from "./design-lifecycle";
@@ -70,8 +70,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // UserPromptSubmit (core scope): brainstorm flag + CLAUDE.md injection.
   const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
   if (userPrompt !== undefined) {
-    const track = await loadTrack(file);
-    await saveTrack(file, recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
+    await withTrack(file, (track) => recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
     return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
   }
 

@@ -14,31 +14,15 @@ import { runSecurityScan } from "../runtime/lifecycle/security/scan";
 import { buildCodexRules } from "../codex-rules";
 import { writeFileSync } from "node:fs";
 import { handleHook } from "../runtime/handle";
-import type { PluginScope } from "../runtime/lifecycle";
 import { resolveTtlSec } from "../config/ttl";
 import { loadDotenv } from "../config/dotenv";
 import { discoverRefs } from "../refs/discover";
 import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 import { runDoctor, runningVersion, versionBanner } from "./doctor";
-import { readStdin as readRawStdin } from "../util/runtime-io";
+import { parseScope } from "./scope";
+import { isOversize, oversizeStdout, readStdin, traceHook } from "./hook-io";
 import { maybePlaySound } from "./hook-sound";
-
-// Inline trace helper (kept in this file, not a separate module) — stderr-only, active only when FUSE_HARNESS_DEBUG=1 AND CI=true (both set by test/sim/exec.ts; never in an interactive session).
-const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1" && process.env.CI === "true";
-function traceHook(label: string, data: unknown): void {
-  if (hookDebug) process.stderr.write(`[hook-debug] ${label}: ${typeof data === "string" ? data : JSON.stringify(data)}\n`);
-}
-
-async function readStdin(): Promise<Record<string, unknown>> {
-  const text = (await readRawStdin()).trim();
-  traceHook("stdin-text-length", text.length);
-  if (!text) return {};
-  try {
-    const parsed: unknown = JSON.parse(text);
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
-  } catch (e) { traceHook("stdin-parse-error", e instanceof Error ? e.message : String(e)); return {}; }
-}
 
 const cmd = process.argv[2];
 
@@ -52,16 +36,20 @@ if (cmd === "--version" || cmd === "-v") {
 } else if (cmd === "hook") {
   const id = process.argv[3] ?? detectHarness().id;
   loadDotenv(id as HarnessId);
-  const scopeArg = process.argv[4];
-  const validScopes = new Set<string>(["solid", "rules", "carto", "security", "changelog", "aipilot", "lessons", "seo", "memory", "tailwindcss"]);
-  const scope: PluginScope = scopeArg !== undefined && validScopes.has(scopeArg) ? (scopeArg as PluginScope) : "core";
+  const scope = parseScope(process.argv[4]);
   if (maybePlaySound(process.argv)) process.exit(0);
   const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
   const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
   traceHook("args", { id, scope });
   let outcome: Awaited<ReturnType<typeof handleHook>>;
   try {
-    outcome = await handleHook(id, await readStdin(), { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
+    const stdin = await readStdin();
+    if (isOversize(stdin)) {
+      const stdout = oversizeStdout(id, stdin.head);
+      if (stdout) process.stdout.write(stdout);
+      process.exit(0);
+    }
+    outcome = await handleHook(id, stdin, { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
   } catch (e) { traceHook("handleHook-threw", e instanceof Error ? `${e.message}\n${e.stack}` : String(e)); throw e; }
   traceHook("outcome", { stdoutLength: outcome.stdout.length, exit: outcome.exit });
   if (outcome.stdout) process.stdout.write(outcome.stdout);

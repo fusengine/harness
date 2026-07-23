@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 import { existsSync, readFileSync } from "node:fs";
-import { loadTrack, saveTrack } from "./store";
+import { withTrack } from "./store";
 import { verifyTrack, type TrackEnvelope } from "./integrity";
 import type { SessionTrack } from "./session-state";
 
@@ -95,6 +95,5 @@ export function freshReceiptFromFile(file: string, windowMs: number, now: number
 export async function captureReceipt(file: string, command: string, output: string, exitCode: number, now: number): Promise<void> {
   const receipt = classifyReceipt(command, output, exitCode, now);
   if (!receipt) return;
-  const track = await loadTrack(file);
-  await saveTrack(file, recordReceipt(track, receipt));
+  await withTrack(file, (track) => recordReceipt(track, receipt));
 }

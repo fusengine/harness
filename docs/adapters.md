@@ -71,6 +71,34 @@ timeout = 30
 > (int, 1-600s, default 30). **Any extra field makes Kimi fail to load the whole
 > config** — do not add `id`, `name`, `type`, `enabled`, or anything else.
 
+Scoped wiring is also available — the second argument selects the plugin scope
+(`core` when omitted; unknown values now warn on stderr). The `solid` scope
+carries the PreToolUse file-size deny (`FUSE_SOLID_MAX_LINES`, default 100)
+without the core-only APEX freshness gates:
+
+```toml
+[[hooks]]
+event = "PreToolUse"
+matcher = "Write|Edit"
+command = "npx -y @fusengine/harness hook kimi solid"
+timeout = 30
+```
+
+When distributing as a **Kimi plugin**, skip the global config entirely and
+declare the hooks in `kimi.plugin.json` — Kimi injects `KIMI_PLUGIN_ROOT` and
+`KIMI_CODE_HOME` into the hook process (the rules scope resolves both):
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "hooks": [
+    { "event": "PreToolUse", "matcher": "Write|Edit", "command": "npx -y @fusengine/harness hook kimi solid", "timeout": 30 },
+    { "event": "UserPromptSubmit", "command": "npx -y @fusengine/harness hook kimi rules", "timeout": 30 }
+  ]
+}
+```
+
 Notes:
 
 - Tool names differ from Claude Code: `FetchURL` (not `WebFetch`), `Agent` (not

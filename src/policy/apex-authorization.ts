@@ -90,7 +90,8 @@ export const apexAuthorizationGate: ApexGate = (ctx) => {
   }
   const optional = routed.optional.map((r) => r.meta.filePath);
   const reason = [
-    `APEX: Read specific SOLID references (expires every ${ttl}) for ${ctx.framework}.`,
+    // H2b: name the full set (required + Optional) and invite the retry.
+    `APEX: Read ALL SOLID references below (including Optional), then retry (expires every ${ttl}) for ${ctx.framework}.`,
     `Editing: ${ctx.filePath}`,
     ...(optional.length ? [`Optional: ${optional.join(", ")}`] : []),
     `Full skill: ${routed.skillPath}`,

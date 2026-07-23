@@ -10,7 +10,7 @@ import { aipilotPostToolUse, checkFileSize, validateTailwind } from "./lifecycle
 import { seoPostToolUseResponse } from "./lifecycle/seo/post-tool-use";
 import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-evidence-record";
 import { recordCodexSpawnEvidence } from "../freshness/codex-spawn-evidence";
-import { captureReceipt } from "../tracking/receipts";
+import { captureBashReceipt } from "./receipt-capture";
 import { recordCodexPostFailure } from "../tracking/codex-post-failure";
 import { designPassNotice } from "../policy/design/gates";
 import { attachSystemMessage } from "../adapters/claude";
@@ -44,14 +44,9 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // Codex multi_agent_v2 `spawn_agent` -> same session track (no-op for every
   // other harness / non-spawn tool / missing `agent_type`; see module doc).
   await recordCodexSpawnEvidence(file, id, event.tool, event.input, opts.now);
-  // Verification receipts: a Bash `tsc`/`bun test` run is parsed (exit code +
-  // pass/fail counts) into a signed receipt the TaskCompleted gate later demands.
-  if (event.tool === "Bash" && event.command) {
-    const r = (payload.tool_result ?? response) as { exit_code?: unknown; stdout?: unknown; stderr?: unknown } | undefined;
-    const out = `${typeof r?.stdout === "string" ? r.stdout : ""}\n${typeof r?.stderr === "string" ? r.stderr : ""}`;
-    const exit = Number(r?.exit_code ?? 0);
-    await captureReceipt(file, event.command, out, Number.isFinite(exit) ? exit : 0, opts.now);
-  }
+  // Verification receipts (tsc/bun test runs) — structured responses only
+  // (Kimi's string `tool_output` would forge a success receipt; see module).
+  await captureBashReceipt(file, event.tool, event.command, payload.tool_result, response, opts.now);
   if (id === "codex") recordCodexPostFailure(event.tool, payload.tool_result ?? response, { now: opts.now, dir: defaultStateDir(opts.cwd), sessionId: event.sessionId });
   // Codex `apply_patch` fans into per-file events here; every other tool is a
   // single-element identity array, so behavior below is unchanged for them.
@@ -92,7 +87,9 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   if (!extra) return { stdout: respond(id, withUserMessage, "PostToolUse"), exit: 0 };
   // `extra` is already-rendered Claude-shaped stdout (postEditContext): claude/codex get the
   // notice attached onto it; other harnesses cannot parse `extra` anyway, so the notice —
-  // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra).
+  // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra;
+  // kimi never inherits the Claude-shaped `extra` — it could not parse it).
   if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, userMessage), exit: 0 };
+  if (id === "kimi") return { stdout: respond(id, withUserMessage, "PostToolUse"), exit: 0 };
   return { stdout: respond(id, withUserMessage, "PostToolUse") || extra, exit: 0 };
 }

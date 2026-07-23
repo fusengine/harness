@@ -1,5 +1,5 @@
 import { dirname } from "node:path";
-import { loadTrack, saveTrack } from "../tracking/store";
+import { withTrack } from "../tracking/store";
 import { recordAgent, recordDoc, recordRefRead, type AgentQuality } from "../tracking/session-state";
 import { appendRefRead } from "../freshness/ref-journal";
 
@@ -11,14 +11,13 @@ export type Activity =
 
 /** Apply an activity to a session's track and persist it (PostToolUse path). */
 export async function recordActivity(file: string, activity: Activity): Promise<void> {
-  const track = await loadTrack(file);
-  const next =
+  await withTrack(file, (track) =>
     activity.kind === "agent"
       ? recordAgent(track, activity.name, activity.ts, activity.quality)
       : activity.kind === "doc"
         ? recordDoc(track, activity.framework, activity.sessionId, activity.source, activity.ts)
-        : recordRefRead(track, activity.path, activity.ts);
-  await saveTrack(file, next);
+        : recordRefRead(track, activity.path, activity.ts),
+  );
   // Mirror a `.md` ref read into the append-only journal: the racy load→save above
   // loses a lone write under the hook fan-out, and a teammate's read has not yet
   // flushed to the platform transcript at edit time (multi-minute lag > TTL) — the

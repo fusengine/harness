@@ -5,7 +5,7 @@ import { FAIL_CLOSED } from "../policy/guards";
 import { agentsFresh, recordTarget, recordTrivialEdit, trivialCount, type SessionTrack } from "../tracking/session-state";
 import { agentsRanFromTranscript } from "../freshness/agent-evidence";
 import { agentsFreshInTrack } from "../freshness/agent-evidence-record";
-import { saveTrack } from "../tracking/store";
+import { withTrack } from "../tracking/store";
 import { REQUIRED_AGENTS, TRIVIAL_BUDGET } from "./gate";
 import type { GateInput } from "./gate-input";
 import type { Prompt } from "../prompt/types";
@@ -35,7 +35,7 @@ export async function apexScopedGate(input: GateInput, track: SessionTrack, wind
   // (parity :58-65 — only Edit ever qualifies as "trivial"; a Write always
   // creates/replaces a file wholesale and must go through the full gate).
   if (isTrivialEdit(input.tool, input.content, input.isReplaceAll) && trivialCount(track, window, input.now) < TRIVIAL_BUDGET) {
-    await saveTrack(input.trackFile, recordTrivialEdit(track, input.now, window, input.now));
+    await withTrack(input.trackFile, (fresh) => recordTrivialEdit(fresh, input.now, window, input.now));
     return null;
   }
 
@@ -70,7 +70,7 @@ export async function apexScopedGate(input: GateInput, track: SessionTrack, wind
     const authDeny = apexAuthorizationGate(ctx);
     if (authDeny) {
       const set_at = new Date(input.now).toISOString();
-      await saveTrack(input.trackFile, recordTarget(track, { project: input.cwd ?? "", framework: input.framework, set_by: "apex-authorization", set_at }));
+      await withTrack(input.trackFile, (fresh) => recordTarget(fresh, { project: input.cwd ?? "", framework: input.framework, set_by: "apex-authorization", set_at }));
       return authDeny;
     }
     // (6) Check 2 (doc consulted once per session) + SOLID refs.

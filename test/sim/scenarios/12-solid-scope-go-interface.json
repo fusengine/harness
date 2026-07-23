@@ -1,7 +1,10 @@
 {
   "name": "solid-scope-go-interface",
-  "doc": "The `solid` plugin scope in isolation (validate-solid.ts). Unlike core, the solid scope short-circuits in handlePre (handle-pre.ts:55-57) to validateSolidGate ONLY — a Go/Python interface-location check gated behind SOLID_PROJECT_TYPE, NEVER the file-size ceiling. A top-level Go interface outside /interfaces/ is denied; the same interface INSIDE internal/interfaces/ is allowed. This is why 01 (file-size) runs in CORE, not solid.",
-  "env": { "FUSE_ENFORCE_TTL_SEC": "3600", "SOLID_PROJECT_TYPE": "go" },
+  "doc": "The `solid` plugin scope in isolation (solid-pre.ts). The scope short-circuits in handlePre to the solid-scope gates ONLY: the PreToolUse file-size ceiling (solid-file-size-gate.ts, same policy as core's evaluate.ts, without the APEX freshness gates), then validateSolidGate — a Go/Python interface-location check gated behind SOLID_PROJECT_TYPE. A top-level Go interface outside /interfaces/ is denied; the same interface INSIDE internal/interfaces/ is allowed.",
+  "env": {
+    "FUSE_ENFORCE_TTL_SEC": "3600",
+    "SOLID_PROJECT_TYPE": "go"
+  },
   "steps": [
     {
       "scope": "solid",
@@ -10,9 +13,17 @@
         "hook_event_name": "PreToolUse",
         "session_id": "sc12",
         "tool_name": "Write",
-        "tool_input": { "file_path": "$TMP/foo.go", "content": "package main\n\ntype Foo interface {\n\tBar()\n}\n" }
+        "tool_input": {
+          "file_path": "$TMP/foo.go",
+          "content": "package main\n\ntype Foo interface {\n\tBar()\n}\n"
+        }
       },
-      "expect": { "exit": 0, "stdout": { "contains": "internal/interfaces" } }
+      "expect": {
+        "exit": 0,
+        "stdout": {
+          "contains": "internal/interfaces"
+        }
+      }
     },
     {
       "scope": "solid",
@@ -21,9 +32,17 @@
         "hook_event_name": "PreToolUse",
         "session_id": "sc12",
         "tool_name": "Write",
-        "tool_input": { "file_path": "$TMP/internal/interfaces/foo.go", "content": "package interfaces\n\ntype Foo interface {\n\tBar()\n}\n" }
+        "tool_input": {
+          "file_path": "$TMP/internal/interfaces/foo.go",
+          "content": "package interfaces\n\ntype Foo interface {\n\tBar()\n}\n"
+        }
       },
-      "expect": { "exit": 0, "stdout": { "empty": true } }
+      "expect": {
+        "exit": 0,
+        "stdout": {
+          "empty": true
+        }
+      }
     }
   ]
 }

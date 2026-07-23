@@ -1,5 +1,6 @@
 import { sessionStartCore } from "./session-start";
 import { injectRules } from "./inject-rules";
+import { resolveRulesRoot } from "./rules-root";
 import { solidDetectStart } from "./solid-detect";
 import { subagentCacheContext } from "./subagent-cache";
 import { trackAgentMemory } from "./agent-memory";
@@ -33,9 +34,9 @@ export interface LifecycleInput {
 /** SessionStart handler keyed on plugin scope. */
 function sessionStart(input: LifecycleInput): string {
   if (input.scope === "solid") return solidDetectStart();
-  if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event);
+  if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
   if (input.scope === "carto") return cartoSessionStart(input.cwd, input.now);
-  if (input.scope === "lessons") return dispatchLessons("SessionStart", input.payload, input.cwd, input.now);
+  if (input.scope === "lessons") return dispatchLessons("SessionStart", input.payload, input.cwd, input.now, input.id ?? "claude-code");
   const core = sessionStartCore(input.cwd, undefined, input.now, input.id ?? "claude-code");
   // core scope only: concatenate the reconciliation snapshot onto the existing
   // additionalContext (CLAUDE.md + dev-context) — never replaces it, fail-safe.
@@ -54,16 +55,16 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     case "SessionStart":
       return sessionStart(input);
     case "UserPromptSubmit":
-      if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event);
-      if (input.scope === "lessons") return dispatchLessons("UserPromptSubmit", input.payload, input.cwd, input.now);
+      if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
+      if (input.scope === "lessons") return dispatchLessons("UserPromptSubmit", input.payload, input.cwd, input.now, input.id ?? "claude-code");
       return null;
     case "SubagentStart":
-      if (input.scope === "rules") return injectRules(process.env.CLAUDE_PLUGIN_ROOT ?? input.cwd, input.event);
+      if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
       if (input.scope === "aipilot") return "";
-      if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now);
+      if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now, input.id ?? "claude-code");
       return subagentCacheContext(input.payload.session_id);
     case "Stop":
-      if (input.scope === "lessons") return dispatchLessons("Stop", input.payload, input.cwd, input.now);
+      if (input.scope === "lessons") return dispatchLessons("Stop", input.payload, input.cwd, input.now, input.id ?? "claude-code");
       return input.scope === "core" ? stopCore(input.payload, input.cwd, input.now) : null;
     case "SubagentStop":
       if (input.scope === "aipilot") return "";

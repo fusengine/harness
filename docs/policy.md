@@ -56,7 +56,7 @@ if (r.decision === "deny") report(r.prompt?.reason ?? r.message);
 |--------|-------------|
 | `evaluateFileSize(lines, max?)` | `{ ok, lines, max, message }` against the SOLID limit |
 | `countLines(content)` | line count (empty = 0) |
-| `detectProjectType(dir)` | framework from config files on disk (15 types) |
+| `detectProjectType(dir)` | framework from config files on disk (19 types) |
 | `detectFramework(path, content)` | framework from extension + content patterns |
 | `DEV_KEYWORDS`, `isApexCommand(prompt)` | dev-task / `/apex` detection |
 | `GIT_BLOCKED`, `GIT_ASK`, `SYSTEM_INSTALL`, `PROJECT_INSTALL` | `RegExp[]` guard data (verbatim from the fusengine guards) |

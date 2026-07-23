@@ -3,6 +3,7 @@ import type { AgentQuality } from "../tracking/session-state";
 import { classifyExplore } from "../freshness/explore-tools";
 import { docFramework } from "../freshness/query-framework";
 import { shellReadRefPaths } from "../policy/shell-read-refs";
+import { isAgentTool } from "./is-agent-tool";
 
 /** A live tool-use, already normalized to `tool` + `input` by the adapter. */
 export interface ToolEvent {
@@ -16,10 +17,8 @@ export interface ToolEvent {
   responseLength?: number;
 }
 
-/** Min response length (chars) for a lead agent call to count as `sufficient`. */
+/** Quality thresholds (chars): lead agent calls vs direct explore/research (parity Python `> 50`). */
 const AGENT_QUALITY_MIN = 500;
-
-/** Min response length (chars) for direct exploration/research (parity Python `> 50`). */
 const EXPLORE_QUALITY_MIN = 50;
 
 /** Read tools across harnesses (Claude `Read`, Gemini/Cline `read_file`, …). */
@@ -71,10 +70,8 @@ export function activityFor(event: ToolEvent): Activity[] {
   const docSource = docSourceOf(event.tool);
   if (docSource) out.push({ kind: "doc", framework: docFramework(event.input, event.framework), sessionId: event.sessionId, source: docSource, ts: event.now });
 
-  // `AgentSwarm` is Kimi Code's batch sub-agent launcher: `subagent_type` applies
-  // to every spawned sub-agent (same identity field as Task/Agent), so it shares
-  // this branch rather than needing its own name-extraction logic.
-  if (event.tool === "Task" || event.tool === "Agent" || event.tool === "AgentSwarm") {
+  // AgentSwarm is Kimi Code's batch launcher — same `subagent_type` identity field.
+  if (isAgentTool(event.tool)) {
     const name = String(event.input?.subagent_type ?? event.input?.name ?? "").split(":").pop() ?? "";
     if (name) out.push(agentActivity(name, event.now, qualityFor(event.responseLength, AGENT_QUALITY_MIN)));
     return out;

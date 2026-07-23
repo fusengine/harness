@@ -8,7 +8,7 @@
  * event router + lesson-file injection. Non-fatal by design.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { attachSystemMessage, contextResponse } from "../../../adapters/claude";
+import { renderInform } from "../../inform";
 import { projectRoot } from "../../../util/project-root";
 import { atomicWrite } from "../../../util/json-io";
 import { curateLessons } from "../aipilot/curate-lessons";
@@ -45,7 +45,7 @@ function persistCuration(file: string, root: string, curated: string, archive: s
  * was this exact block silently reaching ~44k tokens. Any curation report
  * surfaces via systemMessage.
  */
-function injectMemory(cwd: string, event: string, now: number): string {
+function injectMemory(cwd: string, event: string, now: number, id: string): string {
   const root = projectRoot(cwd);
   const file = lessonsFileFor(root);
   if (!existsSync(file)) return "";
@@ -56,8 +56,8 @@ function injectMemory(cwd: string, event: string, now: number): string {
   if (curated !== content) content = persistCuration(file, root, curated, archive, content);
   const body = capFragment("lessons", compressInjection(content));
   const ctx = `Project lessons — never reproduce these:\n${body}\nYou may append OR refine/merge/dedupe bullets in MEMORY/LESSON.md — keep it terse.`;
-  const withNotice = attachSystemMessage(contextResponse(event, ctx), "lessons injected");
-  return report ? attachSystemMessage(withNotice, `LESSON.md curation:\n${report}`) : withNotice;
+  const notice = report ? `lessons injected\nLESSON.md curation:\n${report}` : "lessons injected";
+  return renderInform(id, event, ctx, notice);
 }
 
 /**
@@ -68,14 +68,15 @@ function injectMemory(cwd: string, event: string, now: number): string {
  * @param payload - The raw hook payload.
  * @param cwd - Project root for memory injection.
  * @param now - Clock.
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native stdout (possibly empty).
  */
-export function dispatchLessons(event: string, payload: Record<string, unknown>, cwd: string, now: number): string {
+export function dispatchLessons(event: string, payload: Record<string, unknown>, cwd: string, now: number, id: string = "claude-code"): string {
   switch (event) {
     case "SessionStart":
     case "SubagentStart":
     case "UserPromptSubmit":
-      return injectMemory(cwd, event, now);
+      return injectMemory(cwd, event, now, id);
     case "Stop":
       return remindWrite(payload, now);
     case "PostToolUse":

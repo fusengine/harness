@@ -6,8 +6,9 @@
  * Workflow-spawned agents count, unlike the lead-transcript scan.
  */
 import { classifyExplore } from "./explore-tools";
-import { loadTrack, saveTrack } from "../tracking/store";
+import { withTrack } from "../tracking/store";
 import { recordAgent, type AgentQuality, type SessionTrack } from "../tracking/session-state";
+import { isAgentTool } from "../runtime/is-agent-tool";
 
 /** One classified PostToolUse call, ready to persist as freshness evidence. */
 export interface AgentEvidence {
@@ -16,14 +17,6 @@ export interface AgentEvidence {
   /** `sufficient` when the call hit an MCP cache OR its response JSON is >50 chars. */
   quality: AgentQuality;
 }
-
-/**
- * Tools the existing Task tracking already credits as agent LAUNCHES.
- * `AgentSwarm` is Kimi Code's batch launcher (`prompt_template` + `items`,
- * one `subagent_type` applied to every spawned sub-agent) — same launch
- * semantics as `Task`/`Agent`, so it is excluded here too (anti-double-count).
- */
-const AGENT_LAUNCH_TOOLS = new Set(["Task", "Agent", "AgentSwarm"]);
 
 /**
  * `JSON.stringify` length of the raw `tool_response` OBJECT (parity Python
@@ -47,7 +40,7 @@ function responseJsonLength(toolResponse: unknown): number {
  * @returns The evidence to record, or null to skip.
  */
 export function classifyAgentEvidence(tool: string, input: Record<string, unknown> | undefined, toolResponse: unknown): AgentEvidence | null {
-  if (AGENT_LAUNCH_TOOLS.has(tool)) return null;
+  if (isAgentTool(tool)) return null;
   const hit = classifyExplore(tool, input);
   if (!hit) return null;
   const name = hit.phase === "explore-codebase" ? "subagent-explore-codebase" : "subagent-research-expert";
@@ -66,14 +59,15 @@ export function classifyAgentEvidence(tool: string, input: Record<string, unknow
  * @param agentId - Optional Claude `agent_id` — metadata tag only.
  */
 export async function recordAgentEvidence(file: string, evidence: AgentEvidence, ts: number, agentId?: string): Promise<void> {
-  const track = await loadTrack(file);
-  const next = recordAgent(track, evidence.name, ts, evidence.quality);
-  const last = next.agents[next.agents.length - 1];
-  if (agentId && last) {
-    const tagged: SessionTrack["agents"][number] & { agentId?: string } = { ...last, agentId };
-    next.agents[next.agents.length - 1] = tagged;
-  }
-  await saveTrack(file, next);
+  await withTrack(file, (track) => {
+    const next = recordAgent(track, evidence.name, ts, evidence.quality);
+    const last = next.agents[next.agents.length - 1];
+    if (agentId && last) {
+      const tagged: SessionTrack["agents"][number] & { agentId?: string } = { ...last, agentId };
+      next.agents[next.agents.length - 1] = tagged;
+    }
+    return next;
+  });
 }
 
 /**

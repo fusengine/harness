@@ -1,0 +1,31 @@
+{
+  "name": "kimi-rules-userprompt-inform",
+  "harness": "kimi",
+  "doc": "Rules-scope UserPromptSubmit under kimi: the injection goes through renderInform (runtime/inform.ts) — raw rule text on stdout (Kimi appends it to context), NEVER the Claude-shaped hookSpecificOutput envelope the other harnesses consume. The rules root resolves dynamically (rules-root.ts): no CLAUDE_PLUGIN_ROOT/KIMI_PLUGIN_ROOT in the scrubbed sim env, no managed kimi plugin -> cwd fallback, whose rules/ dir the setup materializes.",
+  "env": {
+    "FUSE_ENFORCE_TTL_SEC": "3600"
+  },
+  "setup": [
+    {
+      "path": "$TMP/rules/00-critical-rules.md",
+      "content": "# Rules\nAlways split files.\n"
+    }
+  ],
+  "steps": [
+    {
+      "scope": "rules",
+      "doc": "UserPromptSubmit -> injectRules(resolveRulesRoot) -> renderInform kimi branch -> raw text, no JSON.",
+      "event": {
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": "sc42",
+        "prompt": "add a feature"
+      },
+      "expect": {
+        "exit": 0,
+        "stdout": {
+          "regex": "^(?![\\s\\S]*hookSpecificOutput)[\\s\\S]*Always split files\\.[\\s\\S]*$"
+        }
+      }
+    }
+  ]
+}

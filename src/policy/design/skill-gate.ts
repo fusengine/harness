@@ -66,7 +66,7 @@ export function uiDesignSkillGate(tool: string, filePath: string, content: strin
   if (missing.length) {
     return block(
       `BLOCKED: code uses ${missing.join(", ")} but the matching design skill(s) were not consulted. `
-      + `Read the SKILL.md for: ${missing.join(", ")}, then retry.`,
+      + `Read the SKILL.md FILE (with the Read tool) for: ${missing.join(", ")}, then retry.`,
       `Read design skill(s): ${missing.join(", ")}, then retry`,
     );
   }

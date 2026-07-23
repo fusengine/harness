@@ -1,11 +1,11 @@
 /**
- * Platform-authored transcript evidence for APEX agent freshness.
- * Parses the Claude Code session JSONL transcript to find genuine `Task`/`Agent`
- * tool_use entries — forging this requires writing into the transcript file
- * which the Claude Code platform controls, unlike the self-recorded track.
+ * Platform-authored transcript evidence for APEX agent freshness. Parses the
+ * Claude Code session JSONL transcript for genuine dispatch tool_use entries
+ * — forging requires writing into the platform-controlled transcript file.
  */
 import { readText } from "../util/runtime-io";
 import { classifyExplore } from "./explore-tools";
+import { isAgentTool } from "../runtime/is-agent-tool";
 
 /** Raw shape of one JSONL line in a Claude Code transcript. */
 interface TranscriptLine {
@@ -17,9 +17,7 @@ interface TranscriptLine {
 /** A tool_use content block inside a transcript message. */
 interface ToolUseBlock {
   type: string;
-  /** Tool name, e.g. "Task", "Read", "Edit", "Glob", "Grep", "mcp__context7__query-docs". */
   name?: string;
-  /** Raw tool input — shape varies per tool; narrowed at each call-site. */
   input?: Record<string, unknown>;
 }
 
@@ -32,23 +30,14 @@ function parseTs(raw: string | number | undefined): number | undefined {
 }
 
 /**
- * Return `true` ONLY when, for EVERY name in `names`, the Claude Code
- * transcript at `transcriptPath` contains a genuine `tool_use` of the `Task`/
- * `Agent` tool whose `subagent_type` (or `name`) matches — after stripping any
- * plugin prefix — OR a direct exploration/research tool_use (Glob/Grep, an
- * explore Bash command, mcp__context7/mcp__exa, WebSearch/WebFetch) classified
- * via {@link classifyExplore} into that name, issued by ANY sub-agent or the
- * lead within this same transcript — with the entry timestamp within
- * `windowMs` of `now`.
- *
- * **Timestamp note:** when a transcript entry carries no `timestamp` field it
- * is counted as within-window (we cannot prove staleness). This is
- * intentionally lenient to stay robust across transcript-format evolution; the
- * tamper-resistance guarantee derives from the platform authoring the file —
- * not from the timestamp alone.
- *
- * @param transcriptPath - Absolute path to the session `.jsonl` transcript
- *   (hook payload field: `transcript_path`). Returns `false` when `undefined`.
+ * Return `true` ONLY when, for EVERY name in `names`, the transcript at
+ * `transcriptPath` shows a within-window genuine `tool_use`: a dispatch tool
+ * ({@link isAgentTool}) whose `subagent_type`/`name` (plugin prefix stripped)
+ * matches, OR a direct exploration/research call classified into that name by
+ * {@link classifyExplore} — issued by any sub-agent or the lead (the transcript
+ * carries no author field). Entries without `timestamp` count as within-window
+ * (format-evolution leniency; tamper-resistance comes from platform authoring).
+ * @param transcriptPath - Session `.jsonl` transcript (`transcript_path`); false when undefined.
  * @param names - Required agent `subagent_type` values — ALL must appear.
  * @param windowMs - Freshness window in milliseconds.
  * @param now - Current epoch ms (pass `Date.now()` at the call-site).
@@ -83,7 +72,7 @@ export function agentsRanFromTranscript(
     if (!Array.isArray(content)) continue;
     for (const block of content as ToolUseBlock[]) {
       if (block?.type !== "tool_use") continue;
-      if (block.name === "Task" || block.name === "Agent") {
+      if (block.name !== undefined && isAgentTool(block.name)) {
         const raw = block.input?.subagent_type ?? block.input?.name;
         // Strip any plugin prefix (`fuse-ai-pilot:research-expert` → `research-expert`)
         // before matching the bare REQUIRED_AGENTS names.

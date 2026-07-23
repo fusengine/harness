@@ -6,8 +6,8 @@
  * The proprietary rule "NEVER propose the same fix twice" is prose a model under
  * pressure ignores. This makes it machine-enforced: when a call whose
  * `(tool + normalized input)` hash was ALREADY denied in-window is retried, the
- * harness keeps the deny but rewrites the message — `[REPEAT]` title, STOP
- * prefix, forced `research-expert` action. State + wiring live in the sidecar
+ * harness keeps the deny but rewrites the message — `[REPEAT]` title, a
+ * mid-sentence STOP warning, forced `research-expert` action. State + wiring live in the sidecar
  * store ({@link module:deny-loop-store}); this file is IO-free and pure.
  * @packageDocumentation
  */
@@ -74,7 +74,10 @@ export function denyLoopCheck(hash: string, priorDenies: Record<string, DenyEntr
  * @returns A block prompt with `[REPEAT]` title, STOP-prefixed reason, forced research action.
  */
 export function enrichRepeatDeny(prompt: Prompt, count: number): Prompt {
-  const stop = `Identical attempt #${count} already denied for the same reason. STOP: do not retry this same call. `;
+  // H2b: the counter cannot know whether new reads/actions happened since the
+  // last deny, so the hard STOP is reserved for the UNCHANGED retry — a retry
+  // after completing the required reads/actions is legitimate and expected.
+  const stop = `Identical attempt #${count} already denied for the same reason. Do not retry this same call UNCHANGED — if you have since completed the required reads/actions, retry now; otherwise STOP and pick a DIFFERENT approach. `;
   const action = "Launch fuse-ai-pilot:research-expert to find a DIFFERENT approach";
   return {
     ...prompt,
