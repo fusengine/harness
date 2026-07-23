@@ -65,6 +65,19 @@ export function toKimiResponse(prompt: Prompt): string {
 }
 
 /**
+ * Render a raw deny reason as a Kimi hook response — for callers that already
+ * hold a fully-formatted message (e.g. the MCP cache-hit notice) rather than a
+ * portable {@link Prompt}. Same envelope as {@link toKimiResponse}, minus the
+ * `[BLOCKED]` prompt framing and without `hookEventName` (undocumented upstream).
+ * @param reason - The fully-formatted deny message.
+ * @returns The native Kimi response string.
+ */
+export function kimiDenyResponse(reason: string): string {
+  const res: KimiResponse = { hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: reason } };
+  return JSON.stringify(res);
+}
+
+/**
  * Run the bundled policy over a Kimi hook payload and return the native
  * response string, or null to allow (the hook then exits 0 with empty stdout).
  * @param input - Parsed hook stdin payload.

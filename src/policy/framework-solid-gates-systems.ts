@@ -1,6 +1,7 @@
 import { resolveMaxLines } from "../config/limits";
 import { countFrameworkCodeLines } from "./file-size";
 import { moduleAwarePath } from "./module-layout";
+import { maskCommentsAndStrings } from "./conventions/strip";
 
 /**
  * Systems-language SOLID gates (Go, Rust). Split out of `framework-solid-gates.ts`
@@ -35,6 +36,7 @@ const RUST_DERIVE_PARSER_RE: RegExp = /#\[derive\([^)]*Parser[^)]*\)\]/;
 /** Go: line limit, interface co-located with its (pointer-receiver) implementation. */
 export function goGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
+  content = maskCommentsAndStrings(content, "c");
   const max = resolveMaxLines();
   const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) {
@@ -72,6 +74,8 @@ function isClapArgsOnly(content: string): boolean {
 /** Rust: line limit, trait co-location, god-main.rs, unsafe without `// SAFETY:`. */
 export function rustGate(filePath: string, content: string, fileLines?: number): string[] {
   const v: string[] = [];
+  const raw = content;
+  content = maskCommentsAndStrings(content, "c");
   const max = resolveMaxLines();
   const lines = fileLines ?? countFrameworkCodeLines(content);
   if (lines > max) {
@@ -89,7 +93,7 @@ export function rustGate(filePath: string, content: string, fileLines?: number):
   const isMain = RUST_MAIN_RE.test(filePath) || RUST_BIN_RE.test(filePath);
   if (isMain && (RUST_TYPE_DECL_RE.test(content) || RUST_IMPL_RE.test(content)) && !isClapArgsOnly(content))
     v.push("Entry point contains business logic — keep main.rs to wiring only (parse args, init, call lib.rs/app::run()).");
-  if (RUST_UNSAFE_RE.test(content) && !RUST_SAFETY_COMMENT_RE.test(content))
+  if (RUST_UNSAFE_RE.test(content) && !RUST_SAFETY_COMMENT_RE.test(raw))
     v.push("unsafe without a // SAFETY: comment. Justify the invariant above each unsafe block.");
   return v;
 }

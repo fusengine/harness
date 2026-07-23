@@ -7,20 +7,31 @@
 import { readText, pathExists } from "../../../util/runtime-io";
 import { contextResponse } from "../../../adapters/claude";
 import { resolveMaxLines } from "../../../config/limits";
+import { resolveTtlSec } from "../../../config/ttl";
+import { projectLayout } from "../../../config/layout";
 import { transcriptFilePaths } from "./transcript";
 import { countCodeLines } from "./solid-compliance";
+import { noticeFingerprint, shouldEmitNotice } from "./solid-notice";
 
 const CODE_EXTENSIONS = /\.(ts|tsx|js|jsx|py|go|rs|java|php|cpp|c|rb|swift|kt|dart|vue|svelte|astro)$/;
 const INTERFACE_PATTERN = /^(export )?(interface|type) [A-Z]/m;
-const INTERFACE_DIRS = ["components/", "pages/", "views/", "app/"];
+/** Segment-anchored dirs (a substring like `app/` matched `livetest-app/`). */
+const INTERFACE_DIRS_RE = /\/(components|pages|views|app)\//;
+/** Canonical homes — never a violation there (owner decision: types/ is
+ * canonical; Contracts/ is the Laravel home taught by solid-php/laravelGate). */
+const INTERFACE_EXEMPT_RE = /\/(interfaces|types|Contracts|contracts)\//;
 
 /**
  * Check every Write/Edit target in a subagent transcript against the SOLID
- * line-count ceiling and interface-location convention.
+ * line-count ceiling and interface-location convention. Deduped per
+ * transcript (`solid-notice.ts`): an unchanged violation set is emitted once
+ * per TTL window, never in a loop.
  * @param transcript - Path to the agent JSONL transcript (`agent_transcript_path`).
- * @returns The SubagentStop `additionalContext` response, or `""` when clean.
+ * @param cwd - Project root (locates the `.harness/track` dedup sidecar).
+ * @param now - Clock (tests inject it).
+ * @returns The SubagentStop `additionalContext` response, or `""` when clean/deduped.
  */
-export async function checkSolidFromTranscript(transcript: string | undefined): Promise<string> {
+export async function checkSolidFromTranscript(transcript: string | undefined, cwd: string = process.cwd(), now: number = Date.now()): Promise<string> {
   if (!transcript || !pathExists(transcript)) return "";
   const files = await transcriptFilePaths(transcript, ["Write", "Edit"]);
   const max = resolveMaxLines();
@@ -37,11 +48,13 @@ export async function checkSolidFromTranscript(transcript: string | undefined): 
     }
     const lc = countCodeLines(content);
     if (lc > max) violations.push(`SOLID: ${name} = ${lc} lines (max ${max})`);
-    if (INTERFACE_DIRS.some((prefix) => fp.includes(prefix)) && INTERFACE_PATTERN.test(content)) {
-      violations.push(`SOLID: ${name}: move interfaces to interfaces/`);
+    if (INTERFACE_DIRS_RE.test(fp) && !INTERFACE_EXEMPT_RE.test(fp) && INTERFACE_PATTERN.test(content)) {
+      const dest = fp.endsWith(".php") ? "app/Contracts/" : "interfaces/";
+      violations.push(`SOLID: ${name}: move interfaces to ${dest}`);
     }
   }
 
   if (violations.length === 0) return "";
+  if (!shouldEmitNotice(projectLayout(cwd).solidNoticeFile, transcript, noticeFingerprint(violations), now, resolveTtlSec(process.env) * 1000)) return "";
   return contextResponse("SubagentStop", `## SOLID VIOLATIONS DETECTED (subagent output)\n${violations.join("\n")}\nRun sniper to fix these issues.`);
 }

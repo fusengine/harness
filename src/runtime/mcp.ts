@@ -3,6 +3,7 @@ import { cacheLookupMeta, cacheLookupSubstringMeta, type CacheHit } from "../cac
 import { extractText } from "../cache/mcp-response";
 import { mcpCacheWrite, webfetchCacheWrite } from "../cache/mcp-store";
 import { WEBFETCH_TTL_MS, cacheQueryOf, isMcpTool, isWebFetch } from "./mcp-key";
+import { kimiDenyResponse } from "../adapters/kimi";
 
 export { MCP_TTL_MS, WEBFETCH_TTL_MS, cacheQueryOf, isMcpTool, queryOf } from "./mcp-key";
 
@@ -11,6 +12,7 @@ function denyWith(id: string, content: string): string {
     return JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: content } });
   }
   if (id === "gemini-cli") return JSON.stringify({ decision: "deny", reason: content });
+  if (id === "kimi") return kimiDenyResponse(content);
   return "";
 }
 
@@ -19,6 +21,8 @@ function mutateWith(id: string, input: Record<string, unknown>): string {
     return JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: input } });
   }
   if (id === "gemini-cli") return JSON.stringify({ hookSpecificOutput: { tool_input: input } });
+  // Kimi has no input-mutation contract (`updatedInput` is undocumented
+  // upstream) — the exa verbosity cap stays inoperative there.
   return "";
 }
 

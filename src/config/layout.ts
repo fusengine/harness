@@ -24,6 +24,8 @@ export interface ProjectLayout {
   lessonsFile: string;
   /** `<root>/.harness/memory/state.json` — machine-local throttle. */
   memoryStateFile: string;
+  /** `<root>/.harness/track/solid-notice.json` — SubagentStop dedup sidecar. */
+  solidNoticeFile: string;
   /** `<root>/.harness/.gitignore`. */
   gitignoreFile: string;
 }
@@ -40,6 +42,7 @@ export function projectLayout(root: string): ProjectLayout {
     root,
     stateDir,
     trackDir: join(stateDir, "track"),
+    solidNoticeFile: join(stateDir, "track", "solid-notice.json"),
     cacheDir: join(stateDir, "cache"),
     memoryDir,
     lessonsFile: join(memoryDir, "LESSON.md"),

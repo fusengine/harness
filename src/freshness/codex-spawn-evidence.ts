@@ -26,7 +26,7 @@
  * elsewhere by construction.
  */
 import { recordAgent, type SessionTrack } from "../tracking/session-state";
-import { loadTrack, saveTrack } from "../tracking/store";
+import { withTrack } from "../tracking/store";
 
 /**
  * True when `tool` is Codex's `spawn_agent` primitive, bare or
@@ -84,7 +84,8 @@ export function creditCodexSpawnAgent(id: string, tool: string, input: Record<st
  */
 export async function recordCodexSpawnEvidence(file: string, id: string, tool: string, input: Record<string, unknown> | undefined, ts: number): Promise<void> {
   if (id !== "codex" || !isCodexSpawnAgentTool(tool)) return;
-  const track = await loadTrack(file);
-  const next = creditCodexSpawnAgent(id, tool, input, track, ts);
-  if (next !== track) await saveTrack(file, next);
+  await withTrack(file, (track) => {
+    const next = creditCodexSpawnAgent(id, tool, input, track, ts);
+    return next !== track ? next : track;
+  });
 }

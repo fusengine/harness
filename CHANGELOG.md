@@ -2,6 +2,118 @@
 
 All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://keepachangelog.com), [SemVer](https://semver.org).
 
+## [Unreleased]
+
+## [0.1.81] - 2026-07-23
+
+### Added
+
+- **Solid scope: PreToolUse file-size deny, tri-harness** (`src/runtime/solid-file-size-gate.ts` + `src/runtime/solid-pre.ts`) — `harness hook <id> solid` now blocks oversized Write/Edit with the exact policy of core's `evaluate.ts` (strictly-shrinking Edit passes, Explore/Plan exemption, `FUSE_SOLID_MAX_LINES` honored) but WITHOUT the core-only APEX freshness gates, and renders via `respond()` so kimi receives its native `hookSpecificOutput` deny instead of nothing. Intentional behavior change for claude-code/codex: the solid scope previously only warned PostToolUse (that warn remains). Sim scenario `40-kimi-solid-filesize-deny`.
+- **Kimi: APEX task-context trigger on `Agent`/`AgentSwarm`** (`src/runtime/is-agent-tool.ts`) — the PreToolUse dispatch branch tested `event.tool === "Task"` (claude/codex), so the injection never fired for Kimi's sub-agent tools. Sim scenario `41-kimi-agent-task-context`.
+- **Kimi: MCP/WebFetch cache-hit deny** (`adapters/kimi::kimiDenyResponse`, `runtime/mcp.ts`) — a fresh cache hit now denies with the cached body through the documented envelope (no `hookEventName`); input mutation stays unsupported (Kimi documents no `updatedInput`), so the exa verbosity cap remains inoperative there by design.
+- **Kimi: lifecycle injections rendered natively** (`src/runtime/inform.ts`) — rules, lessons, and the CLAUDE.md preamble go through `renderInform`: raw text on stdout for kimi (appended to context on exit 0) instead of the Claude-shaped envelope Kimi ignores; every other harness is byte-identical (associative `attachSystemMessage` merge preserved). The rules plugin root now resolves dynamically (`src/runtime/lifecycle/rules-root.ts`): `CLAUDE_PLUGIN_ROOT` → `KIMI_PLUGIN_ROOT` → per-harness install probe (claude marketplace, codex versioned cache — latest version, kimi managed plugins) → `cwd`. Sim scenario `42-kimi-rules-userprompt-inform`.
+- **Kimi: `KIMI_CODE_HOME` honored** (`src/config/home-dir.ts`) for the harness-home `.env` probe; other harnesses ignore it, defaults unchanged.
+- **CLI: unknown hook scope warns on stderr** (`src/cli/scope.ts`) instead of silently falling back to `"core"` — the fallback stays for wiring compatibility, stderr is never parsed by harnesses. `bin.ts` split under the 100-line ceiling (`src/cli/hook-io.ts`).
+
+### Fixed
+
+- **Duplicate file-size deny when core-guards AND solid are both wired** (`src/runtime/core-guards-wired.ts`) — the solid scope now abstains from its PreToolUse file-size gate when the core-guards plugin is detected (claude marketplace / codex versioned cache / kimi managed plugins): one tool-call, one deny, core stays the primary owner. Single-scope behavior is unchanged on both sides (test `dedup: core-guards installed -> solid abstains, core denies — exactly ONE deny`).
+- **Solid abstention could mean ZERO deny when core-guards is installed but disabled** — `core-guards-wired.ts` now probes the REAL activation state per harness (`core-guards-active.ts`: claude `settings.json` `enabledPlugins` — required core = no entry means active, explicit `false` disabled; codex `[plugins."core-guards@…"] enabled` in `config.toml`; kimi `installed.json`). Anything undetectable reads as NOT active: the solid scope fires, worst case a duplicate deny, never zero (owner decision; test "installed but DISABLED -> solid fires").
+- **Agent-dispatch recognition drifted across a fourth copy** — `freshness/agent-evidence.ts` (transcript scan) matched `Task`/`Agent` inline and missed `AgentSwarm`; it now consumes the canonical `AGENT_TOOLS` set, and the consumers lock test greps all three files.
+- **compareSemver NaN on prerelease segments** — `Number("0-beta")` is NaN, leaving `sort()` undefined; non-integer segments now compare lexicographically (identical strings → 0), JSDoc corrected, sort-stability test added.
+- **Codex rules probe picked stale versions** — `rules-root.ts` sorted version dirs lexicographically (`"1.0.9" > "1.0.23"`); now orders by numeric semver (`src/util/semver.ts`, zero-dependency).
+- **Agent-tool detection duplicated** — `freshness/agent-evidence-record.ts` and `runtime/activity.ts` kept their own `Task`/`Agent`/`AgentSwarm` definitions; both now consume `runtime/is-agent-tool.ts` (single source). The file-size logic twin (`evaluate.ts` frozen vs `solid-file-size-gate.ts`) is locked by a bidirectional anti-drift test (`test/anti-drift-file-size.test.ts`) that fails if either side drifts.
+- **Kimi: forged verification receipts** (`src/runtime/receipt-capture.ts`) — PostToolUse Bash receipts are recorded only from structured responses; Kimi's truncated string `tool_output` no longer produces `exit 0` success receipts for possibly-failed runs.
+- **Kimi: Claude-shaped `extra` leak in PostToolUse** (`handle-post.ts`) — the kimi branch no longer inherits the unparseable post-edit envelope.
+
+### Added (conventions module — Patch E)
+
+- **Store conventions gate (Zustand/Pinia, advisory-first)** — signature-strict detection (zustand import or v5 curried `create<T>()(`, pinia import + `defineStore(`; `Object.create`/home-made factories never match): store declared outside `stores/` → advisory, store file over `storeBudget` (ratio 0.4 of the global limit, born with its consumer) → advisory.
+- **TanStack Query conventions gate (cap-gated)** — a `useQuery`/`useMutation`/`useInfiniteQuery` definition in a component/page → advisory "Move to src/query/", only when `@tanstack/react-query`/`vue-query` is in the nearest manifest; `query/` and `hooks/` are both accepted homes.
+- **Components rule (deterministic case)** — a `.tsx/.vue` component inside `src/hooks|stores|query|interfaces|types/` → advisory "Move to modules/[feature]/components/".
+- **Extended interface syntaxes wired (advisory-first)** — Swift `public protocol`, Kotlin `sealed`/`fun interface`, unexported Go top-level interface (`interface-separation-ext.ts`); legacy verdicts byte-identical (exact-JSON assertions).
+- **Self-reference hardening** — `SELF_GATE_EXCLUDE_RE` now covers `framework-solid-extended.ts`, `detect-framework.ts`, and all of `src/policy/conventions/`; store/query-definition files are exempt from the legacy hook-location rule (they are not hooks).
+
+### Added (conventions module — anti-loop, in-vivo Laravel)
+
+- **SubagentStop SOLID-notice dedup** (`aipilot/solid-notice.ts`) — the stateless checker re-emitted identical violations on every SubagentStop (observed ~15-repeat agent loop). A SHA-256 fingerprint of the sorted file:message set is persisted per agent key in `.harness/track/solid-notice.json` (canonical layout entry, sync-locked write, TTL derived from `FUSE_ENFORCE_TTL_SEC`): unchanged set → silence; changed/expired → one emission.
+
+### Fixed (conventions module — G, in-vivo)
+
+- **Idiomatic generic forms were invisible** — `create<CartState>((set) => …)` (and nested `create<Store<T>>(`) now match the Zustand declaration, `useQuery<T>({…})`/`useMutation<Data, Error>({…})`/`useInfiniteQuery<T>({…})` the query definition; `Object.create`/home-made factories still never match.
+- **`Contracts/` flagged as an interface violation (Laravel in-vivo)** — `app/Contracts/` (both casings) is now exempt alongside `interfaces/`/`types/`, and flagged `.php` files get the `app/Contracts/` destination message (laravelGate parity).
+- **Directory matchers were unanchored substrings** — `app/` matched `livetest-app/`, `views/` matched `reviews/` (and `view/` matched `overview/` in the interface guard). All segment-anchored (`solid-transcript.ts`, `solid-compliance.ts`, `interface-separation.ts`'s `inAny`), and `/interfaces/` + `/types/` are exempt by owner decision (canonical homes never violate).
+
+### Fixed (H1 — in-vivo Next.js runtime crash)
+
+- **Marker-less client components escaped the `'use client'` rule** — `jsViolations` routed nextGate/reactGate by CONTENT (`NEXT_RE`), so a bare client component (`useState`, no `next` marker) in a Next.js app went to reactGate, landed without the directive, and crashed at runtime. Routing is now MANIFEST-FIRST (`src/policy/js-gate-route.ts`, per-process memoized manifest capabilities): a project declaring `next` always gates with nextGate; `react`/TanStack Start projects gate with reactGate; no JS-framework capability (no manifest, backend, vue) falls back to the legacy content routing, byte-identical. Consequence accepted by spec: in a next-manifest project the legacy react hook-location rule no longer applies (everything routes to nextGate, which never had it — legacy coverage was marker-dependent).
+
+### Changed (H2 — gate message wording, byte-parity broken on 3 messages)
+
+- **Design skill-consult deny** — `Read the SKILL.md for: X` → `Read the SKILL.md FILE (with the Read tool) for: X`: invoking the skill via the Skill tool leaves no receipt; only a Read of the file credits (`src/policy/design/skill-gate.ts`).
+- **APEX refs denies** (`apex-gates.ts`, `apex-authorization.ts`) — now say `Read ALL references below (including Optional), then retry`: the credit needs the full routed set and the old wording never said so.
+- **Deny-loop repeat prefix** (`deny-loop.ts`) — `STOP: do not retry this same call.` → `Do not retry this same call UNCHANGED — if you have since completed the required reads/actions, retry now; otherwise STOP and pick a DIFFERENT approach.`: the counter cannot know about new reads, so the hard STOP is reserved for the unchanged retry (a legitimate retry after new reads was being discouraged). Text only — no credit-logic change anywhere.
+
+### Fixed (hardening — F2, final counter-audit)
+
+- **`readBounded` head corruption on multi-chunk payloads** — chunk views into the reused read buffer were overwritten, so an oversize payload's head lost `hook_event_name` and observation-only events were denied instead of neutral. Chunks are now copied; a >64 KiB multi-chunk test proves head readability and the neutral PostToolUse path.
+- **Last two track RMW races closed** — `recordCodexSpawnEvidence` (async `withTrack`) and `harvestSubagentTrack` (new synchronous lock variant `track-lock-sync.ts` using `Atomics.wait`, required because the SubagentStop dispatch cannot float async work) now run under the track lock.
+
+### Added (hardening — F2, final)
+
+- **Bounded stdin for `harness hook`** — `readBounded` never buffers past `FUSE_HOOK_STDIN_MAX_BYTES` (default 16 MiB; the mission's only new env var, owner-approved). Oversized payloads fail CLOSED: a native deny (`denied uninspected`) on blockable/undeterminable events, neutral silence on observation-only ones. Largest legitimate payload measured at 3,757 bytes across the sim suite.
+- **Session-track lock** (`tracking/track-lock.ts` + `withTrack`) — the read-modify-write of `loadTrack → mutate → saveTrack` is now serialized across the ~11-hook fan-out (`wx` lockfile, 400 ms total retry budget, named skipped write on contention instead of a crash, 10 s stale-lock reclamation). Proven: 8 concurrent processes × 3 writes, zero loss; degradation path renders its decision with a stderr note. The 5 RMW call sites (record, receipts, handle, gate-apex, agent-evidence-record) migrated.
+
+### Fixed (hardening — F2)
+
+- **`parseScope` warned on the explicit default** — `hook <id> core` no longer logs the unknown-scope warning (only genuinely unknown scopes do).
+
+### Changed (conventions module — F1)
+
+- **`FUSE_CONVENTIONS_MODE` default inverted to `deny`** (owner decision): new convention rules block by default; `advisory` is now the explicit opt-out observation mode. Docs: `docs/conventions.md` (full conventions reference: canonical structure, rule matrix, env vars, voluntary gaps).
+
+### Fixed (conventions module — F1)
+
+- **Every legitimate Next.js client component was denied** (F1.1, blocking): the `'use client'` directive check ran on masked content, and the directive is a string literal — it now reads comment-masked content only, so a real directive (either quote form) passes while `// "use client"` still fails.
+
+### Fixed (conventions module — F0 counter-audit)
+
+- **reactGate masked the store imports it probed** (F0.1, blocking): `content` was masked BEFORE `declaresStore`, so the `from "zustand"/"pinia"` import literal was blanked and plain stores were hard-denied into `hooks/` even inside `stores/`. New `maskCommentsOnly` (comments masked, strings kept) drives the import probes; gates pass raw content to the store/query detectors.
+- **Hook exemption was not cap-gated** (F0.2): a fake `useQuery(` caller without `@tanstack/*-query` in the manifest escaped every rule; the exemption now requires a validated signature AND the cap (shared `conventions/store-or-query.ts`), otherwise the legacy hook rule fires byte-identically.
+- **Self-gate regex matched a non-existent file** (F0.3): `framework-solid-gates(-systems|-extended)?` missed the real `framework-solid-extended.ts`; regex fixed, `guards/interface-separation-ext.ts` added, lock test asserts `isSelfGateSourcePath() === true` for all 10 detector sources plus a no-verdict pass on their real disk content.
+- **Vue SFC invisible to the components rule**: `export default {}`/`defineComponent(` now count as component declarations and `.vue` enters the extended gate path.
+
+### Fixed (conventions module — Patch E)
+
+- **Hook-location rule shadowed store/query conventions** — `useAuthStore`/`useUsers` were hard-denied into `hooks/`; store- and query-definition files are now governed by their own advisory rules.
+
+### Added (conventions module — D0 + Patch D)
+
+- **Extended convention gate** (`src/policy/framework-solid-extended.ts`, advisory-first per `FUSE_CONVENTIONS_MODE`) — widened custom-hook location rule (`export default`/`async` syntaxes, nextjs/tanstack family), hook-file line budget (`hookBudget`, ratio 0.3 of the global `FUSE_SOLID_MAX_LINES` limit — 30 at the default, one variable drives every budget; owner decision: no per-file-kind env vars), TanStack Start route files kept routing-only.
+- **`routeTree.gen.ts` hard-blocked** (generated TanStack Router artifact, owner Amendment 8).
+- **Derived budgets** in `src/config/limits.ts`: `hookBudget` (ratio 0.3 → 30 at the default global limit); the store budget (ratio 0.4) ships with its consumer in Patch E — no dead code.
+
+### Fixed (conventions module — D0 + Patch D)
+
+- **strip.ts unmatched-quote FN** (external audit D0.1): a JSX apostrophe (`Don't`) opened a "string" that swallowed the rest of the file and hid real declarations; plain quotes now never span lines, and an unpaired backtick masks nothing.
+- **validate-solid.ts rollout violation** (D0.2): Go `interface{` (no space) and Python `Protocol` were hard-denied outside the flag — now advisory-first; indented/local Go interfaces (a true false positive — a local type cannot move to `internal/interfaces/`) never match (column-0 anchor). Legacy stays hard deny, byte-identical (test asserts the exact JSON in both modes).
+- **detect-framework tanstack signal read raw content** (D0.3): a comment citing `createServerFn` flipped a real Next.js file to tanstack-start; JS content signals now ride masked content.
+- **Literal line limits** (D0.4): `nextGate`/`swiftGate` `? 150 : 100` → `resolveMaxLines()` base + 50 (defaults unchanged; override test at 80/130). Permanent rule: every size limit via `config/limits.ts`, every TTL via `config/ttl.ts`.
+
+### Added (conventions module — Phase 1 patches A/B/C)
+
+- **`src/policy/conventions/` module** (owner Plan v4 + amendments) — masked-content, per-language convention detectors, single source for the four historical interface layers: `strip.ts` (lexical comment/string/heredoc masking, line offsets preserved), `langs.ts` (language families, vendor exclusion, canonical path predicates for `interfaces/ types/ hooks/ stores/ query/ components/`), `interfaces.ts` (interface + exported-alias detection), `react-hooks.ts`, `stores.ts` (Zustand + Pinia), `query.ts` (TanStack Query), `verdict.ts` (advisory-first rollout).
+- **Rollout flag `FUSE_CONVENTIONS_MODE=advisory|deny`** (default advisory, owner Amendment 5) — every NEW convention deny starts as non-blocking `inform`; existing denies keep their blocking behavior byte-identically.
+- **Detection**: `projectCaps` reads `zustand`, `pinia`, `@tanstack/react-start|react-router|react-query|vue-query`; new `tanstack-start` framework label (first-class, Next.js-equivalent — `createFileRoute`/`createServerFn`/`@tanstack/react-*` signals, priority over generic react); SOLID_REF mapping `solid-tanstack-start/`.
+
+### Fixed (conventions module — Phase 1 patches A/B/C)
+
+- **Interface gates fired inside comments/strings/templates/heredocs** — all four layers (`interface-separation.ts`, `framework-solid-gates*.ts`, `validate-solid.ts`, `solid-compliance.ts`) now match on masked content; legitimate cases keep byte-identical messages (proven live: real Go/Python interfaces still denied with the legacy strings, comment-embedded ones allowed).
+- **`validate-solid.ts` unanchored `class.*ABC`** — `class ABCParser` and comment mentions no longer denied; detection requires `class X(…ABC|ABCMeta|Protocol…)` masked.
+- **`nextGate` `'use client'` regex** — word boundaries; `onChangeHandler`/`useStateMachine` no longer flagged.
+- **`solid-compliance.ts`** — vendor/build dirs excluded; per-extension matching (no TS regex on `.py`, no PHP regex on `.ts`).
+- **Exported type aliases in components** — redirected to `modules/[feature]/src/types/` with a dedicated message (owner Amendment 2), advisory-first, instead of the interfaces/ message.
+
 ## [0.1.80] - 20-07-2026
 
 ### Added

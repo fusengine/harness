@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { attachSystemMessage, contextResponse } from "../../adapters/claude";
+import { renderInform } from "../inform";
 
 /** Read & concatenate all `*.md` files (sorted) under `rulesDir`. */
 export function readRules(rulesDir: string): string {
@@ -24,15 +24,17 @@ export function readRules(rulesDir: string): string {
 
 /**
  * Build the rules injection for claude-rules (SessionStart, UserPromptSubmit,
- * SubagentStart): read `<pluginRoot>/rules/*.md` and emit as `additionalContext`,
- * or "" when no rules. Tags the output with the *actual* `hookEventName` — the
- * spec requires it to match the firing event (a hardcoded "SessionStart" is
- * non-conforming and may be dropped on UserPromptSubmit/SubagentStart).
+ * SubagentStart): read `<pluginRoot>/rules/*.md` and emit via {@link renderInform}
+ * (Claude-shaped `additionalContext`, or raw text for kimi). Tags the output
+ * with the *actual* `hookEventName` — the spec requires it to match the firing
+ * event (a hardcoded "SessionStart" is non-conforming and may be dropped on
+ * UserPromptSubmit/SubagentStart).
  * @param pluginRoot - `CLAUDE_PLUGIN_ROOT` of the claude-rules plugin.
  * @param event - The firing hook event name (e.g. "SessionStart").
+ * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
  * @returns The native hook stdout (possibly empty).
  */
-export function injectRules(pluginRoot: string, event: string): string {
+export function injectRules(pluginRoot: string, event: string, id: string = "claude-code"): string {
   const content = readRules(join(pluginRoot, "rules"));
-  return content ? attachSystemMessage(contextResponse(event, content), "rules 00-08 injected") : "";
+  return content ? renderInform(id, event, content, "rules 00-08 injected") : "";
 }

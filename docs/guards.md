@@ -1,6 +1,6 @@
 # Guards — `@fusengine/harness/policy`
 
-Ten portable enforcement guards, composed into `evaluate()` via a
+Five portable enforcement guards, composed into `evaluate()` via a
 `runGuards` chain (first firing guard wins, ahead of git + file-size). Each is a
 pure `(ctx: GuardContext) => Prompt | null`.
 

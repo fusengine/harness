@@ -9,39 +9,52 @@
  * gated behind `SOLID_PROJECT_TYPE`. Inert when `SOLID_PROJECT_TYPE` is
  * absent/"unknown"/nextjs/laravel/swift/rust (parity: the Python hook only
  * has a `go`/`python` validator).
+ *
+ * Detection rides the conventions module (MASKED content, column-0 anchored
+ * for Go): the old naive regexes matched inside comments/strings and
+ * indented locals — all killed. LEGACY-level detections keep the exact hard
+ * deny (byte-parity); EXTENDED-level ones (Go `interface{` without the
+ * space, Python `Protocol`) follow `FUSE_CONVENTIONS_MODE` — advisory
+ * (non-blocking additionalContext) by default, deny only on `"deny"`
+ * (owner Amendment 5, external audit D0.2).
  */
-import { denyResponse } from "../../adapters/claude";
-
-/** Top-level Go interface declaration, e.g. `type Foo interface {`. */
-const GO_INTERFACE_RE = /^type.*interface \{/m;
-/** Python class whose header mentions `ABC` (naive, parity with the Python regex). */
-const PY_ABC_RE = /class.*ABC/;
+import { contextResponse, denyResponse } from "../../adapters/claude";
+import { interfaceDeclLevel } from "../../policy/conventions/interfaces";
+import { conventionsMode } from "../../policy/conventions/verdict";
 
 /** Go: deny a top-level interface declared outside `/interfaces/`. */
-function checkGo(filePath: string, content: string): string | null {
+function checkGo(filePath: string, content: string, env: Record<string, string | undefined>): string | null {
   if (!filePath.endsWith(".go") || filePath.includes("/interfaces/")) return null;
-  return GO_INTERFACE_RE.test(content) ? "SOLID: Interfaces must be in internal/interfaces/" : null;
+  const level = interfaceDeclLevel(filePath, content);
+  if (level === null) return null;
+  const msg = "SOLID: Interfaces must be in internal/interfaces/";
+  if (level === "legacy" || conventionsMode(env) === "deny") return denyResponse("PreToolUse", msg);
+  return contextResponse("PreToolUse", msg);
 }
 
 /** Python: deny an ABC subclass declared outside `/interfaces/`. */
-function checkPython(filePath: string, content: string): string | null {
+function checkPython(filePath: string, content: string, env: Record<string, string | undefined>): string | null {
   if (!filePath.endsWith(".py") || filePath.includes("/interfaces/")) return null;
-  return PY_ABC_RE.test(content) ? "SOLID: Abstract classes must be in src/interfaces/" : null;
+  const level = interfaceDeclLevel(filePath, content);
+  if (level === null) return null;
+  const msg = "SOLID: Abstract classes must be in src/interfaces/";
+  if (level === "legacy" || conventionsMode(env) === "deny") return denyResponse("PreToolUse", msg);
+  return contextResponse("PreToolUse", msg);
 }
 
 /** `SOLID_PROJECT_TYPE` values this gate validates (parity subset — see module doc). */
-const VALIDATORS: Record<string, (filePath: string, content: string) => string | null> = {
+const VALIDATORS: Record<string, (filePath: string, content: string, env: Record<string, string | undefined>) => string | null> = {
   go: checkGo,
   python: checkPython,
 };
 
 /**
- * Deny a Write/Edit that violates the Go/Python interface-location SOLID rule.
+ * Deny (or advise on) a Write/Edit that violates the Go/Python interface-location SOLID rule.
  * @param tool - The tool name (only "Write"/"Edit" are checked).
  * @param filePath - The written file's absolute path.
  * @param content - The written/edited content (`new_string` snippet on Edit).
  * @param env - Environment (defaults to `process.env`).
- * @returns The PreToolUse deny response, or `""` when clean/inert.
+ * @returns The PreToolUse response, or `""` when clean/inert.
  */
 export function validateSolidGate(
   tool: string,
@@ -53,6 +66,5 @@ export function validateSolidGate(
   if (!ptype || ptype === "unknown") return "";
   if (tool !== "Write" && tool !== "Edit") return "";
   if (!filePath) return "";
-  const violation = VALIDATORS[ptype]?.(filePath, content) ?? null;
-  return violation ? denyResponse("PreToolUse", violation) : "";
+  return VALIDATORS[ptype]?.(filePath, content, env) ?? "";
 }

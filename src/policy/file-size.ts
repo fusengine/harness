@@ -16,6 +16,7 @@ export const PLUGINS_DIR = "~/.claude/plugins/marketplaces/fusengine-plugins/plu
 export const SOLID_REF: Record<string, string> = {
   react: "react-expert/skills/solid-react/",
   nextjs: "nextjs-expert/skills/solid-nextjs/",
+  "tanstack-start": "tanstack-start-expert/skills/solid-tanstack-start/",
   laravel: "laravel-expert/skills/solid-php/",
   swift: "swift-apple-expert/skills/solid-swift/",
   go: "solid/skills/solid-go/",

@@ -77,7 +77,7 @@ async function onSubagentStop(payload: Record<string, unknown>, cwd: string, hom
     await cacheSniperLessons(transcript, cwd, home);
     await cacheTestResults(transcript, cwd, home);
   }
-  return checkSolidFromTranscript(transcript);
+  return checkSolidFromTranscript(transcript, cwd);
 }
 
 /**

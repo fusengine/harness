@@ -121,9 +121,8 @@ describe("P2: ts/next/laravel/swift gates are module-aware", () => {
 });
 
 describe("P1: self-gate exemption", () => {
-  test("isSelfGateSourcePath matches the 2 gate-source files, nothing else", () => {
+  test("isSelfGateSourcePath matches detector sources, nothing else", () => {
     expect(isSelfGateSourcePath("/x/src/policy/framework-solid-gates.ts")).toBe(true);
-    expect(isSelfGateSourcePath("/x/src/policy/framework-solid-gates-systems.ts")).toBe(true);
     expect(isSelfGateSourcePath("/x/src/policy/framework-solid.ts")).toBe(false);
     expect(isSelfGateSourcePath("/x/src/policy/guards/interface-separation.ts")).toBe(false);
     expect(isSelfGateSourcePath("/x/src/components/Foo.tsx")).toBe(false);

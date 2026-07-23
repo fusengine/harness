@@ -5,7 +5,9 @@ import { detectProjectType } from "./detect-project";
 /** Real project capabilities inferred from a manifest's deps + config files. */
 export type Cap =
   | "react" | "nextjs" | "vue" | "svelte" | "angular" | "nuxt"
-  | "laravel" | "swift" | "tailwind";
+  | "laravel" | "swift" | "tailwind"
+  | "tanstack-start" | "tanstack-router" | "tanstack-query" | "vue-query"
+  | "zustand" | "pinia";
 
 /** Manifest filenames that anchor a project root (any one marks the dir). */
 const MANIFESTS = ["package.json", "composer.json", "Package.swift", "Cargo.toml", "go.mod", "pyproject.toml"];
@@ -55,6 +57,12 @@ export function projectCaps(dir: string | null): Set<Cap> {
       if ("@angular/core" in deps) caps.add("angular");
       if ("nuxt" in deps) caps.add("nuxt");
       if ("tailwindcss" in deps) caps.add("tailwind");
+      if ("@tanstack/react-start" in deps) caps.add("tanstack-start");
+      if ("@tanstack/react-router" in deps) caps.add("tanstack-router");
+      if ("@tanstack/react-query" in deps) caps.add("tanstack-query");
+      if ("@tanstack/vue-query" in deps) caps.add("vue-query");
+      if ("zustand" in deps) caps.add("zustand");
+      if ("pinia" in deps) caps.add("pinia");
     }
     const type = detectProjectType(dir);
     if (type === "laravel") caps.add("laravel");

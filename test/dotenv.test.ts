@@ -40,6 +40,18 @@ test("envCandidates: home dir per harness + cwd", () => {
   expect(envCandidates("unknown", "/h", "/p")).toEqual(["/h/.claude/.env", "/p/.env"]);
 });
 
+test("envCandidates: KIMI_CODE_HOME relocates the kimi .env probe", () => {
+  const prev = process.env.KIMI_CODE_HOME;
+  process.env.KIMI_CODE_HOME = "/data/kimi";
+  try {
+    expect(envCandidates("kimi", "/h", "/p")).toEqual(["/data/kimi/.env", "/p/.env"]);
+  } finally {
+    if (prev === undefined) delete process.env.KIMI_CODE_HOME;
+    else process.env.KIMI_CODE_HOME = prev;
+  }
+  expect(envCandidates("kimi", "/h", "/p")).toEqual(["/h/.kimi-code/.env", "/p/.env"]);
+});
+
 test("loadDotenv: hydrates missing keys, never overwrites existing", () => {
   const home = mkdtempSync(join(tmpdir(), "fh-envhome-"));
   mkdirSync(join(home, ".claude"), { recursive: true });
