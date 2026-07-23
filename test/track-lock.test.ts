@@ -22,22 +22,27 @@ test("concurrency: 8 processes × 3 writes each — no write lost SILENTLY under
   const file = join(d, "track.json");
   const storePath = join(new URL("..", import.meta.url).pathname, "src/tracking/store.ts");
   // Each worker reports how many of its 3 writes were fail-open-skipped (withTrack -> false,
-  // see track-lock.ts's documented contention budget) so the assertion below can tell that
-  // NAMED, logged skip apart from an actual silently-lost write.
+  // see track-lock.ts's documented contention budget) via its OWN exit code, not stdout:
+  // buffering/flush timing across 8 concurrent child processes is not reliable on a loaded
+  // CI runner (observed: skip counts silently read back as 0), while the exit code is
+  // delivered by the kernel's waitpid and carries no such race. 99 is a crash sentinel,
+  // clearly outside the valid 0-3 skip range, so a real failure can't be folded into a skip.
   const script = `import { withTrack } from ${JSON.stringify(storePath)};
 const file = ${JSON.stringify(file)}, id = process.env.WORKER_ID;
 let skipped = 0;
-for (let i = 0; i < 3; i++) { const ok = await withTrack(file, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })); if (!ok) skipped++; }
-console.log(skipped);`;
-  const procs = Array.from({ length: 8 }, (_, i) => new Promise<{ code: number | null; skipped: number }>((done) => {
-    let out = "";
+try {
+  for (let i = 0; i < 3; i++) { const ok = await withTrack(file, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })); if (!ok) skipped++; }
+} catch { process.exit(99); }
+process.exit(skipped);`;
+  const procs = Array.from({ length: 8 }, (_, i) => new Promise<{ code: number | null }>((done) => {
     const p = spawn("bun", ["-e", script], { env: { ...process.env, WORKER_ID: `p${i}` } });
-    p.stdout.on("data", (c) => { out += String(c); });
-    p.on("close", (code) => done({ code, skipped: Number(out.trim()) || 0 }));
+    p.on("close", (code) => done({ code }));
   }));
   const results = await Promise.all(procs);
-  for (const r of results) expect(r.code).toBe(0);
-  const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
+  // No worker crashed (99) or was killed by a signal (null) — a real failure must fail the
+  // test loudly, never be silently folded into the skip tally.
+  for (const r of results) { expect(r.code).not.toBeNull(); expect(r.code).not.toBe(99); }
+  const totalSkipped = results.reduce((sum, r) => sum + (r.code as number), 0);
   const track = await loadTrack(file);
   const landed = track.refsRead?.length ?? 0;
   // Every attempted write either lands or is a named fail-open skip — never silently vanishes.
