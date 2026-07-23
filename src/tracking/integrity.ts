@@ -37,12 +37,25 @@ export interface TrackEnvelope {
 /** Load (or create on first use) the per-machine HMAC key stored at mode 0600. */
 function loadOrCreateKey(): string {
   mkdirSync(HARNESS_DIR, { recursive: true });
-  if (!existsSync(KEY_PATH)) {
-    const key = randomBytes(32).toString("hex");
-    writeFileSync(KEY_PATH, key, { encoding: "utf8", mode: 0o600 });
-    return key;
+  if (existsSync(KEY_PATH)) return readFileSync(KEY_PATH, "utf8").trim();
+  // Race-tolerant creation ("wx" crowns ONE creator): before, N concurrent
+  // first-time processes (virgin home — CI) each signed with their OWN key.
+  const candidate = randomBytes(32).toString("hex");
+  try {
+    writeFileSync(KEY_PATH, candidate, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    return candidate;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
   }
-  return readFileSync(KEY_PATH, "utf8").trim();
+  // The winner's 64-byte write is one write(2); bounded re-reads cover the gap.
+  for (let i = 0; i < 5; i++) {
+    const existing = readFileSync(KEY_PATH, "utf8").trim();
+    if (existing) return existing;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+  }
+  const key = readFileSync(KEY_PATH, "utf8").trim();
+  if (!key) throw new Error("fuse: empty .key after write contention");
+  return key;
 }
 
 /**

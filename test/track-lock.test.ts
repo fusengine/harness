@@ -88,3 +88,13 @@ test("sync variant: acquire/run/release, then busy -> LOCK_FAILED without throwi
   } finally { process.stderr.write = orig; }
   rmSync(join(d, "track.lock"));
 });
+test("virgin-home .key race: 8 workers x 3 writes converge on ONE key (CI fix)", async () => {
+  const home = dir(), file = join(dir(), "track.json");
+  const script = `import { withTrack, loadTrack } from ${JSON.stringify(join(new URL("..", import.meta.url).pathname, "src/tracking/store.ts"))};
+const f = ${JSON.stringify(file)}, id = process.env.WORKER_ID;
+if (id === "v") process.exit((await loadTrack(f)).refsRead?.length ?? 0); else { let s = 0; try { for (let i = 0; i < 3; i++) if (!(await withTrack(f, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })))) s++; } catch { process.exit(99); } process.exit(s); }`;
+  const run = (id: string) => new Promise<number | null>((done) => spawn("bun", ["-e", script], { env: { ...process.env, HOME: home, WORKER_ID: id } }).on("close", done));
+  const rs = await Promise.all(Array.from({ length: 8 }, (_, i) => run(`p${i}`)));
+  expect(rs.some((c) => c === null || c === 99)).toBe(false);
+  expect((await run("v"))! + rs.reduce<number>((sum, c) => sum + (c ?? 0), 0)).toBe(24);
+});
