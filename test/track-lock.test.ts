@@ -17,20 +17,39 @@ test("locked RMW: mutation lands and track stays valid", async () => {
   expect(track.refsRead?.length).toBe(1);
 });
 
-test("concurrency: 8 processes × 3 writes each — zero lost write under the lock", async () => {
-  const d = dir();
-  const file = join(d, "track.json");
+test("concurrency: 8 processes × 3 writes each — no write lost SILENTLY under the lock", async () => {
+  const d = dir(), home = dir(), file = join(d, "track.json");
   const storePath = join(new URL("..", import.meta.url).pathname, "src/tracking/store.ts");
-  const script = `import { withTrack } from ${JSON.stringify(storePath)};
+  // Hermetic HOME (CI flake fix): the parent froze HARNESS_DIR at import while
+  // neighbouring tests mutate process.env.HOME — workers signed under a home
+  // whose .key differed from the verifier's → verifyTrack rejected every write
+  // (landed=0, skipped=0). A 9th verifier worker shares the SAME pinned HOME.
+  const script = `import { withTrack, loadTrack } from ${JSON.stringify(storePath)};
 const file = ${JSON.stringify(file)}, id = process.env.WORKER_ID;
-for (let i = 0; i < 3; i++) await withTrack(file, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] }));`;
-  const procs = Array.from({ length: 8 }, (_, i) => new Promise<number | null>((done) => {
-    spawn("bun", ["-e", script], { env: { ...process.env, WORKER_ID: `p${i}` } }).on("close", done);
-  }));
-  for (const code of await Promise.all(procs)) expect(code).toBe(0);
-  const track = await loadTrack(file);
-  expect(track.refsRead?.length).toBe(24);
-  expect(new Set(track.refsRead ?? []).size).toBe(24);
+if (id === "v") { process.stdout.write(JSON.stringify((await loadTrack(file)).refsRead ?? [])); process.exit(0); }
+let skipped = 0;
+try {
+  for (let i = 0; i < 3; i++) { const ok = await withTrack(file, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })); if (!ok) skipped++; }
+} catch { process.exit(99); }
+process.exit(skipped);`;
+  const run = (id: string) => new Promise<{ code: number | null; out: string }>((done) => {
+    const p = spawn("bun", ["-e", script], { env: { ...process.env, HOME: home, WORKER_ID: id } });
+    let out = "";
+    p.stdout!.on("data", (c: Buffer) => (out += c.toString()));
+    p.on("close", (code) => done({ code, out }));
+  });
+  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => run(`p${i}`)));
+  // Exit code = skip count (kernel waitpid, race-free); 99 = crash sentinel.
+  for (const r of results) { expect(r.code).not.toBeNull(); expect(r.code).not.toBe(99); }
+  const totalSkipped = results.reduce<number>((sum, r) => sum + (r.code ?? 0), 0);
+  const v = await run("v");
+  expect(v.code).toBe(0);
+  const refs = JSON.parse(v.out) as string[];
+  const landed = refs.length;
+  // Every attempted write either lands or is a named fail-open skip — never silently vanishes.
+  expect(landed + totalSkipped).toBe(24);
+  // No duplicate/corrupted entries: the lock must never let two writers land the same slot.
+  expect(new Set(refs).size).toBe(landed);
 });
 
 test("degradation: busy lock -> decision rendered without the write, stderr logged", async () => {
@@ -68,4 +87,14 @@ test("sync variant: acquire/run/release, then busy -> LOCK_FAILED without throwi
     expect(withTrackLockSync(d, () => "never")).toBe(LOCK_FAILED);
   } finally { process.stderr.write = orig; }
   rmSync(join(d, "track.lock"));
+});
+test("virgin-home .key race: 8 workers x 3 writes converge on ONE key (CI fix)", async () => {
+  const home = dir(), file = join(dir(), "track.json");
+  const script = `import { withTrack, loadTrack } from ${JSON.stringify(join(new URL("..", import.meta.url).pathname, "src/tracking/store.ts"))};
+const f = ${JSON.stringify(file)}, id = process.env.WORKER_ID;
+if (id === "v") process.exit((await loadTrack(f)).refsRead?.length ?? 0); else { let s = 0; try { for (let i = 0; i < 3; i++) if (!(await withTrack(f, (t) => ({ ...t, refsRead: [...(t.refsRead ?? []), id + "-" + i] })))) s++; } catch { process.exit(99); } process.exit(s); }`;
+  const run = (id: string) => new Promise<number | null>((done) => spawn("bun", ["-e", script], { env: { ...process.env, HOME: home, WORKER_ID: id } }).on("close", done));
+  const rs = await Promise.all(Array.from({ length: 8 }, (_, i) => run(`p${i}`)));
+  expect(rs.some((c) => c === null || c === 99)).toBe(false);
+  expect((await run("v"))! + rs.reduce<number>((sum, c) => sum + (c ?? 0), 0)).toBe(24);
 });

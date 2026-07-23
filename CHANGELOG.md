@@ -6,6 +6,11 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [0.1.81] - 2026-07-23
 
+### Fixed (hotfix — CI stabilization)
+
+- **HMAC key race on virgin `HOME` (CI red)** (`src/tracking/integrity.ts`) — `loadOrCreateKey` now creates the per-machine `.key` atomically (`wx` flag crowns one creator among N concurrent first-time processes) instead of each racer signing with its own key, and throws on a still-empty key after bounded contention retries instead of returning silently.
+- **`track-lock` concurrency test flaked in CI** (`test/track-lock.test.ts`) — the 8-worker write test now pins a hermetic `HOME` shared with a same-`HOME` verifier worker; the parent process previously froze `HARNESS_DIR` at import while neighbouring tests mutated `process.env.HOME`, so workers signed under a `HOME` diverging from the verifier's and every write was rejected.
+
 ### Added
 
 - **Solid scope: PreToolUse file-size deny, tri-harness** (`src/runtime/solid-file-size-gate.ts` + `src/runtime/solid-pre.ts`) — `harness hook <id> solid` now blocks oversized Write/Edit with the exact policy of core's `evaluate.ts` (strictly-shrinking Edit passes, Explore/Plan exemption, `FUSE_SOLID_MAX_LINES` honored) but WITHOUT the core-only APEX freshness gates, and renders via `respond()` so kimi receives its native `hookSpecificOutput` deny instead of nothing. Intentional behavior change for claude-code/codex: the solid scope previously only warned PostToolUse (that warn remains). Sim scenario `40-kimi-solid-filesize-deny`.
