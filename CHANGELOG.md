@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.83] - 2026-07-24
+
+### Fixed
+
+- **Append/compaction TOCTOU lost-write in the event journal** (`src/tracking/track-journal.ts`, `src/tracking/track-lock-sync.ts`) — `appendEvent` used a bare `appendFileSync` with no mutual exclusion against the compactor's rename→fold→unlink; an append straddling open→write during compaction could land in the renamed inode and be silently unlinked. `appendEvent` now serialises on `withTrackLockSyncBlocking`, a blocking twin of the existing non-blocking lock (spins on `track.lock`, stale-lock TTL as the only anti-deadlock guard, never skipped), the same lock the compaction takes — zero lost write. Deterministic, non-vacant probes (`test/track-journal-toctou.test.ts`): a manually-held-lock block test, and a real `appendEvent` loop racing a real `maybeCompactJournal` with zero event loss asserted.
+
 ## [0.1.82] - 2026-07-24
 
 ### Added

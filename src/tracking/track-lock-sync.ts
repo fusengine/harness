@@ -52,3 +52,32 @@ export function withTrackLockSync<T>(dir: string, fn: () => T): T | typeof LOCK_
     try { unlinkSync(lock); } catch { /* best-effort release */ }
   }
 }
+
+/**
+ * Blocking twin of {@link withTrackLockSync}: NEVER skips — spins (1 ms step)
+ * until the lock is acquired. Used by the journal append path (track-journal
+ * `appendEvent`): an append must wait out an in-flight compaction (same
+ * `track.lock`), never race its rename/fold/unlink, never be skipped — a lost
+ * write is not an option. The stale-lock TTL (dead-process reclamation) is the
+ * only anti-deadlock guard. Do NOT use on paths that may already hold the lock.
+ */
+export function withTrackLockSyncBlocking<T>(dir: string, fn: () => T): T {
+  mkdirSync(dir, { recursive: true });
+  const lock = join(dir, "track.lock");
+  for (;;) {
+    try {
+      const fd = openSync(lock, "wx");
+      closeSync(fd);
+      break;
+    } catch {
+      if (isStale(lock)) { try { unlinkSync(lock); } catch { /* raced */ } }
+      sleepSync(1);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    try { unlinkSync(lock); } catch { /* best-effort release */ }
+  }
+}
+
