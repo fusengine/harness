@@ -6,9 +6,8 @@
  * exists — mechanising "no proof, no done".
  * @packageDocumentation
  */
-import { existsSync, readFileSync } from "node:fs";
-import { withTrack } from "./store";
-import { verifyTrack, type TrackEnvelope } from "./integrity";
+import { withTrack, trackJournalEnabled } from "./store";
+import { readTrackSync } from "./track-compact";
 import type { SessionTrack } from "./session-state";
 
 /**
@@ -73,16 +72,13 @@ export function freshPassingReceipt(track: SessionTrack, windowMs: number, now: 
 }
 
 /**
- * Sync variant reading the signed track file directly — for the sync gates
- * (TaskCompleted / SubagentStop). Returns the newest passing receipt, or `null`
- * on any read/verify failure (fail-closed: no proof ⇒ treated as unverified).
+ * Sync variant reading the track directly (snapshot ⊕ journal) — for the sync
+ * gates (TaskCompleted / SubagentStop). Returns the newest passing receipt, or
+ * `null` on any read/verify failure (fail-closed: no proof ⇒ unverified).
  */
 export function freshReceiptFromFile(file: string, windowMs: number, now: number): Receipt | null {
   try {
-    if (!existsSync(file)) return null;
-    const env = JSON.parse(readFileSync(file, "utf-8")) as TrackEnvelope;
-    const track = verifyTrack(env);
-    return track ? freshPassingReceipt(track, windowMs, now) : null;
+    return freshPassingReceipt(readTrackSync(file, trackJournalEnabled()), windowMs, now);
   } catch {
     return null;
   }

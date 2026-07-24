@@ -35,7 +35,7 @@ export interface TrackEnvelope {
 }
 
 /** Load (or create on first use) the per-machine HMAC key stored at mode 0600. */
-function loadOrCreateKey(): string {
+export function loadOrCreateKey(): string {
   mkdirSync(HARNESS_DIR, { recursive: true });
   if (existsSync(KEY_PATH)) return readFileSync(KEY_PATH, "utf8").trim();
   // Race-tolerant creation ("wx" crowns ONE creator): before, N concurrent
@@ -67,8 +67,8 @@ export function writeLastNonce(nonce: number): void {
   writeFileSync(NONCE_PATH, String(nonce), { encoding: "utf8", mode: 0o600 });
 }
 
-/** Compute HMAC-SHA256 over the canonical message `"${nonce}:${data}"`. */
-function computeMac(key: string, data: string, nonce: number): string {
+/** Compute HMAC-SHA256 over `"${nonce}:${data}"` (nonce: envelope number or journal per-line string). */
+export function computeMac(key: string, data: string, nonce: number | string): string {
   return createHmac("sha256", key).update(`${nonce}:${data}`).digest("hex");
 }
 
