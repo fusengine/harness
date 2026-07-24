@@ -1,38 +1,81 @@
+/**
+ * @module store
+ * Session-track persistence — TWO modes behind an env kill-switch:
+ * - JOURNAL (default): writes append signed event lines to `track-<sid>.log`
+ *   (O_APPEND, lock-free — see track-journal.ts), reads fold the log over the
+ *   legacy `track-<sid>.json` snapshot. No lock on the hot path ⇒ the fan-out
+ *   can no longer lose a write to "track lock busy, write skipped" — compaction
+ *   included (it is rename-atomic, see track-compact.ts).
+ * - LEGACY (`FUSE_TRACK_JOURNAL=0`): the original locked read-modify-write,
+ *   kept fully intact below as the instant rollback (G1) — no redeploy needed.
+ *   NOTE: =0 does NOT honour the uncompacted journal (the track reads as its
+ *   last snapshot, possibly EMPTY); the events are recoverable by switching
+ *   back to journal mode — never delete a `.log` during a =0 rollback.
+ * The flag is read at CALL time so the switch is live.
+ * @packageDocumentation
+ */
 import { readJsonFile, writeJsonFile } from "../util/json-io";
 import { emptyTrack, type SessionTrack } from "./session-state";
 import { signTrack, verifyTrack, writeLastNonce, type TrackEnvelope } from "./integrity";
 import { LOCK_FAILED, withTrackLock } from "./track-lock";
 import { dirname } from "node:path";
+import { appendEvent, foldEvents } from "./track-journal";
+import { diffTrackEvents } from "./track-diff";
+import { journalLogPath, maybeCompactJournal, readEvents } from "./track-compact";
 
-/**
- * Load and verify a session track from a signed envelope file.
- *
- * Returns {@link emptyTrack} (fail closed) when the file is absent, corrupt, or
- * fails MAC validation — so the gates re-require real agents rather than trust a
- * forged track. Only a MAC mismatch triggers fail-closed; the nonce is advisory
- * and is never checked during load.
- */
-export async function loadTrack(file: string): Promise<SessionTrack> {
+/** Journal mode is the default; `FUSE_TRACK_JOURNAL=0` reverts to the legacy locked RMW (see the module NOTE: =0 ignores the uncompacted journal — recoverable, keep the `.log`). */
+export function trackJournalEnabled(): boolean {
+  return process.env.FUSE_TRACK_JOURNAL !== "0";
+}
+
+/** Verified legacy snapshot (fail closed: absent/corrupt/tampered → emptyTrack). */
+async function loadSnapshot(file: string): Promise<SessionTrack> {
   const envelope = await readJsonFile<TrackEnvelope>(file);
   if (!envelope) return emptyTrack();
   return verifyTrack(envelope) ?? emptyTrack();
 }
 
 /**
- * Sign and persist a session track as a tamper-evident envelope, then write the
+ * Load a session track: the verified legacy snapshot (the migration base — an
+ * old `track-<sid>.json` with no log reads exactly as before) with the journal
+ * folded on top. Fail closed on tampering (envelope MAC, per-line MAC).
+ */
+export async function loadTrack(file: string): Promise<SessionTrack> {
+  const base = await loadSnapshot(file);
+  if (!trackJournalEnabled()) return base;
+  return foldEvents(readEvents(journalLogPath(file)), base);
+}
+
+/** Journal-mode write: append the mutation's events, then maybe compact. */
+async function appendDiff(file: string, prev: SessionTrack, next: SessionTrack): Promise<boolean> {
+  const log = journalLogPath(file);
+  let ok = true;
+  for (const ev of diffTrackEvents(prev, next, Date.now())) ok = appendEvent(log, ev.field, ev.op, ev.value, ev.ts) && ok;
+  await maybeCompactJournal(file);
+  return ok;
+}
+
+/**
+ * Persist a session track. Journal mode appends the diff as signed events;
+ * legacy mode signs and persists the tamper-evident envelope, then writes the
  * advisory nonce watermark.
  */
 export async function saveTrack(file: string, track: SessionTrack): Promise<void> {
+  if (trackJournalEnabled()) {
+    await appendDiff(file, await loadTrack(file), track);
+    return;
+  }
   const envelope = signTrack(track);
   await writeJsonFile(file, envelope);
   writeLastNonce(envelope.nonce);
 }
 
 /**
- * Locked read-modify-write on a session track (the fan-out-safe way to mutate
- * it): loads under the lock, applies `mutate`, persists atomically. On lock
- * contention the write is SKIPPED (fail-open, stderr already logged) and
- * `false` is returned — a named lost write, never a crash.
+ * Mutate a session track. Journal mode: load (snapshot ⊕ log), run `mutate`,
+ * append the resulting events — lock-free, so a write is only ever lost to a
+ * genuine I/O error (reported as `false`). Legacy mode: locked RMW; on lock
+ * contention the write is SKIPPED (fail-open, stderr logged) and `false` is
+ * returned — a named lost write, never a crash.
  * @param file - The session track file.
  * @param mutate - Pure mutation over the freshly loaded track.
  * @returns True when the write landed.
@@ -41,6 +84,10 @@ export async function withTrack(
   file: string,
   mutate: (track: SessionTrack) => SessionTrack | Promise<SessionTrack>,
 ): Promise<boolean> {
+  if (trackJournalEnabled()) {
+    const track = await loadTrack(file);
+    return appendDiff(file, track, await mutate(track));
+  }
   const ran = await withTrackLock(dirname(file), async () => {
     const track = await loadTrack(file);
     await saveTrack(file, await mutate(track));

@@ -14,6 +14,10 @@ import { emptyTrack, type SessionTrack } from "../tracking/session-state";
 import { signTrack, verifyTrack, writeLastNonce, type TrackEnvelope } from "../tracking/integrity";
 import { atomicWrite } from "../util/json-io";
 import { LOCK_FAILED, withTrackLockSync } from "../tracking/track-lock-sync";
+import { trackJournalEnabled } from "../tracking/store";
+import { appendEvent } from "../tracking/track-journal";
+import { diffTrackEvents } from "../tracking/track-diff";
+import { journalLogPath, readTrackSync } from "../tracking/track-compact";
 import { dirname } from "node:path";
 
 /** Load the current track synchronously; `emptyTrack()` when absent/corrupt (fail-closed read). */
@@ -41,8 +45,19 @@ export function harvestSubagentTrack(payload: Record<string, unknown>, cwd: stri
   if (!transcriptPath) return;
   const sessionId = typeof payload.session_id === "string" ? payload.session_id : "unknown";
   const file = trackFile(sessionId, baseDir);
-  // Locked RMW (sync variant — this path cannot float async work): on
-  // contention the harvest is skipped like any other write error, fail-open.
+  // Journal mode (default): snapshot ⊕ log read, then lock-free signed event
+  // appends — same fail-open contract, never a "write skipped" under fan-out.
+  if (trackJournalEnabled()) {
+    const track = readTrackSync(file, true);
+    const next = harvestAgentEvidence(transcriptPath, track, now);
+    if (next === track) return; // nothing harvested → no write
+    const log = journalLogPath(file);
+    for (const ev of diffTrackEvents(track, next, now)) appendEvent(log, ev.field, ev.op, ev.value, ev.ts);
+    return;
+  }
+  // Locked RMW (legacy kill-switch path, sync variant — this path cannot float
+  // async work): on contention the harvest is skipped like any other write
+  // error, fail-open.
   const ran = withTrackLockSync(dirname(file), () => {
     const track = loadTrackSync(file);
     const next = harvestAgentEvidence(transcriptPath, track, now);
