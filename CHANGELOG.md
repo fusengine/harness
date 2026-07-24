@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.82] - 2026-07-24
+
+### Added
+
+- **Lock-free append-only event journal for `SessionTrack`** (`src/tracking/track-journal.ts`, `src/tracking/track-diff.ts`, `src/tracking/track-compact.ts`) — writes append events instead of read-modify-write on the shared state file, eliminating the write-skipped outcome under concurrent multi-agent fan-out. Kill-switch `FUSE_TRACK_JOURNAL=0` reverts to legacy read-modify-write; `FUSE_TRACK_COMPACT_BYTES` tunes when compaction fires; compaction rewrites the journal into a fresh state file via atomic rename. Guarantees: G1 append never skipped under fan-out, G2 replay deterministic/idempotent, G3 compaction crash-safe, G4 legacy behavior preserved byte-for-byte with the kill-switch off. Validated in real conditions (deployed dist, multi-agent fan-out, 0 write-skipped, 24/24 runs without loss, clean migration from legacy state).
+
 ## [0.1.81] - 2026-07-23
 
 ### Fixed (hotfix — CI stabilization)
