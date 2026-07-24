@@ -2,17 +2,18 @@
  * @module track-journal
  * Append-only, per-line-signed event journal for {@link SessionTrack} — the
  * fan-out-immune replacement for the locked RMW (generalises the freshness/
- * ref-journal.ts pattern to every field). O_APPEND keeps short appends from
- * concurrent hook processes non-interleaved: no lock, no lost write (compaction
- * is rename-atomic — see track-compact.ts). Per-line HMAC (same key/scheme as
- * integrity.ts): a tampered line is dropped, never the whole file (fail-closed
- * PER LINE).
+ * ref-journal.ts pattern to every field). Appends serialise on a SHORT
+ * BLOCKING track lock (never skipped, sub-ms wait — see appendEvent) so they
+ * can never race the rename-atomic compaction: zero lost write. Per-line HMAC
+ * (same key/scheme as integrity.ts): a tampered line is dropped, never the
+ * whole file (fail-closed PER LINE).
  * @packageDocumentation
  */
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { computeMac, loadOrCreateKey } from "./integrity";
+import { withTrackLockSyncBlocking } from "./track-lock-sync";
 import { emptyTrack, type SessionTrack } from "./session-state";
 import type { AuthEntry } from "../freshness/doc-helpers";
 import type { SessionTarget } from "../policy/apex-authorization";
@@ -38,13 +39,12 @@ export function signEvent(field: string, op: TrackEvent["op"], value: unknown, t
   return { v: 1, field, op, value, ts, nonce, mac: computeMac(loadOrCreateKey(), data, nonce) };
 }
 
-/** Append one signed event line. Fail-open: returns false instead of throwing. */
+/** Append one signed event line under the BLOCKING track lock (same `track.lock` as the compaction — an append can never straddle rename/fold/unlink; never skipped). Fail-open on I/O error. */
 export function appendEvent(logPath: string, field: string, op: TrackEvent["op"], value: unknown, ts: number): boolean {
   try {
     const ev = signEvent(field, op, value, ts);
     if (!ev) return false;
-    mkdirSync(dirname(logPath), { recursive: true });
-    appendFileSync(logPath, JSON.stringify(ev) + "\n", "utf8");
+    withTrackLockSyncBlocking(dirname(logPath), () => appendFileSync(logPath, JSON.stringify(ev) + "\n", "utf8"));
     return true;
   } catch { return false; }
 }
