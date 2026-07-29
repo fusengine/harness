@@ -4,10 +4,11 @@ import { loadDesignState, type DesignState } from "./state";
 import { activeDesignAgent } from "./flag";
 import { isUiWrite } from "./skill-gate";
 import { SKILL_TRIGGERS } from "./skill-triggers";
+import { ALLOWED_WRITE, isAllowedWrite } from "./allowed-write";
 
 export { validateDesignSystem } from "./design-system-rules";
+export { ALLOWED_WRITE, isAllowedWrite } from "./allowed-write";
 
-export const ALLOWED_WRITE: RegExp = /\.(html|css|md|json)$/;
 export const EXEMPT_DIRS: readonly string[] = ["node_modules/", "dist/", "build/", ".claude/"];
 const NAV = "mcp__fuse-browser__browser_navigate";
 const SHOT = "mcp__fuse-browser__browser_screenshot";
@@ -18,11 +19,11 @@ export const deny = (reason: string): Prompt => ({
   actions: ["Follow the design pipeline phases (0→identity, 1→inspiration, 2→screenshots, 3→design-system, 4→generate) in order"],
 });
 
-/** Block the design agent from writing anything but .html/.css/.md/.json. */
+/** Block the design agent from writing anything but .html/.css/.md/.json (+ motion*.js). */
 export function htmlCssOnlyGate(filePath: string): Prompt | null {
-  if (EXEMPT_DIRS.some((d) => filePath.includes(d)) || ALLOWED_WRITE.test(filePath)) return null;
+  if (EXEMPT_DIRS.some((d) => filePath.includes(d)) || isAllowedWrite(filePath)) return null;
   return deny(
-    "BLOCKED: design-expert can only write .html, .css, .md, and .json files. " +
+    "BLOCKED: design-expert can only write .html, .css, .json, .md, and motion*.js files. " +
       "Framework files (.tsx, .astro, .vue, .swift, .php) must be written by the domain expert " +
       "(astro-expert, react-expert, etc.) AFTER design validation.",
   );

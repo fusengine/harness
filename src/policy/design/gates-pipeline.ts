@@ -15,7 +15,7 @@ export function designSystemWriteGate(filePath: string, state: DesignState, corp
         "RECOVERY: 1) Read identity templates from skills/design-system/ " +
         "2) Read design-inspiration.md 3) Read the refs-design corpus (README.md + relevant tokens-*.md) with the Read tool " +
         "4) Screenshot real sector sites with mcp__fuse-browser__browser_screenshot on a LIVE session " +
-        "(note: browser_shots_batch/browser_site_shots do NOT advance the phase) " +
+        "(browser_shots_batch/browser_site_shots also count, 1 credit per call) " +
         "5) Then write design-system.md",
     );
   }
@@ -25,7 +25,7 @@ export function designSystemWriteGate(filePath: string, state: DesignState, corp
       `BLOCKED: ${state.screenshotsCount}/${needed} screenshots for mode '${state.mode}'. ` +
         `RECOVERY: 1) Read the refs-design corpus (README.md + tokens-*.md) if not done ` +
         `2) Take ${needed - state.screenshotsCount} more screenshots of REAL sector sites with ` +
-        "mcp__fuse-browser__browser_screenshot (browser_shots_batch/browser_site_shots do NOT count) " +
+        "mcp__fuse-browser__browser_screenshot (browser_shots_batch/browser_site_shots also count, 1 credit per call) " +
         "3) Use browser_open + browser_navigate + browser_screenshot fullPage:true 4) Then write design-system.md",
     );
   }

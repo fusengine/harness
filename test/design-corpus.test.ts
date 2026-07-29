@@ -18,17 +18,21 @@ test("classifyCorpusRead: index vs tokens vs outside the delivered corpus", () =
   expect(classifyCorpusRead("/proj/docs/refs-design/README.md", ROOT)).toBeNull();
 });
 
-test("corpusReady: per-mode thresholds (component >= 1, page >= 2, full = index + 2 tokens)", () => {
+test("corpusReady: per-mode thresholds (component >= 1, page >= 2, full = index + 3 tokens)", () => {
   const idx = ["README.md"];
   const one = ["README.md", "umbrel-recode/tokens-umbrel.md"];
   const two = [...one, "fora-recode/tokens-fora.md"];
+  const three = [...two, "linear-recode/tokens-linear.md"];
   expect(corpusReady([], "component")).toBe(false);
   expect(corpusReady(idx, "component")).toBe(true);
   expect(corpusReady(idx, "page")).toBe(false);
   expect(corpusReady(one, "page")).toBe(true);
   expect(corpusReady(one, "full")).toBe(false); // one tokens file only
   expect(corpusReady(two.filter((r) => r !== "README.md"), "full")).toBe(false); // no index
-  expect(corpusReady(two, "full")).toBe(true);
+  // C5: README + 2 tokens is NO LONGER enough for full (raised 2 -> 3) — this
+  // is the assertion that bites: without it, the 2->3 change would be invisible.
+  expect(corpusReady(two, "full")).toBe(false);
+  expect(corpusReady(three, "full")).toBe(true);
 });
 
 test("pluginsWriteGuard: writes under the delivered corpus are denied, anything else passes", () => {
