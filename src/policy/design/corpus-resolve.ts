@@ -6,32 +6,32 @@
  * anywhere: an agent-controlled directory can never become its own taste
  * reference (self-attested proof — the failure this gate exists to prevent).
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, normalize } from "node:path";
 import type { Prompt } from "../../prompt/types";
 import { detectHarness, type HarnessId } from "../../detect/harness";
 import { maxSemver } from "../../util/semver";
+import { CORPUS_SUFFIX, children } from "./corpus-fs";
+import { probeClaudeCache } from "./corpus-resolve-cache";
 
-const CORPUS_SUFFIX = join("skills", "design-web", "references", "refs-design");
-
-/** Immediate child dir names of `dir`, or [] when unreadable. */
-function children(dir: string): string[] {
-  try {
-    return readdirSync(dir).sort();
-  } catch {
-    return [];
-  }
-}
-
-/** Claude: `<home>/.claude/plugins/marketplaces/<mkt>/plugins/design-expert` ("" when absent). */
-function probeClaude(home: string): string {
+/** Claude marketplace checkout: `<home>/.claude/plugins/marketplaces/<mkt>/plugins/design-expert` ("" when absent). */
+function probeClaudeMarketplace(home: string): string {
   const markets = join(home, ".claude", "plugins", "marketplaces");
   for (const m of children(markets)) {
     const de = join(markets, m, "plugins", "design-expert");
     if (existsSync(de)) return de;
   }
   return "";
+}
+
+/**
+ * Claude: the marketplace checkout WINS when present (a single unambiguous
+ * live git checkout); the versioned plugin CACHE tree is the fallback, since
+ * Claude Code keeps orphaned prior-version cache dirs ~14 days after a bump.
+ */
+function probeClaude(home: string): string {
+  return probeClaudeMarketplace(home) || probeClaudeCache(home);
 }
 
 /** Codex: `<CODEX_HOME|~/.codex>/plugins/cache/<mkt>/design-expert/<highest STABLE semver>` ("" when absent). */

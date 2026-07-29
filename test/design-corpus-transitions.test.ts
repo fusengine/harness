@@ -34,7 +34,10 @@ test("page: one corpus read plus one screenshot is not enough", () => {
 
 test("full: corpus alone is not enough — the 2-screenshot quota still applies", () => {
   let s = st("full");
-  for (const r of ["README.md", "a-recode/tokens-a.md", "b-recode/tokens-b.md"]) s = recordCorpusRead(s, r, true);
+  // C5: full mode now needs README + 3 tokens; the 3rd file (c-recode) only
+  // satisfies the corpus side of the conjunction — this test's own assertions
+  // stay on the screenshot quota, unchanged.
+  for (const r of ["README.md", "a-recode/tokens-a.md", "b-recode/tokens-b.md", "c-recode/tokens-c.md"]) s = recordCorpusRead(s, r, true);
   expect(s.currentPhase).toBe(1);
   s = recordScreenshot(s, true);
   expect(s.currentPhase).toBe(1);

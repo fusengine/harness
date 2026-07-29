@@ -11,13 +11,13 @@ import type { NormalizedEvent } from "./normalize";
 import { type DesignState, saveDesignState } from "../policy/design/state";
 import { recordScreenshot, recordCorpusRead, recordNavigate, recordScroll, recordValidDesignSystem, recordRead } from "../policy/design/transitions";
 import { classifyCorpusRead } from "../policy/design/corpus";
+import { SHOT_TOOLS } from "../policy/design/screenshot-tools";
 import { designSystemProblems } from "./design-content-gate";
 import { substituteLiteral } from "./design-files-gate";
 
 export { designSystemContentGate } from "./design-content-gate";
 
 const NAV = "mcp__fuse-browser__browser_navigate";
-const SHOT = "mcp__fuse-browser__browser_screenshot";
 const SCROLL = "mcp__fuse-browser__browser_scroll";
 const GEMINI = "mcp__gemini-design__create_frontend";
 
@@ -42,7 +42,7 @@ export function findDesignSystem(cwd: string): string {
 
 /** Apply a PostToolUse fuse-browser transition to the design state. */
 export function recordPost(event: NormalizedEvent, cacheDir: string, state: DesignState, corpusRoot = "", corpusRequired = false, cwd = ""): void {
-  if (event.tool === SHOT) saveDesignState(cacheDir, recordScreenshot(state, corpusRequired));
+  if (SHOT_TOOLS.has(event.tool)) saveDesignState(cacheDir, recordScreenshot(state, corpusRequired));
   else if (event.tool === NAV) saveDesignState(cacheDir, recordNavigate(state));
   else if (event.tool === SCROLL) saveDesignState(cacheDir, recordScroll(state));
   else if (event.tool === GEMINI) saveDesignState(cacheDir, { ...state, geminiCalls: state.geminiCalls + 1 });

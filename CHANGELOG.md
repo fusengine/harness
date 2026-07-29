@@ -4,6 +4,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.86] - 2026-07-29
+
+### Fixed
+
+- **Design pipeline dropped screenshot and corpus-read counts it should have credited** (`src/runtime/design-helpers.ts`, `src/policy/design/screenshot-tools.ts`, `corpus-resolve.ts`, `corpus-fs.ts`, `corpus-resolve-cache.ts`, `gates.ts`, `allowed-write.ts`, `corpus.ts`, `src/policy/detect-framework.ts`) — a real `design-expert` run had captured 3 screenshots and read 5 corpus files, yet the pipeline reported `screenshotsCount:0, corpusReads:[], currentPhase:1`, so the phase-2 gate never opened. Root cause: corpus resolution only recognized the `marketplaces/<mkt>/plugins/design-expert` tree, not the `cache/<mkt>/<plugin>/<version>/` tree Claude Code also serves (where the plugin is named `fuse-design`) — now detected structurally by corpus suffix, never a hardcoded name, with marketplace priority and `maxSemver` selection. Alongside: `browser_shots_batch`/`browser_site_shots` now credit the screenshot quota (previously only `browser_screenshot` did); the write gate now allows `motion*.js` by basename (all eleven corpus references ship one); reference `design-system.md` sheets now credit as a new `"sheet"` `CorpusKind` (without counting toward the `tokens-*` threshold that the `full` quota requires); `.css` files are classified `tailwind` only when their content matches known Tailwind markers, not by extension alone.
+
+### Changed
+
+- **`full` corpus quota raised to README + 3 tokens** (was 2) (`src/policy/design/corpus.ts`) — owner-arbitrated; `page` and `component` quotas unchanged.
+
 ## [0.1.85] - 2026-07-29
 
 ### Fixed

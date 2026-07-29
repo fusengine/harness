@@ -11,8 +11,16 @@ import type { DesignMode } from "./state";
 
 export { resolveCorpusRoot, resolvePluginsRoot, pluginsWriteGuard } from "./corpus-resolve";
 
-/** What a read under the corpus root is: the index, or a tokens-* procedure file. */
-export type CorpusKind = "index" | "tokens";
+/**
+ * What a read under the corpus root is: the index, a tokens-* procedure
+ * file, or a per-reference `design-system.md` DIRECTION sheet (C6) — the
+ * fiche a reference ships alongside its `tokens-*.md`: register, tone,
+ * macrostructure, signature element (the PROCEDURES live in tokens-*;
+ * design-system.md is what you read to CHOOSE a reference in the first
+ * place). "sheet" is a new variant, not folded into "index" — the two are
+ * read for opposite reasons (corpus-wide index vs one reference's direction).
+ */
+export type CorpusKind = "index" | "tokens" | "sheet";
 
 const TOKENS_RE = /^tokens-.+\.md$/;
 const CORPUS_LINE_RE = /^[-*]\s*Corpus:\s*(.+)$/gim;
@@ -21,15 +29,23 @@ const CORPUS_LINE_RE = /^[-*]\s*Corpus:\s*(.+)$/gim;
 export function classifyCorpusRead(filePath: string, corpusRoot: string): CorpusKind | null {
   if (!corpusRoot) return null;
   if (filePath === join(corpusRoot, "README.md")) return "index";
-  if (filePath.startsWith(`${corpusRoot}/`) && TOKENS_RE.test(basename(filePath))) return "tokens";
+  if (!filePath.startsWith(`${corpusRoot}/`)) return null;
+  if (TOKENS_RE.test(basename(filePath))) return "tokens";
+  if (basename(filePath) === "design-system.md") return "sheet";
   return null;
 }
 
-/** Per-mode corpus-read threshold (component >= 1 file, page >= 2 files, full = index + 2 tokens). */
+/**
+ * Per-mode corpus-read threshold (component >= 1 file, page >= 2 files,
+ * full = index + 3 tokens — C5: raised from 2, since 2 references still let
+ * an agent pattern-match by tonal affinity without ever opening the one
+ * reference that actually answered the brief). `"sheet"` reads (C6,
+ * `design-system.md`) never count toward this — only `TOKENS_RE` matches do.
+ */
 export function corpusReady(reads: readonly string[], mode: DesignMode): boolean {
   if (mode === "component") return reads.length >= 1;
   if (mode === "page") return reads.length >= 2;
-  return reads.includes("README.md") && reads.filter((r) => TOKENS_RE.test(basename(r))).length >= 2;
+  return reads.includes("README.md") && reads.filter((r) => TOKENS_RE.test(basename(r))).length >= 3;
 }
 
 /** True when the content carries a `- Corpus: ref/section` citation line (form only). */

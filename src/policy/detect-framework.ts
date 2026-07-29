@@ -18,6 +18,17 @@ const NEXT_CONTENT = /use client|use server|NextRequest|NextResponse|from ['"]ne
 const NEXT_ROUTE = /(page|layout|loading|error|route|middleware)\.(ts|tsx|js|jsx)$/;
 /** TanStack Start markers (file routes, server fns, start/router imports). */
 const TANSTACK_CONTENT = /createFileRoute|createServerFn|from ['"]@tanstack\/react-(start|router)/;
+/**
+ * C7: Tailwind CSS-file signals, verified against official docs (v3 + v4) —
+ * `@tailwind` (v3 layer directive, removed in v4), `@apply` (both versions),
+ * `@config` (v3 native / v4 compat, JS config path), `@source` (v4 content
+ * globbing), `@theme` (v4 design-token block), `theme(` (the function, both
+ * versions' syntax). Deliberately NOT a bare utility-class-in-selector scan
+ * (e.g. `.flex{}`) — an ordinary hand-written class named `.flex` is exactly
+ * the false-positive shape this fix removes; only genuine Tailwind-specific
+ * at-rules/functions count.
+ */
+const TAILWIND_CSS_CONTENT = /@tailwind\b|@apply\b|@config\b|@source\b|@theme\b|\btheme\(/;
 
 /** Derive the raw signal an extension + content carry (no filesystem access). */
 function fileSignal(filePath: string, content: string): FileSignal {
@@ -27,7 +38,15 @@ function fileSignal(filePath: string, content: string): FileSignal {
   if (/\.go$/.test(filePath)) return { definitive: "go" };
   if (/\.rb$/.test(filePath)) return { definitive: "ruby" };
   if (/\.rs$/.test(filePath)) return { definitive: "rust" };
-  if (/\.css$/.test(filePath) || /@tailwind|@apply/.test(content)) return { definitive: "tailwind" };
+  // C7: a .css file is "tailwind" only when its CONTENT shows it — bare
+  // extension used to classify EVERY .css as tailwind, forcing 6 unrelated
+  // skill reads on hand-written CSS. Empty content (file-size-scope.ts's
+  // caller) can never prove Tailwind usage, so it falls through to the
+  // JS-family checks below (all false for .css) and returns "generic" — the
+  // function's existing fail-open contract, not a special case. That caller
+  // never reaches here in practice: .css is already outside its
+  // FILE_SIZE_CODE_EXT scope, so this is inert there either way.
+  if (/\.css$/.test(filePath) && TAILWIND_CSS_CONTENT.test(content)) return { definitive: "tailwind" };
   // JS branch: content signals ride MASKED content (a `// migrated from
   // createServerFn pattern` comment must not flip nextjs → tanstack-start).
   const masked = maskCommentsAndStrings(content, "c");
