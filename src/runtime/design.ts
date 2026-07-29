@@ -6,9 +6,12 @@ import { activeDesignAgent } from "../policy/design/flag";
 import { runDesignChecks } from "../policy/design/content-checks";
 import { uiDesignSkillGate } from "../policy/design/skill-gate";
 import { collectDesignEvidence } from "../policy/design/skill-evidence";
-import { findDesignSystem, recordPost } from "./design-helpers";
+import { findDesignSystem, recordPost, designSystemContentGate } from "./design-helpers";
+import { checkDesignSystemContent } from "./design-content-gate";
+import { designFilesGate } from "./design-files-gate";
+import { resolveCorpusRoot, resolvePluginsRoot, pluginsWriteGuard } from "../policy/design/corpus";
 import {
-  htmlCssOnlyGate, stateFileGate, screenshotScrollGate, validateDesignSystem,
+  htmlCssOnlyGate, stateFileGate, screenshotScrollGate,
   geminiEnabled,
 } from "../policy/design/gates";
 import { designSystemWriteGate, geminiCreateGate, browserNavigateGate } from "../policy/design/gates-pipeline";
@@ -21,7 +24,7 @@ const GEMINI = "mcp__gemini-design__create_frontend";
  * Design-pipeline gate (effectful: reads/writes the design state + design-system.md).
  * Returns a Prompt to block, or null when this isn't a design-agent context / nothing fires.
  */
-export function designGate(payload: Record<string, unknown>, event: NormalizedEvent, cacheDir: string, cwd: string): Prompt | null {
+export function designGate(payload: Record<string, unknown>, event: NormalizedEvent, cacheDir: string, cwd: string, corpusRootOverride?: string, pluginsRootOverride?: string): Prompt | null {
   // UI design-skill gate (ports check-design-skill.py): fires for ANY agent on a
   // UI write — requires a design-skill read + ANY doc source (Context7/Exa/web).
   // Gemini is NEVER required. Runs before the design-agent pipeline state logic.
@@ -45,9 +48,15 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
     state = initDesignState(id, dsExists ? "page" : "full", dsExists);
     saveDesignState(cacheDir, state);
   }
+  // Corpus + plugin roots, resolved INDEPENDENTLY (corpusRoot never decides
+  // pluginsRoot — F4). Corpus absent ⇒ requirement waived (pre-doctrine quotas);
+  // the plugin-root write guard stays active against refs-design fabrication.
+  const corpusRoot = corpusRootOverride ?? resolveCorpusRoot();
+  const corpusRequired = corpusRoot !== "";
+  const pluginsRoot = pluginsRootOverride ?? resolvePluginsRoot();
 
   if (event.phase === "post") {
-    recordPost(event, cacheDir, state);
+    recordPost(event, cacheDir, state, corpusRoot, corpusRequired, cwd);
     if ((event.tool === "Write" || event.tool === "Edit") && /\.(tsx|jsx|css)$/.test(event.filePath ?? "")) {
       const warnings = runDesignChecks(event.content ?? "");
       if (warnings.length) return { kind: "inform", title: "Design review", reason: warnings.join(" "), actions: [] };
@@ -56,17 +65,17 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   }
   if (event.tool === "Write" || event.tool === "Edit") {
     const fp = event.filePath ?? "";
-    // Parity: only design-system.md is screenshot-quota-gated (designSystemWriteGate,
-    // ports the live pipeline_checks.check_design_system_write). The old
-    // preScreenshotWriteGate ported check-browser-browsing.py, which is DEAD in the
-    // plugin (not wired in any hooks.json) and wrongly blocked plain .html/.css writes.
-    const base = stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? designSystemWriteGate(fp, state);
+    // Parity: only design-system.md is screenshot-quota-gated (designSystemWriteGate).
+    const base = pluginsWriteGuard(fp, pluginsRoot) ?? stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? designSystemWriteGate(fp, state, corpusRequired)
+      ?? designSystemContentGate({ filePath: fp, tool: event.tool, content: event.content ?? "", oldString: event.oldString, replaceAll: event.input.replace_all === true, state, corpusRoot, corpusRequired });
     if (base) return base;
     if (geminiEnabled() && state.geminiCalls === 0 && /\.(html|css)$/.test(fp)) {
       return { kind: "block", title: "Design pipeline", reason: "BLOCKED: generate the frontend via create_frontend before hand-writing HTML/CSS.", actions: ["Call mcp__gemini-design__create_frontend first"] };
     }
     return null;
   }
+  // Codex apply_patch (D2): gate each fanned-out file like a Write.
+  if (event.files && event.files.length > 0) return designFilesGate(event.files, state, pluginsRoot, corpusRoot, corpusRequired, cwd);
   if (event.tool === NAV) {
     return browserNavigateGate(state, typeof event.input.url === "string" ? event.input.url : "");
   }
@@ -79,12 +88,12 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
     // Parity validate-design-system.py DENY_NOT_FOUND: a MISSING file gets its own
     // recovery message, distinct from the "too generic" message for a present-but-thin one.
     if (ds === "") {
-      return { kind: "block", title: "Design pipeline", reason: "BLOCKED: design-system.md not found. RECOVERY: 1) Read the identity templates 2) Read design-inspiration.md 3) Browse 4 reference sites 4) Write design-system.md, then retry create_frontend.", actions: ["Create design-system.md via the pipeline, then retry create_frontend"] };
+      return { kind: "block", title: "Design pipeline", reason: "BLOCKED: design-system.md not found. RECOVERY: 1) Read the identity templates 2) Read design-inspiration.md 3) Read the refs-design corpus (README.md + relevant tokens-*.md) 4) Screenshot 1-2 real sector sites 5) Write design-system.md, then retry create_frontend.", actions: ["Create design-system.md via the pipeline, then retry create_frontend"] };
     }
-    const missing = validateDesignSystem(ds);
-    if (missing.length) {
-      return { kind: "block", title: "Design pipeline", reason: `BLOCKED: design-system.md too generic. Missing: ${missing.join(", ")}.`, actions: ["Fix design-system.md, then retry create_frontend"] };
-    }
+    // Same content rules as the nominal write path (jointure included): the
+    // Gemini branch must not be weaker than the gate the Write just went through.
+    const contentBlock = checkDesignSystemContent(ds, state.corpusReads, corpusRequired);
+    if (contentBlock) return contentBlock;
     saveDesignState(cacheDir, recordValidDesignSystem(state));
   }
   return null;

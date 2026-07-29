@@ -40,7 +40,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     return { stdout: intercept.stdout, exit: 0 };
   }
 
-  const designBlock = designGate(payload, event, mcpDir, opts.cwd);
+  const designBlock = designGate(payload, event, mcpDir, opts.cwd, opts.corpusRoot);
   if (designBlock) return { stdout: withDenyNotice(id, respond(id, designBlock), designBlock, event.sessionId, dirname(file), opts.now), exit: 0 };
 
   // Security scope is advisory-only (ports check-security-skill.py): emit the
@@ -96,5 +96,5 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
   // decision-time lesson + evidence-fresh notice). A deny/ask already returned
   // above, so nothing it emits can block nor override a decision.
-  return allowOutcome(id, event, payload, mcpDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now });
+  return allowOutcome(id, event, payload, mcpDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
 }
