@@ -155,7 +155,7 @@
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"tsdown": "^0.22.13",
+		"tsdown": "^0.22.14",
 		"typedoc": "^0.28.20",
 		"typescript": "^7.0.2"
 	},
