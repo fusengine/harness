@@ -5,10 +5,10 @@ import { activeDesignAgent } from "./flag";
 import { isUiWrite } from "./skill-gate";
 import { SKILL_TRIGGERS } from "./skill-triggers";
 
+export { validateDesignSystem } from "./design-system-rules";
+
 export const ALLOWED_WRITE: RegExp = /\.(html|css|md|json)$/;
 export const EXEMPT_DIRS: readonly string[] = ["node_modules/", "dist/", "build/", ".claude/"];
-const FORBIDDEN_FONTS: readonly string[] = ["Inter", "Roboto", "Arial", "Open Sans"];
-const OKLCH_RE = /oklch\(\s*[\d.]+%?\s+0\.0*[1-9]/;
 const NAV = "mcp__fuse-browser__browser_navigate";
 const SHOT = "mcp__fuse-browser__browser_screenshot";
 const GEMINI = "mcp__gemini-design__create_frontend";
@@ -38,16 +38,6 @@ export function stateFileGate(filePath: string): Prompt | null {
     : null;
 }
 
-/** Return the requirements missing from a design-system.md (empty = valid). */
-export function validateDesignSystem(content: string): string[] {
-  const missing: string[] = [];
-  if (!content.includes("## Design Reference")) missing.push("## Design Reference section");
-  if (!/https?:\/\//.test(content)) missing.push("reference URL (https://…)");
-  if (!OKLCH_RE.test(content)) missing.push("oklch() color with chroma > 0");
-  if (FORBIDDEN_FONTS.some((f) => content.includes(f))) missing.push("forbidden font (Inter/Roboto/Arial/Open Sans)");
-  return missing;
-}
-
 /** Gate a screenshot: require a scroll since the last navigate (lazy-load content). */
 export function screenshotScrollGate(state: DesignState): Prompt | null {
   return state.scrolledSinceNav
@@ -72,7 +62,7 @@ export interface PassNoticeInput { agentId: string; tool: string; filePath: stri
  * null when nothing applies. The check-design-skill line fires for ANY agent
  * on a UI write; the rest only inside the active design-agent context.
  */
-export function designPassNotice(i: PassNoticeInput, cacheDir: string): Prompt | null {
+export function designPassNotice(i: PassNoticeInput & { corpusMissing?: boolean }, cacheDir: string): Prompt | null {
   const isWrite = i.tool === "Write" || i.tool === "Edit";
   const fp = i.filePath;
   const lines: string[] = [];
@@ -82,6 +72,7 @@ export function designPassNotice(i: PassNoticeInput, cacheDir: string): Prompt |
   }
   const state = i.agentId && activeDesignAgent(cacheDir) === i.agentId ? loadDesignState(cacheDir, i.agentId) : null;
   if (state && i.phase === "pre") {
+    if (i.corpusMissing) lines.push("design-corpus: refs-design corpus not found — corpus requirement waived (screenshot-only fallback, install defect)");
     if (isWrite && fp && !EXEMPT_DIRS.some((d) => fp.includes(d)) && ALLOWED_WRITE.test(fp)) lines.push(`enforce-html-css-only: allowed: ${basename(fp)}`);
     if (i.tool === NAV) lines.push(`check-inspiration-read: pass (${i.url})`);
     if (i.tool === GEMINI && geminiEnabled()) lines.push("validate-design-system: design-system.md ok");

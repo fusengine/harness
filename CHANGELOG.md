@@ -4,6 +4,22 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.84] - 2026-07-29
+
+### Added
+
+- **Local design corpus as the source of taste** (`src/policy/design/corpus.ts`, `corpus-resolve.ts`, `design-system-rules.ts`, `template-urls.ts`, `src/runtime/design-content-gate.ts`, `design-files-gate.ts`) — the `design-expert` plugin produced generic, interchangeable pages because its inspiration phase browsed ~100 Framer/Webflow templates. The harness now executes the corpus doctrine instead: corpus resolution per runtime (Claude marketplace tree vs Codex `plugins/cache/<mp>/<plugin>/<version>/`, semver-selected, no `process.cwd()` fallback), corpus reads recorded as state progression, and a citation↔read join tolerant of both naming conventions and both layouts. The template-platform allowlist is inverted into a frozen denylist — reviving it would resurrect the doctrine this replaces.
+
+### Changed
+
+- **Design quotas** (`src/policy/design/state.ts`, `transitions.ts`, `gates-pipeline.ts`) — at least one screenshot in every mode, always; with the corpus present, `{ full: 2, page: 1, component: 1 }` plus the corpus reads. Corpus absent leaves the requirement waived (pre-doctrine quotas), so the branch stays dormant until `refs-design/` ships to the marketplace.
+- **`apply_patch` brought into the design pipeline** (`src/runtime/design.ts`, `design-helpers.ts`, `handle-pre.ts`, `handle-post.ts`) — Codex's patch primitive now passes the PRE path/phase/quota gates; `op:"add"` is validated as a `Write`, `delete` is skipped, and `cwd` is wired so the POST re-reads the real file rather than the hunk. The POST is promote-only: a clean file promotes to phase 3, a dirty one changes nothing.
+
+### Fixed
+
+- **`pluginsWriteGuard` bypass on relative paths** (`src/runtime/pre-allow.ts`) — the guard anchored on absolute paths only; `corpusRoot` and `pluginsRoot` are now resolved independently, so a corpus override no longer decides where plugin writes are allowed.
+- **Substitution bypass in the design content gate** (`src/runtime/design-files-gate.ts`) — `String.replace` treats `$&`, `` $` ``, `$'` and `$$` as substitution patterns; literal replacement now goes through `replace(from, () => to)` / `split().join()`, closing all four quadrants.
+
 ## [0.1.83] - 2026-07-24
 
 ### Fixed

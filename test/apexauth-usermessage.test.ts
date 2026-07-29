@@ -91,8 +91,9 @@ test("handleHook e2e: a PASSING design-agent navigate emits the user notice on c
   const cwd = tmp();
   designCache("agE", 1, projectLayout(cwd).cacheDir);
   const payload = { hook_event_name: "PreToolUse", session_id: "sE", agent_id: "agE", tool_name: "mcp__fuse-browser__browser_navigate", tool_input: { url: "https://godly.website/site" } };
-  const out = await handleHook("claude-code", payload, { now: 5000, cwd });
-  expect((JSON.parse(out.stdout) as Record<string, unknown>).systemMessage).toBe("check-inspiration-read: pass (https://godly.website/site)\npipeline-gate: phase 1 ok");
+  // Corpus ABSENT (injected ""): the waived-requirement warning is user-visible — deliberate new line.
+  const out = await handleHook("claude-code", payload, { now: 5000, cwd, corpusRoot: "" });
+  expect((JSON.parse(out.stdout) as Record<string, unknown>).systemMessage).toBe("design-corpus: refs-design corpus not found — corpus requirement waived (screenshot-only fallback, install defect)\ncheck-inspiration-read: pass (https://godly.website/site)\npipeline-gate: phase 1 ok");
   // Same passing event on a harness without a user channel (cline shape): no crash, plain allow.
   expect((await handleHook("cline", { preToolUse: { toolName: "x", parameters: {} }, taskId: "tE" }, { now: 5000, cwd })).stdout).toBe("");
 });

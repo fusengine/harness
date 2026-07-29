@@ -34,7 +34,7 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   const { id, payload, event, framework, mcpDir, file, opts } = ctx;
   const response = payload.tool_response ?? payload.tool_output;
   mcpPostStore(event.tool, event.input, response, mcpDir);
-  const designWarn = designGate(payload, event, mcpDir, opts.cwd);
+  const designWarn = designGate(payload, event, mcpDir, opts.cwd, opts.corpusRoot);
   const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
   for (const activity of activities) await recordActivity(file, activity);
   // Session-scoped evidence (parity track-subagent-research.py): sub-agent hooks

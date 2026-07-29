@@ -7,6 +7,7 @@
  * Write/Edit that clears the freshness gate.
  */
 import { designPassNotice } from "../policy/design/gates";
+import { resolveCorpusRoot } from "../policy/design/corpus";
 import { lessonFor } from "../policy/lessons/lesson-gate";
 import { lessonsFileFor } from "./lifecycle/lessons/state";
 import { projectRoot } from "../util/project-root";
@@ -71,11 +72,14 @@ export async function allowOutcome(
   mcpDir: string,
   cwd: string,
   evidence?: EvidenceCheck,
+  corpusRoot?: string,
 ): Promise<HandleOutcome> {
+  const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
   const notice = designPassNotice({
-    agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
+    agentId,
     tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "",
     url: typeof event.input.url === "string" ? event.input.url : "", phase: "pre",
+    corpusMissing: agentId !== "" && (corpusRoot ?? resolveCorpusRoot()) === "",
   }, mcpDir);
   const lesson = lessonFor(event.tool, event.input, { file: lessonsFileFor(projectRoot(cwd)), once: oncePerWindow });
   const evidenceNotice = evidence ? await freshEvidenceNotice(event, evidence, cwd) : null;
