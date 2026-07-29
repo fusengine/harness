@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.85] - 2026-07-29
+
+### Fixed
+
+- **Typo gate missed quoted font names in non-English custom properties** (`src/policy/design/design-system-rules.ts`) — the gate only recognized typography custom properties by an English keyword in the property name (`--*font*`/`--*ff*`/`--*type*`), so a token named in French like the corpus's `--police-texte: "Inter", …` (`refs-design/linear-recode/styles.css`) slipped through unbanned. `FONT_QUOTED_PROP_RE` now flags any `--*` custom property whose value quotes a forbidden name, using the quote itself as the usage signal instead of an English keyword.
+
 ## [0.1.84] - 2026-07-29
 
 ### Added
