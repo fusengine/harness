@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.87] - 2026-07-30
+
+### Fixed
+
+- **Kimi Code CLI dumped the full rules corpus and root `AGENTS.md` into the terminal on every prompt** (`src/runtime/inject-context.ts`, `src/runtime/lifecycle/inject-rules.ts`, `src/runtime/lifecycle/kimi-rules-native.ts`) — Kimi has no model-only channel for hooks: on exit 0, hook stdout is both fed to the model's context *and* echoed raw to the terminal. The ~18 KB rules corpus and root `AGENTS.md` were therefore printed to the user on every `UserPromptSubmit`, even though Kimi already loads `AGENTS.md` natively. Now only the notice is emitted on `UserPromptSubmit`, with a fail-safe: missing fences or an unreadable file fall back to emitting the full corpus (never silently drop rules). `SessionStart`/`SubagentStart` are unaffected and keep emitting the full corpus. Verified zero regression on claude-code/codex/gemini-cli via a 32-cell characterization golden captured before the fix (`test/inform-matrix.characterization.test.ts`).
+
 ## [0.1.86] - 2026-07-29
 
 ### Fixed
