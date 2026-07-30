@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderInform } from "../inform";
+import { rulesInAgentsMd } from "./kimi-rules-native";
 
 /** Read & concatenate all `*.md` files (sorted) under `rulesDir`. */
 export function readRules(rulesDir: string): string {
@@ -29,6 +30,13 @@ export function readRules(rulesDir: string): string {
  * with the *actual* `hookEventName` — the spec requires it to match the firing
  * event (a hardcoded "SessionStart" is non-conforming and may be dropped on
  * UserPromptSubmit/SubagentStart).
+ *
+ * On kimi's `UserPromptSubmit` specifically, when the corpus is already fenced
+ * inside `<kimiHome>/AGENTS.md` (native load, {@link rulesInAgentsMd}), only the
+ * notice is emitted — the re-injected corpus would otherwise dump into the
+ * user's terminal on every single prompt for no model-context benefit.
+ * `SessionStart`/`SubagentStart` always keep the full corpus (session bootstrap
+ * / sub-agent contexts need it regardless of the native AGENTS.md load).
  * @param pluginRoot - `CLAUDE_PLUGIN_ROOT` of the claude-rules plugin.
  * @param event - The firing hook event name (e.g. "SessionStart").
  * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
@@ -36,5 +44,7 @@ export function readRules(rulesDir: string): string {
  */
 export function injectRules(pluginRoot: string, event: string, id: string = "claude-code"): string {
   const content = readRules(join(pluginRoot, "rules"));
-  return content ? renderInform(id, event, content, "rules 00-08 injected") : "";
+  if (!content) return "";
+  if (id === "kimi" && event === "UserPromptSubmit" && rulesInAgentsMd()) return "rules 00-08 injected";
+  return renderInform(id, event, content, "rules 00-08 injected");
 }
