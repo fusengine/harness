@@ -23,12 +23,36 @@ export function claudeMdKey(prompt: string, ctx: string): string {
 }
 
 /**
+ * Extract the APEX preamble portion of a `buildClaudeMdContext` result, i.e.
+ * everything BEFORE the `# <docName>\n` root-doc block it prepends on dev
+ * prompts. Returns "" when `ctx` has no preamble (plain prompt: `ctx` starts
+ * directly with the root-doc heading).
+ * @param ctx - The full `buildClaudeMdContext` return value.
+ * @param docName - Root doc file name (e.g. "AGENTS.md").
+ * @returns The preamble text, or "" when absent.
+ */
+function extractApexPreamble(ctx: string, docName: string): string {
+  const heading = `# ${docName}\n`;
+  if (ctx.startsWith(heading)) return "";
+  const sep = `\n\n${heading}`;
+  const idx = ctx.indexOf(sep);
+  return idx === -1 ? "" : ctx.slice(0, idx);
+}
+
+/**
  * UserPromptSubmit context injection: render the CLAUDE.md (+ optional APEX)
  * preamble as a Claude `additionalContext` response, or "" when nothing to emit.
  * Guarded by {@link oncePerWindow} via {@link claudeMdKey}: only a
  * near-simultaneous double-fire of the SAME turn (identical prompt AND identical
  * block, within {@link DEDUP_WINDOW_MS}) is suppressed. The invariant "CLAUDE.md
  * is emitted on EVERY message" is thus preserved.
+ *
+ * On kimi specifically, the root doc body is dropped from the emitted text:
+ * Kimi loads `<kimiHome>/AGENTS.md` natively at session start (`apex-target.ts`),
+ * so re-injecting its full body on every prompt is redundant terminal noise
+ * (kimi has no model-only hook channel — `runtime/inform.ts`). The APEX
+ * preamble, which is NOT part of `AGENTS.md`, is still emitted in full when the
+ * prompt is dev-shaped; a plain prompt leaves only the notice.
  * @param prompt - The raw user prompt.
  * @param cwd - Project root (for project-type detection).
  * @param id - Harness target id (defaults to "claude-code" — zero-regression default).
@@ -38,7 +62,12 @@ export function promptSubmitContext(prompt: string, cwd: string, id: string = "c
   const ctx = buildClaudeMdContext(prompt, cwd, id);
   if (!ctx) return "";
   if (!oncePerWindow(claudeMdKey(prompt, ctx), DEDUP_WINDOW_MS)) return "";
-  return renderInform(id, "UserPromptSubmit", ctx, `${apexDocName(id)} injected`);
+  const notice = `${apexDocName(id)} injected`;
+  if (id === "kimi") {
+    const preamble = extractApexPreamble(ctx, apexDocName(id));
+    return preamble ? renderInform(id, "UserPromptSubmit", preamble, notice) : notice;
+  }
+  return renderInform(id, "UserPromptSubmit", ctx, notice);
 }
 
 /**
