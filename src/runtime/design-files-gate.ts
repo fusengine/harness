@@ -19,9 +19,14 @@
  * the design agent may write — an `apply_patch` `.tsx`/`.astro`/etc. add or
  * update is just as much a framework-file write as the same content via
  * `Write`/`Edit`, and letting it through only on this path was an unintended
- * apply_patch-shaped bypass, not a deliberate relaxation. KNOWN GAPS
- * (documented, still out of scope): apply_patch also bypasses
- * uiDesignSkillGate and the Gemini create_frontend precondition;
+ * apply_patch-shaped bypass, not a deliberate relaxation. `uiDesignSkillGate`
+ * and the Gemini create_frontend precondition NO LONGER bypass apply_patch
+ * (fixed): the skill gate is wired in `design.ts` on `event.files` (same
+ * any-agent scope as its Write/Edit call site, before the agentId
+ * early-return); the Gemini precondition is ported into this function,
+ * right below `htmlCssOnlyGate`, gated the same way (opt-in,
+ * FUSE_DESIGN_GEMINI, state.geminiCalls === 0). REMAINING KNOWN GAPS
+ * (documented, still out of scope):
  * `Design-System.md` (case) escapes every endsWith check, here and on
  * Write — a real bypass on case-insensitive macOS, not widened now; and
  * `*** Move to:` (apply-patch.ts:76-79) unconditionally OVERWRITES `cur.path`
@@ -50,8 +55,8 @@ import type { Prompt } from "../prompt/types";
 import type { NormalizedFile } from "./normalize";
 import type { DesignState } from "../policy/design/state";
 import { pluginsWriteGuard } from "../policy/design/corpus";
-import { htmlCssOnlyGate, stateFileGate } from "../policy/design/gates";
-import { designSystemWriteGate } from "../policy/design/gates-pipeline";
+import { htmlCssOnlyGate, stateFileGate, geminiEnabled } from "../policy/design/gates";
+import { designSystemWriteGate, htmlCssPipelineGate } from "../policy/design/gates-pipeline";
 import { designSystemContentGate } from "./design-content-gate";
 
 /**
@@ -66,7 +71,13 @@ export function substituteLiteral(s: string, from: string, to: string, all: bool
   return all ? s.split(from).join(to) : s.replace(from, () => to);
 }
 
-/** Gate every file of a multi-file write primitive; the first violation blocks the envelope. */
+/**
+ * Gate every file of a multi-file write primitive; the first violation blocks
+ * the envelope. `designSystemFileExists` is caller-computed (`findDesignSystem`
+ * lives in `design-helpers.ts`, which itself imports `substituteLiteral` from
+ * THIS module — importing it back here would cycle) so both write paths
+ * (Write/Edit in `design.ts`, apply_patch here) consume the SAME disk read.
+ */
 export function designFilesGate(
   files: readonly NormalizedFile[],
   state: DesignState,
@@ -74,6 +85,7 @@ export function designFilesGate(
   corpusRoot: string,
   corpusRequired: boolean,
   cwd: string,
+  designSystemFileExists: boolean,
 ): Prompt | null {
   for (const f of files) {
     const hit = pluginsWriteGuard(f.filePath, pluginsRoot, cwd) ?? stateFileGate(f.filePath);
@@ -81,6 +93,16 @@ export function designFilesGate(
     if (f.op === "delete") continue;
     const htmlCssHit = htmlCssOnlyGate(f.filePath);
     if (htmlCssHit) return htmlCssHit;
+    // Parity with design.ts's htmlCssPipelineGate call: SAME verdict for the
+    // SAME file+state on both write paths (Write/Edit vs apply_patch).
+    const pipelineHit = htmlCssPipelineGate(f.filePath, state, designSystemFileExists);
+    if (pipelineHit) return pipelineHit;
+    // apply_patch parity for the Gemini precondition (design.ts:72-74, D2 gap):
+    // same condition, same Prompt shape as the Write/Edit branch — opt-in via
+    // FUSE_DESIGN_GEMINI (OFF by default), so a no-op when Gemini is disabled.
+    if (geminiEnabled() && state.geminiCalls === 0 && /\.(html|css)$/.test(f.filePath)) {
+      return { kind: "block", title: "Design pipeline", reason: "BLOCKED: generate the frontend via create_frontend before hand-writing HTML/CSS.", actions: ["Call mcp__gemini-design__create_frontend first"] };
+    }
     if (!f.filePath.endsWith("design-system.md")) continue;
     const gate = designSystemWriteGate(f.filePath, state, corpusRequired)
       ?? (f.op === "add"

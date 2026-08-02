@@ -9,11 +9,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import type { NormalizedEvent } from "./normalize";
 import { type DesignState, saveDesignState } from "../policy/design/state";
-import { recordScreenshot, recordCorpusRead, recordNavigate, recordScroll, recordValidDesignSystem, recordRead } from "../policy/design/transitions";
-import { classifyCorpusRead } from "../policy/design/corpus";
+import { recordNavigate, recordScroll, recordScreenshot, recordValidDesignSystem } from "../policy/design/transitions";
 import { SHOT_TOOLS } from "../policy/design/screenshot-tools";
 import { designSystemProblems } from "./design-content-gate";
 import { substituteLiteral } from "./design-files-gate";
+import { creditRead, creditShellReads } from "./design-read-credit";
 
 export { designSystemContentGate } from "./design-content-gate";
 
@@ -46,14 +46,10 @@ export function recordPost(event: NormalizedEvent, cacheDir: string, state: Desi
   else if (event.tool === NAV) saveDesignState(cacheDir, recordNavigate(state));
   else if (event.tool === SCROLL) saveDesignState(cacheDir, recordScroll(state));
   else if (event.tool === GEMINI) saveDesignState(cacheDir, { ...state, geminiCalls: state.geminiCalls + 1 });
-  else if (event.tool === "Read") {
-    const fp = event.filePath ?? "";
-    // A corpus read counts only when anchored under the delivered root AND the
-    // file exists (no tool_response reaches this hook — existsSync compensates).
-    if (classifyCorpusRead(fp, corpusRoot) && existsSync(fp)) {
-      saveDesignState(cacheDir, recordCorpusRead(state, fp.slice(corpusRoot.length + 1), corpusRequired));
-    } else saveDesignState(cacheDir, recordRead(state, fp, corpusRequired));
-  } else if ((event.tool === "Write" || event.tool === "Edit") && (event.filePath ?? "").endsWith("design-system.md")) {
+  else if (event.tool === "Read") creditRead(cacheDir, state, corpusRoot, corpusRequired, event.filePath ?? "");
+  // Codex Code Mode exec (`exec_command`, canonicalized to "Bash" by codex-shell-tool.ts).
+  else if (event.tool === "Bash" && event.command) creditShellReads(cacheDir, state, corpusRoot, corpusRequired, event.command);
+  else if ((event.tool === "Write" || event.tool === "Edit") && (event.filePath ?? "").endsWith("design-system.md")) {
     // Write access ≠ validity, same rule both sides: POST validates only a
     // zero-problem content and DEGRADES only what PRE would have blocked.
     const fp = event.filePath ?? "";
