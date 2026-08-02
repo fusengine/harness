@@ -24,9 +24,20 @@ import type { Prompt } from "../prompt/types";
 /**
  * Run the PostToolUse pipeline: store the MCP response, emit a design warning,
  * record the activity into the session track, apply per-scope side-effects (SEO
- * deny, aipilot task cache), then inject the post-edit context. Codex
- * `apply_patch` is fanned into per-file events ({@link fanOutFiles}) before the
- * per-file gates (tracking, SOLID size, Tailwind, post-edit context) run.
+ * deny, aipilot task cache), then inject the post-edit context.
+ *
+ * POST is advisory-only for the design pipeline: it can never undo a tool
+ * that already ran (the hard block lives in the PreToolUse `designFilesGate`).
+ * `designGate` therefore stays on the RAW, un-fanned event — its
+ * `recordPost` apply_patch branch is promote-only and resolves relative
+ * `design-system.md` paths via `join(cwd, …)` (design-helpers.ts); fanning
+ * that call would instead route the file through the Write/Edit branch,
+ * which reads `event.filePath` UNRESOLVED (breaking cwd-relative promotion)
+ * and can DEGRADE the state — both forbidden by the apply_patch promote-only
+ * doctrine (see `design-files-gate.ts` module doc). Only `designPassNotice`
+ * (pure formatting, no disk access, no state write) is fanned via
+ * {@link fanOutFiles}, so `apply_patch` gets one notice line per real file
+ * instead of none.
  * @param ctx - The resolved context (same shape as the pre pipeline).
  * @returns The native hook outcome.
  */
@@ -48,7 +59,8 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // (Kimi's string `tool_output` would forge a success receipt; see module).
   await captureBashReceipt(file, event.tool, event.command, payload.tool_result, response, opts.now);
   if (id === "codex") recordCodexPostFailure(event.tool, payload.tool_result ?? response, { now: opts.now, dir: defaultStateDir(opts.cwd), sessionId: event.sessionId });
-  // Codex `apply_patch` fans into per-file events here; every other tool is a
+  // Codex `apply_patch` fans into per-file events here (tracking, SOLID size,
+  // Tailwind, post-edit context, and the notice below); every other tool is a
   // single-element identity array, so behavior below is unchanged for them.
   const files = fanOutFiles(event);
   for (const f of files) postTrackingSideEffects(opts.scope ?? "core", f, f.input, opts.now, payload, opts.cwd);
@@ -72,11 +84,18 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
     if (extra) break;
   }
   // Python-parity `post_pass`: user-visible pass notice, merged into whatever else fires
-  // (deny paths above returned already — a deny stays byte-identical).
-  const notice = designPassNotice({
-    agentId: typeof payload.agent_id === "string" ? payload.agent_id : "",
-    tool: event.tool, filePath: event.filePath ?? "", content: event.content ?? "", url: "", phase: "post",
-  }, mcpDir);
+  // (deny paths above returned already — a deny stays byte-identical). Run
+  // per fanned file (event.tool/filePath/content are always undefined on the
+  // raw apply_patch envelope) and CONCATENATE every non-empty line — unlike
+  // designWarn, a notice is advisory-only, so every file's line is kept, not
+  // just the first.
+  const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
+  const noticeLines: string[] = [];
+  for (const f of files) {
+    const n = designPassNotice({ agentId, tool: f.tool, filePath: f.filePath ?? "", content: f.content ?? "", url: "", phase: "post" }, mcpDir);
+    if (n?.userMessage) noticeLines.push(n.userMessage);
+  }
+  const notice: Prompt | null = noticeLines.length ? { kind: "inform", title: "Design pipeline", reason: "", userMessage: noticeLines.join("\n") } : null;
   // Compact compliance notice: a skill/SOLID `.md` reference credited by THIS
   // PostToolUse call (dedup'd against the ×11 hook fan-out inside refCreditNoticeFor).
   const refNotice = refCreditNoticeFor(activities, event.sessionId, opts.now, defaultStateDir(opts.cwd));

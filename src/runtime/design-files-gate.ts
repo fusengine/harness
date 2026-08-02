@@ -14,18 +14,43 @@
  *            FUSE_DESIGN_GEMINI=1 (off by default — an informational flag),
  *            and designSystemExists is never read after init;
  *  - delete: skipped (parity with the sibling applyPatchGate).
- * One violating file blocks the whole envelope. KNOWN GAPS (documented, out
- * of scope): apply_patch also bypasses uiDesignSkillGate and the Gemini
- * create_frontend precondition; htmlCssOnlyGate stays excluded (owner D2);
- * and `Design-System.md` (case) escapes every endsWith check, here and on
- * Write — a real bypass on case-insensitive macOS, not widened now.
+ * One violating file blocks the whole envelope. `htmlCssOnlyGate` NOW applies
+ * here too (owner D2 revised): the two write paths must not diverge on what
+ * the design agent may write — an `apply_patch` `.tsx`/`.astro`/etc. add or
+ * update is just as much a framework-file write as the same content via
+ * `Write`/`Edit`, and letting it through only on this path was an unintended
+ * apply_patch-shaped bypass, not a deliberate relaxation. KNOWN GAPS
+ * (documented, still out of scope): apply_patch also bypasses
+ * uiDesignSkillGate and the Gemini create_frontend precondition;
+ * `Design-System.md` (case) escapes every endsWith check, here and on
+ * Write — a real bypass on case-insensitive macOS, not widened now; and
+ * `*** Move to:` (apply-patch.ts:76-79) unconditionally OVERWRITES `cur.path`
+ * on ANY preceding op (`Add File`/`Update File`), so a `*** Update File: a.css`
+ * + `Move to: a.tsx` sequence surfaces here as `filePath` ending in `.tsx`
+ * (correctly blocked — NOT a bypass, verified against the parser). The
+ * un-verified direction is the reverse: `Add File: a.tsx` + `Move to: a.css`
+ * would surface only the PERMITTED destination extension while `f.content`
+ * is real framework code — the source path is never preserved anywhere, and
+ * this gate (like Write's htmlCssOnlyGate) checks only the extension, never
+ * the content's actual syntax. Whether Codex's real grammar allows Move-to
+ * after an Add (vs. Update-only) is unconfirmed; flagged, not fixed here.
+ * Also: the POST side still does NOT run `runDesignChecks` (tsx/jsx/css
+ * warnings) on an `apply_patch` file — `handle-post.ts` keeps `designGate` on
+ * the RAW, un-fanned envelope there (recordPost's apply_patch branch is
+ * promote-only and resolves `design-system.md` via `join(cwd, …)`; routing a
+ * fanned Write/Edit-shaped event through it instead would read `filePath`
+ * UNRESOLVED and risk degrading the state — a real regression, not a
+ * hypothetical one). Restoring the tsx/jsx/css warning would require
+ * resolving relative apply_patch paths AND preserving the promote-only
+ * doctrine inside `recordPost` at the same time — out of scope here, owner
+ * decision.
  * @packageDocumentation
  */
 import type { Prompt } from "../prompt/types";
 import type { NormalizedFile } from "./normalize";
 import type { DesignState } from "../policy/design/state";
 import { pluginsWriteGuard } from "../policy/design/corpus";
-import { stateFileGate } from "../policy/design/gates";
+import { htmlCssOnlyGate, stateFileGate } from "../policy/design/gates";
 import { designSystemWriteGate } from "../policy/design/gates-pipeline";
 import { designSystemContentGate } from "./design-content-gate";
 
@@ -54,6 +79,8 @@ export function designFilesGate(
     const hit = pluginsWriteGuard(f.filePath, pluginsRoot, cwd) ?? stateFileGate(f.filePath);
     if (hit) return hit;
     if (f.op === "delete") continue;
+    const htmlCssHit = htmlCssOnlyGate(f.filePath);
+    if (htmlCssHit) return htmlCssHit;
     if (!f.filePath.endsWith("design-system.md")) continue;
     const gate = designSystemWriteGate(f.filePath, state, corpusRequired)
       ?? (f.op === "add"
