@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.89] - 2026-08-03
+
+### Security
+
+- **Arbitrary command execution via a crafted staged filename in `harness check`** (`src/cli/run.ts`) — `stagedContent()` built a shell command string via `execSync(\`git show ":${path}"\`)`, with `path` taken directly from the literal name of a staged file, fully controlled by whoever authored the commit. Git's `core.quotepath` escapes an embedded `"` or `\`, but not backticks or `$(...)`, so a filename like `` x`touch pwned.txt`.ts `` ran as shell syntax. Anyone running `harness check` as a pre-commit hook (the README's own documented usage) against an untrusted staged file list — e.g. right after `git add .` on a checked-out contributor branch — got arbitrary command execution. Both `stagedContent()` and `stagedFiles()` now use `execFileSync` with an argv array; the filename reaches `git show` as a single literal argument and is never parsed by a shell. Reported in [#87](https://github.com/fusengine/harness/issues/87) by @VikramNehreTR, with reproduction, root-cause analysis, and the exact fix adopted here. A non-regression test exercises the real `stagedContent()` against an isolated repo with a backtick-laden filename, proven discriminating against the vulnerable form. All 9 execution sites in `src/` were audited for the same shape; this was the only exploitable one.
+
 ## [0.1.88] - 2026-08-03
 
 ### Added

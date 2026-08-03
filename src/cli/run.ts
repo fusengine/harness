@@ -1,17 +1,24 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { evaluate } from "../policy/evaluate";
 import { formatPrompt } from "../prompt/types";
 import { isCodeFile } from "../util/project-root";
 
 /** Staged files (Added/Copied/Modified/Renamed). Uses `node:child_process` (Bun shell can hang on `git show`). */
 export function stagedFiles(): string[] {
-  const out = execSync("git diff --cached --name-only --diff-filter=ACMR", { encoding: "utf8" });
+  const out = execFileSync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"], {
+    encoding: "utf8",
+  });
   return out.trim().split("\n").filter(Boolean);
 }
 
-/** Read a file's staged (index) content — not the working-tree version. */
+/**
+ * Read a file's staged (index) content — not the working-tree version.
+ * Uses `execFileSync` with an argv array (never a shell), so a staged
+ * filename containing shell metacharacters (backticks, `$(...)`, quotes)
+ * reaches `git show` as a single literal argument — see issue #87.
+ */
 export function stagedContent(path: string): string {
-  return execSync(`git show ":${path}"`, { encoding: "utf8" });
+  return execFileSync("git", ["show", `:${path}`], { encoding: "utf8" });
 }
 
 /**
