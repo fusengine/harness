@@ -17,7 +17,6 @@ export const CODE_REDIRECT: RegExp = new RegExp(`(?:>>?)\\s*[^\\s|;&]*\\.(?:${CO
  */
 export const CODE_MUTATORS: readonly { re: RegExp; desc: string }[] = [
   { re: new RegExp(`${CMD}python3?\\s+-\\s*<<`), desc: "Python heredoc input" },
-  { re: new RegExp(`${CMD}python3?\\s+-c\\b`), desc: "Python inline script" },
   { re: new RegExp(`${CMD}sed\\b[^|]*\\s-i`), desc: "sed in-place edit" },
   { re: new RegExp(`${CMD}perl\\b[^|]*\\s-[pi]i?\\b`), desc: "perl in-place edit" },
   { re: new RegExp(`${CMD}awk\\b[^|]*-i\\s*inplace`), desc: "awk in-place edit" },
@@ -47,6 +46,69 @@ export const NODE_WRITES: RegExp =
   /writeFile|appendFile|createWriteStream|fs\.(?:write|rename|unlink|mkdir|rmdir|copyFile)|execSync|spawnSync|child_process/;
 export const RUBY_WRITES: RegExp =
   /File\.(?:write|open|delete|rename)|IO\.write|FileUtils|\bsystem\b|\bexec\b|`[^`]/;
+
+/**
+ * Command-position anchor for `python3 -c` (same anchored-token shape as the
+ * removed unconditional CODE_MUTATORS entry) — used ONLY to gate {@link PYTHON_WRITES}
+ * below, never as a standalone block. `python3 - <<EOF` (heredoc) stays
+ * unconditionally blocked in CODE_MUTATORS — a heredoc body can't be inspected
+ * reliably with a single-line regex, so it is never widened.
+ */
+export const PYTHON_C_ANCHOR: RegExp = new RegExp(`${CMD}python3?\\s+-c\\b`);
+
+/**
+ * File/process-mutating constructs inside a `python3 -c` inline script (parity
+ * NODE_WRITES/RUBY_WRITES: content-gated, not name-gated). `python3 -c` is
+ * blocked ONLY when this matches — a read-only one-liner (`print(...)`,
+ * `json.load`/`json.dumps`) passes. Doc-verified against docs.python.org
+ * (functions/pathlib/shutil/subprocess/os/pickle) before writing this pattern.
+ *
+ * Families, each independently sufficient to mutate state or run arbitrary code:
+ *  - `open(...)` / `Path(...).open(...)` in a write/append/exclusive/read-write
+ *    mode — positional (`'w'`,`'x'`,`'a'`,`'r+'`,`'w+'`, …) or `mode=` kwarg, any
+ *    `b`/`t` suffix. Plain `open(f)` / `open(f, 'r')` (read-only, the default)
+ *    does NOT match.
+ *  - `pathlib.Path` mutators: `write_text`, `write_bytes`, `unlink`, `rename`,
+ *    `replace`, `mkdir`, `rmdir`, `touch`, `chmod`, `symlink_to`, `hardlink_to`,
+ *    plus 3.14+ `move`, `move_into`, `copy`, `copy_into`.
+ *  - `shutil.*` EXCLUDING the confirmed read-only members `which`,
+ *    `disk_usage`, `get_terminal_size`, `get_archive_formats`,
+ *    `get_unpack_formats` — every other shutil function copies/moves/deletes.
+ *  - `os.*` mutators/exec: `remove`, `unlink`, `rename`, `replace`, `makedirs`,
+ *    `mkdir`, `rmdir`, `removedirs`, `chmod`, `chown`, `symlink`, `link`,
+ *    `truncate`, `chdir`, `fchdir`, `putenv`, `write`, `ftruncate`, `fchmod`,
+ *    `fchown`, `fork`, `system`, `popen`, plus the `exec*`/`spawn*`/
+ *    `posix_spawn` families.
+ *  - `subprocess.run|call|check_call|check_output|Popen|getoutput|getstatusoutput`
+ *    — the actual spawn surface. Non-spawning members (`PIPE`, `DEVNULL`,
+ *    `STDOUT`, `CompletedProcess`, `CalledProcessError`, …) are deliberately
+ *    excluded — a bare `subprocess\.\w+` would false-positive on those.
+ *  - `pickle.dump` / `json.dump` (the file-writing form — `\b` after `dump`
+ *    excludes `dumps`, which only serializes to a string/bytes in memory).
+ *  - `csv.writer`, `tempfile.*` (temp-file/dir creation is still a write).
+ *  - generic `.write(`/`.writelines(` — covers any file-like object, including
+ *    one opened via a variable this static check can't trace back to `open()`.
+ *  - `exec(`/`eval(` — arbitrary code execution, not merely file I/O.
+ *
+ * Deliberately NOT included: bare `import` statements, arithmetic/string
+ * formatting, `print`, `json.load`/`json.loads`, `sys.argv`/`os.environ` reads,
+ * `os.getcwd`/`os.listdir`/`os.path.*` — none of these mutate disk or spawn.
+ */
+export const PYTHON_WRITES: RegExp = new RegExp(
+  "\\bopen\\s*\\([^)]*(?:(['\"])(?:[wax]|r\\+|\\+r)[bt]?\\1|mode\\s*=\\s*(['\"])(?:[wax]|r\\+|\\+r)[bt]?\\2)"
+    + "|\\.(?:write_text|write_bytes|unlink|rename|replace|mkdir|rmdir|touch|chmod|symlink_to|hardlink_to"
+    + "|move_into|copy_into|move|copy|write|writelines)\\s*\\("
+    + "|\\bshutil\\.(?!which\\b|disk_usage\\b|get_terminal_size\\b|get_archive_formats\\b|get_unpack_formats\\b)\\w+"
+    + "|\\bos\\.(?:remove|unlink|rename|replace|makedirs|mkdir|rmdir|removedirs|system|popen|chmod|chown|symlink"
+    + "|link|truncate|chdir|fchdir|putenv|write|ftruncate|fchmod|fchown|fork)\\b"
+    + "|\\bos\\.(?:exec|spawn|posix_spawn)\\w*\\b"
+    + "|\\bsubprocess\\.(?:run|call|check_call|check_output|Popen|getoutput|getstatusoutput)\\b"
+    + "|\\bpickle\\.dump\\b"
+    + "|\\bjson\\.dump\\b"
+    + "|\\bcsv\\.writer\\b"
+    + "|\\btempfile\\.\\w+"
+    + "|\\b(?:exec|eval)\\s*\\(",
+);
 
 /** Redirect to a non-code file. Excludes `/dev/null`, `2>`/`N>` and `>&N` fd
  * redirects via the `(?<![0-9&])` lookbehind + `(?!…|&)` (parity has_file_redirect). */

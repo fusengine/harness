@@ -14,7 +14,7 @@
   "block-git-clean-fd": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Destructive git command\\nDestructive git command: git clean -fd\\nNext:\\n  1. Use a non-destructive alternative (e.g. --force-with-lease; avoid --hard / -D)\"}}",
   "block-git-branch-D": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Destructive git command\\nDestructive git command: git branch -D feature\\nNext:\\n  1. Use a non-destructive alternative (e.g. --force-with-lease; avoid --hard / -D)\"}}",
   "block-git-rebase-force": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Destructive git command\\nDestructive git command: git rebase --force\\nNext:\\n  1. Use a non-destructive alternative (e.g. --force-with-lease; avoid --hard / -D)\"}}",
-  "block-bw-python-c": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Bash write to code file\\nPython inline script — Use Edit/Write tools instead\\nNext:\\n  1. Use the Write/Edit tool instead\"}}",
+  "block-bw-python-write": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Bash write to code file\\nPython inline script mutates files/spawns a process — Use Edit/Write tools instead\\nNext:\\n  1. Use the Write/Edit tool instead\"}}",
   "block-bw-sed-i": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Bash write to code file\\nsed in-place edit — Use Edit/Write tools instead\\nNext:\\n  1. Use the Write/Edit tool instead\"}}",
   "block-bw-redirect-code": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[BLOCKED] Bash write to code file\\nBash redirect to code file — Use Write/Edit tools (enforces APEX + SOLID specs)\\nNext:\\n  1. Use the Write/Edit tool instead\"}}",
   "ask-sec-rm-file": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"[CONFIRM] Dangerous command\\nDELETE: 'rm' permanently deletes - confirmation required.\\nNext:\\n  1. Confirm this command is intended\\n  2. Run with least privilege\"}}",
@@ -36,5 +36,6 @@
   "allow-git-status": null,
   "allow-git-diff": null,
   "allow-echo": null,
-  "allow-cat": null
+  "allow-cat": null,
+  "allow-bw-python-c": null
 }

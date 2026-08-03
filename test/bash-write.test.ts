@@ -7,9 +7,13 @@ test("blocks sed -i on a code file", () => {
   expect(bashWriteGuard(ctx)?.kind).toBe("block");
 });
 
-test("blocks redirect to a code-file extension + python3 -c", () => {
+test("blocks redirect to a code-file extension", () => {
   expect(bashWriteGuard({ tool: "Bash", command: "echo x > app.tsx" })?.kind).toBe("block");
-  expect(bashWriteGuard({ tool: "Bash", command: "python3 -c 'print(1)'" })?.kind).toBe("block");
+});
+
+test("python3 -c: read-only script passes, a mutating one blocks", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "python3 -c 'print(1)'" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "python3 -c \"import os; os.remove('a.ts')\"" })?.kind).toBe("block");
 });
 
 test("asks before redirect to a non-code file", () => {

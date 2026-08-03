@@ -35,7 +35,7 @@ export const CASES: readonly Case[] = [
   c("block-git-clean-fd", "git clean -fd", "block"),
   c("block-git-branch-D", "git branch -D feature", "block"),
   c("block-git-rebase-force", "git rebase --force", "block"),
-  c("block-bw-python-c", "python3 -c 'print(1)'", "block"),
+  c("block-bw-python-write", "python3 -c \"import os; os.remove('a.ts')\"", "block"),
   c("block-bw-sed-i", "sed -i s/a/b/ src/app.ts", "block"),
   c("block-bw-redirect-code", "echo x > src/app.ts", "block"),
   c("ask-sec-rm-file", "rm notes.txt", "ask"),
@@ -58,6 +58,7 @@ export const CASES: readonly Case[] = [
   c("allow-git-diff", "git diff HEAD", "allow"),
   c("allow-echo", "echo hello world", "allow"),
   c("allow-cat", "cat README.md", "allow"),
+  c("allow-bw-python-c", "python3 -c 'print(1)'", "allow"),
 ];
 
 /** Build the Claude PreToolUse stdin payload for a Bash command. */

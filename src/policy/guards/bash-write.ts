@@ -3,7 +3,7 @@ import type { GuardContext } from "./context";
 import { hasSafeWriteTarget, isSafeCommandTarget, isSafeWritePath } from "./bash-write-safe-paths";
 import {
   ASK_WRITERS, CODE_COMMAND_WRITE, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, NODE_WRITES,
-  RUBY_WRITES, SAFE_PREFIXES, SESSION_STATE_FRAGMENT,
+  PYTHON_C_ANCHOR, PYTHON_WRITES, RUBY_WRITES, SAFE_PREFIXES, SESSION_STATE_FRAGMENT,
 } from "./bash-write-patterns";
 
 export { ASK_WRITERS, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, SAFE_PREFIXES, SESSION_STATE_FRAGMENT } from "./bash-write-patterns";
@@ -37,6 +37,9 @@ export function bashWriteGuard(ctx: GuardContext): Prompt | null {
   const mutator = CODE_MUTATORS.find((m) => m.re.test(cmd));
   if (mutator) return blockCodeWrite(`${mutator.desc} — Use Edit/Write tools instead`);
   if (CODE_COMMAND_WRITE.test(cmd)) return blockCodeWrite("tee/dd into a code file — Use Edit/Write tools instead");
+  if (PYTHON_C_ANCHOR.test(cmd) && PYTHON_WRITES.test(cmd)) {
+    return blockCodeWrite("Python inline script mutates files/spawns a process — Use Edit/Write tools instead");
+  }
 
   if (SAFE_PREFIXES.some((p) => stripped.startsWith(p)) && !FILE_REDIRECT.test(stripped)) {
     return null;
