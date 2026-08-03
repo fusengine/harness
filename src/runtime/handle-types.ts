@@ -16,6 +16,8 @@ export interface HandleOptions {
    * as-is, so tests can drive the corpus-present branch deterministically.
    */
   corpusRoot?: string;
+  /** Test-only OS home override for the session-anchored design cache dir (see design-cache-resolve.ts). Undefined = real `os.homedir()`. */
+  home?: string;
 }
 
 /** What the hook bin should print + exit with. */

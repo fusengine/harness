@@ -4,6 +4,20 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.88] - 2026-08-03
+
+### Added
+
+- **`CONFIRM <code>` recourse for `ask` prompts degraded to deny on Codex/Kimi** (`src/runtime/confirm/`) — `permissionDecision: "ask"` is ignored by both host harnesses: Kimi Code's own binary shortcuts on `if (hookSpecificOutput?.permissionDecision !== "deny") return result`, and Codex fails a hook open when it returns `ask` in the unsupported shape, so the harness was downgrading every `ask` to a hard `deny` with no recourse (Claude Code is unaffected — its native `ask` still shows an interactive confirmation, and no code ever appears in its messages). The deny message for a downgraded `ask` now appends a short 4-hex-char code; retyping `CONFIRM <code>` in the next prompt authorizes that exact action once. Covers every guard that can produce an `ask` with a command attached (git routine ops, install, bash-write, security) via one central hook in the PreToolUse pipeline (`src/runtime/handle-pre.ts`), not a per-guard change. Guardrails: no token can be placed while a sub-agent is active (G0, session-scoped, structurally impossible from inside a Task/Agent call since sub-agents never receive their own `UserPromptSubmit`); a token is consumed on first use (G1); a token expires after 5 minutes (G2); the token is keyed to the action's full SHA-256 hash, never the 4-char display code, which exists purely for the human to retype and collides by design (G3); irreversible commands (`push --force`, `reset --hard`, `rm -rf`, `git clean -fd`, `branch -D`, …) are never confirmable — they stay a hard deny regardless of a valid token (G4); an explicit refusal in the next prompt drops any pending token (G5). New env var `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` (default `300`, seconds) tunes the G0 cool-down without a rebuild. **Scope, stated plainly**: this is a guard against accidental/hasty denial-with-no-recourse, not a security control against an adversarial agent — any agent with arbitrary shell access can write the token directly into the session-state file it authorizes from and self-approve, exactly as it could bypass any other stateful gate this harness keeps outside a sandbox.
+
+### Changed
+
+- **`python3 -c` is now judged on its content, like `node -e` already was** (`src/policy/guards/bash-write-patterns.ts`, `bash-write.ts`) — previously every `python3 -c '...'` invocation was blocked outright, regardless of what the script did. The inline script is now scanned for actual file/process mutation (`open(..., 'w'/'x'/'a'/...)`, `pathlib.Path` mutators, `shutil`/`os` mutators, `subprocess.*`, `pickle.dump`/`json.dump`, `exec`/`eval`, …); a read-only one-liner (`python3 -c 'print(1)'`, `json.loads(...)`) now passes, and a mutating one (`python3 -c 'open("x","w").write(...)'`) still blocks. `python3 - <<EOF` (heredoc) is unaffected and stays unconditionally blocked — a heredoc body isn't reliably inspectable with a single-line regex.
+
+### Fixed
+
+- **Kimi's array-shaped `prompt` field was silently read as empty** (`src/runtime/prompt-text.ts`) — Claude Code and Codex send `prompt` as a plain string, but Kimi 0.31.1 sends an array of content blocks (`[{"type":"text","text":"..."}]`) on `UserPromptSubmit` — measured live. Every prompt-based detection (creation-intent, CONFIRM parsing, mode detection) was reading `""` under Kimi as a result. A new `promptText()` helper normalizes both shapes: a string passes through unchanged (byte-identical for Claude Code/Codex — the identity branch that guarantees zero regression there), an array is flattened by joining each block's `.text` with `"\n"`.
+
 ## [0.1.87] - 2026-07-30
 
 ### Fixed

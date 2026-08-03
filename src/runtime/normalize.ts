@@ -1,5 +1,6 @@
 import { parseApplyPatch } from "../adapters/codex/apply-patch";
 import { commandToString } from "./command-string";
+import { canonicalizeCodexShellTool } from "./codex-shell-tool";
 
 /** One file fanned out of a multi-file edit primitive (Codex `apply_patch`). */
 export interface NormalizedFile {
@@ -58,7 +59,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
   }
   const event = str(payload.hook_event_name) ?? "";
   const input = (payload.tool_input as Record<string, unknown> | undefined) ?? payload;
-  const tool = str(payload.tool_name) ?? "";
+  const tool = canonicalizeCodexShellTool(id, str(payload.tool_name) ?? "");
   const base = {
     phase: (/post|after/i.test(event) ? "post" : "pre") as "pre" | "post",
     tool,

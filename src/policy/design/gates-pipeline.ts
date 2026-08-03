@@ -32,6 +32,30 @@ export function designSystemWriteGate(filePath: string, state: DesignState, corp
   return null;
 }
 
+/**
+ * Gate writing .html/.css: PIPELINE gate (never `uiDesignSkillGate`/`UI_FILE_RE`
+ * — owner-scoped out of the skill gate's remit). Requires phase >= 3 AND
+ * designSystemValid (same two-condition defense as {@link geminiCreateGate})
+ * AND `designSystemFileExists` (caller-computed via `findDesignSystem` — a
+ * state can say phase 3 after the file was later deleted, or the file can
+ * exist while a fresh agent's state is still phase 0).
+ */
+export function htmlCssPipelineGate(filePath: string, state: DesignState, designSystemFileExists: boolean): Prompt | null {
+  if (!/\.(html|css)$/.test(filePath)) return null;
+  if (state.currentPhase >= 3 && state.designSystemValid && designSystemFileExists) return null;
+  const gaps: string[] = [];
+  if (state.currentPhase < 3) gaps.push(`phase ${state.currentPhase}/3`);
+  if (!state.designSystemValid) gaps.push("design-system.md not validated");
+  if (!designSystemFileExists) gaps.push("design-system.md not found on disk");
+  return deny(
+    `BLOCKED: cannot write '${filePath}' before the design-system pipeline is complete (${gaps.join(", ")}). ` +
+      "RECOVERY: 1) Read identity templates from skills/design-system/ 2) Read design-inspiration.md " +
+      "3) Read the refs-design corpus with the Read tool 4) Screenshot real sector sites with " +
+      "mcp__fuse-browser__browser_screenshot on a LIVE session 5) Write a valid design-system.md " +
+      "6) Then write .html/.css",
+  );
+}
+
 /** Gate Gemini create_frontend: requires phase >= 3 and a validated design system. */
 export function geminiCreateGate(state: DesignState): Prompt | null {
   if (state.currentPhase < 3) {

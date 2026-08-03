@@ -19,6 +19,7 @@ import { countLines } from "../../policy/file-size";
 import { formatPrompt, type Prompt } from "../../prompt/types";
 import { parseApplyPatch } from "./apply-patch";
 import { commandToString } from "../../runtime/command-string";
+import { canonicalizeCodexShellTool } from "../../runtime/codex-shell-tool";
 import { contextResponse, denyResponse, informResponse, type ClaudeHookInput } from "../claude";
 import { isBypassPermissions } from "./permission-mode";
 
@@ -56,7 +57,10 @@ function applyPatchPrompt(command: string): Prompt | null {
 function resolvePrompt(input: ClaudeHookInput): Prompt | null {
   const i = input.tool_input;
   const r = evaluate({
-    tool: input.tool_name ?? "Write",
+    // Code Mode-wrapped exec_command surfaces its raw function-tool name here
+    // instead of "Bash" (see codex-shell-tool.ts) — canonicalize so the SOLID/
+    // protected-path/bash-write guards recognize it like a native Bash call.
+    tool: canonicalizeCodexShellTool("codex", input.tool_name ?? "Write"),
     filePath: i?.file_path,
     content: i?.content ?? i?.new_string,
     command: commandToString(i?.command),

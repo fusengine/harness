@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { detectMode } from "../policy/design/transitions";
 import { initDesignState, saveDesignState, cleanupDesignStates } from "../policy/design/state";
 import { setActiveDesignAgent, clearActiveDesignAgent, activeDesignAgent } from "../policy/design/flag";
+import { promptText } from "./prompt-text";
 
 /**
  * Handle the design-agent SubagentStart/Stop lifecycle: init the pipeline state +
@@ -29,7 +30,7 @@ export function designLifecycle(payload: Record<string, unknown>, cacheDir: stri
   if (event === "SubagentStart") {
     if (!agentId) return false;
     const dsExists = existsSync(join(cwd, "design-system.md"));
-    const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
+    const prompt = promptText(payload.prompt);
     saveDesignState(cacheDir, initDesignState(agentId, detectMode(prompt, dsExists), dsExists));
     setActiveDesignAgent(cacheDir, agentId);
     return true;

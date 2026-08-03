@@ -14,7 +14,7 @@ import {
   htmlCssOnlyGate, stateFileGate, screenshotScrollGate,
   geminiEnabled,
 } from "../policy/design/gates";
-import { designSystemWriteGate, geminiCreateGate, browserNavigateGate } from "../policy/design/gates-pipeline";
+import { designSystemWriteGate, geminiCreateGate, browserNavigateGate, htmlCssPipelineGate } from "../policy/design/gates-pipeline";
 
 const NAV = "mcp__fuse-browser__browser_navigate";
 const SHOT = "mcp__fuse-browser__browser_screenshot";
@@ -31,6 +31,21 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   if (event.phase !== "post" && (event.tool === "Write" || event.tool === "Edit")) {
     const skillBlock = uiDesignSkillGate(event.tool, event.filePath ?? "", event.content ?? "", collectDesignEvidence(event.sessionId, cwd));
     if (skillBlock) return skillBlock;
+  }
+  // Codex apply_patch parity (D2 gap, docstring design-files-gate.ts:17-24): the
+  // same UI write can arrive fanned into event.files instead of a single
+  // Write/Edit. Map each non-delete file to its Write/Edit-equivalent tool
+  // ("add" -> Write, "update" -> Edit) and run the SAME gate, so the skill
+  // requirement cannot be bypassed just by routing the write through apply_patch.
+  // Scope matches the Write/Edit block above: ANY agent, before the agentId
+  // early-return — never narrowed to design-agent-only.
+  if (event.phase !== "post" && event.files && event.files.length > 0) {
+    const evidence = collectDesignEvidence(event.sessionId, cwd);
+    for (const f of event.files) {
+      if (f.op === "delete") continue;
+      const skillBlock = uiDesignSkillGate(f.op === "add" ? "Write" : "Edit", f.filePath, f.content, evidence);
+      if (skillBlock) return skillBlock;
+    }
   }
 
   const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
@@ -66,7 +81,8 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
   if (event.tool === "Write" || event.tool === "Edit") {
     const fp = event.filePath ?? "";
     // Parity: only design-system.md is screenshot-quota-gated (designSystemWriteGate).
-    const base = pluginsWriteGuard(fp, pluginsRoot) ?? stateFileGate(fp) ?? htmlCssOnlyGate(fp) ?? designSystemWriteGate(fp, state, corpusRequired)
+    const base = pluginsWriteGuard(fp, pluginsRoot) ?? stateFileGate(fp) ?? htmlCssOnlyGate(fp)
+      ?? htmlCssPipelineGate(fp, state, findDesignSystem(cwd) !== "") ?? designSystemWriteGate(fp, state, corpusRequired)
       ?? designSystemContentGate({ filePath: fp, tool: event.tool, content: event.content ?? "", oldString: event.oldString, replaceAll: event.input.replace_all === true, state, corpusRoot, corpusRequired });
     if (base) return base;
     if (geminiEnabled() && state.geminiCalls === 0 && /\.(html|css)$/.test(fp)) {
@@ -75,7 +91,7 @@ export function designGate(payload: Record<string, unknown>, event: NormalizedEv
     return null;
   }
   // Codex apply_patch (D2): gate each fanned-out file like a Write.
-  if (event.files && event.files.length > 0) return designFilesGate(event.files, state, pluginsRoot, corpusRoot, corpusRequired, cwd);
+  if (event.files && event.files.length > 0) return designFilesGate(event.files, state, pluginsRoot, corpusRoot, corpusRequired, cwd, findDesignSystem(cwd) !== "");
   if (event.tool === NAV) {
     return browserNavigateGate(state, typeof event.input.url === "string" ? event.input.url : "");
   }

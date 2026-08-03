@@ -23,12 +23,58 @@ assuming a gate that works on Claude Code also works elsewhere.
 | Harness | Adapter file | PreToolUse coverage | Lifecycle events | Known limit |
 |---|---|---|---|---|
 | **claude-code** | `adapters/claude/index.ts` | Full: `evaluate` + APEX gates via `handleHook` | 14 event types implemented in `runtime/lifecycle/dispatch.ts` (SessionStart, SessionEnd, SubagentStart/Stop, Stop, PreCompact, PostCompact, TaskCompleted, TeammateIdle, PostToolUseFailure, InstructionsLoaded, UserPromptSubmit, plus Pre/PostToolUse) | Only PreToolUse+PostToolUse are wired by `harness init` (`init/templates.ts:18-27`); the other 12 event types require the consumer's own `.claude/settings.json` to route them. |
-| **codex** | `adapters/codex/index.ts` + `adapters/codex/apply-patch.ts` | `Bash \| apply_patch` matcher, PostToolUse (`init/templates.ts:29-38`). **`apply_patch` edits are gated**: the patch text is parsed per file, each hunk runs the file gates (protected-path, file-size, DRY) and one violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenarios 22-23). `ask` is downgraded to an explicit deny (`respond.ts`) — Codex fails open on unsupported shapes. | none wired | Upstream: Codex does not always enforce a correct `apply_patch` deny (openai/codex#27833) — the harness emits the right verdict, enforcement is Codex's. Do not add a Codex `PermissionRequest` path until `respond()` emits Codex's own wire shape (`codex/index.ts`). |
+| **codex** | `adapters/codex/index.ts` + `adapters/codex/apply-patch.ts` | `Bash \| apply_patch` matcher, PostToolUse (`init/templates.ts:29-38`). **`apply_patch` edits are gated**: the patch text is parsed per file, each hunk runs the file gates (protected-path, file-size, DRY) and one violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenarios 22-23). `ask` is downgraded to an explicit deny (`respond.ts`) — Codex fails open on unsupported shapes; the deny now carries a `CONFIRM <code>` recourse (`runtime/confirm/`, see below). | none wired | Upstream: Codex does not always enforce a correct `apply_patch` deny (openai/codex#27833) — the harness emits the right verdict, enforcement is Codex's. Do not add a Codex `PermissionRequest` path until `respond()` emits Codex's own wire shape (`codex/index.ts`). |
 | **cursor** | `adapters/cursor/index.ts` | `beforeShellExecution` can deny/ask (shell only, lines 16-21) | none | File edits are **advisory only**: `afterFileEdit` always returns `allow` + a `user_message` correction on violation — a `deny` there has no proven effect (hook launched "informational only"; Cursor's deny-enforcement for file ops is confirmed broken upstream, forum.cursor.com/t/154377). The human sees the message; the model is never re-informed. Platform ceiling, sourced in the adapter JSDoc. |
 | **gemini-cli** | `adapters/gemini/index.ts` | `BeforeTool` denies via `{decision:"deny",reason}` (lines 22-36) | none | Thin stateless adapter — no session track, no APEX gates reachable through it. |
 | **cline** | `adapters/cline/index.ts` | `PreToolUse` only; block → `{cancel:true}`, non-block → `contextModification` (lines 24-36) | none | Same as gemini-cli: stateless guard only, `PreToolUse` cannot modify tool parameters (per docs.cline.bot). |
 | **hermes** | `adapters/hermes/index.ts` | `pre_tool_call` proven: reuses the Claude stdin reader, blocks via `{decision:"block",reason}` (lines 12-36) | untested — no lifecycle dispatch wired for Hermes in this repo | `ask`/`inform` degrade to non-blocking `{context}` — Hermes "has no interactive ask state" (lines 27-28). |
-| **kimi** | `adapters/kimi/index.ts` | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`; `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop`. | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — see [Kimi Code — manual wiring](#kimi-code--manual-wiring). **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
+| **kimi** | `adapters/kimi/index.ts` | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`, with a `CONFIRM <code>` recourse appended (`runtime/confirm/`, see below); `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop`. | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — see [Kimi Code — manual wiring](#kimi-code--manual-wiring). **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
+
+## `CONFIRM <code>` — recourse for a degraded `ask`
+
+Both harnesses above downgrade `ask` to a hard `deny`: Kimi's binary
+short-circuits on `hookSpecificOutput?.permissionDecision !== "deny"`, and
+Codex fails a hook open on the unsupported `ask` shape. Claude Code is
+unaffected — its native `ask` still shows an interactive confirmation, and
+this mechanism never touches it (`src/runtime/confirm/confirm-gate.ts`'s
+`DEGRADES_ASK_TO_DENY` set is `{"codex", "kimi"}` only).
+
+When an `ask` about to be degraded carries a command, the deny message gets a
+short 4-hex-char code appended. Retyping `CONFIRM <code>` in the next prompt
+authorizes that **exact** action once — parsed in `src/runtime/confirm/confirm-submit.ts`
+(`handleConfirmSubmit`, wired from `UserPromptSubmit` in `handle.ts`) via a
+`CONFIRM_RE` tolerant of `confirm4f2a`/`Confirm-4f2a`/`confirm_4f2a`.
+
+Guardrails (`src/runtime/confirm/confirm-state.ts`, `confirm-subagent.ts`, `confirm-irreversible.ts`):
+
+- **G0** — no token can be placed while a sub-agent is active for the session:
+  a monotone `Math.max(prevSeenAt, now)` timestamp bumped by both
+  SubagentStart and SubagentStop (never decremented, so a duplicated event
+  from the multi-plugin fan-out can't desync it open), window tunable via
+  `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` (default 300s). G0's primary protection
+  is structural, not the window: a sub-agent never receives its own
+  `UserPromptSubmit`, so it cannot place a token regardless of the window's
+  value — the timestamp is a second belt for harnesses where that structural
+  property isn't proven yet (Kimi).
+- **G1** — a token is consumed on first successful use.
+- **G2** — a token expires 5 minutes after it was placed.
+- **G3** — the token is scoped to the action's full SHA-256 hash
+  (`hashForAction`), never the 4-char display code (`displayCodeForAction`),
+  which collides by design at 16 bits — it exists only so a human has
+  something short to retype, never as the actual authorization boundary.
+- **G4** — irreversible commands are never confirmable, regardless of a valid
+  token: destructive git (`push --force`, `reset --hard`, `branch -D`,
+  `clean -fd`, …, reusing `GIT_BLOCKED`) and any `rm -rf`/`-fr` variant.
+- **G5** — an explicit refusal (`non`/`no`/`stop`/`cancel`/`annule`/…) in the
+  next prompt drops any pending token.
+
+**Scope, stated plainly**: this closes a recourse gap for an honest mistake or
+a change of mind under a harness that can't show an interactive prompt — it is
+**not** a security control against an adversarial agent. Any agent with
+arbitrary shell access can write its own confirm token directly into the
+session-state file it would need to pass and self-approve; that is true of
+every stateful gate this harness keeps outside a sandbox, not specific to this
+mechanism.
 
 ## Claude Code — `@fusengine/harness/adapters/claude`
 

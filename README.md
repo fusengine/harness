@@ -125,12 +125,12 @@ also works elsewhere.
 | Harness | PreToolUse coverage | Lifecycle (Session/Subagent/Stop/Compact/…) | Known limit |
 |---|---|---|---|
 | **claude-code** | Full: `evaluate` + APEX gates via `handleHook` (`src/adapters/claude/index.ts`) | 14 event types implemented (`dispatch.ts`) — fires once wired into `.claude/settings.json` beyond the `init` default | None found; richer lifecycle needs manual/marketplace wiring (see Quickstart) |
-| **codex** | Bash gated reliably; **`apply_patch` edits are now gated too** — the patch text is parsed per file (`adapters/codex/apply-patch.ts`), each hunk runs the file gates and ONE violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenario 22 incl. the multi-file smuggling case). `ask` prompts are **downgraded to explicit deny** (`respond.ts`, sim scenario 23) because Codex fails open on unsupported shapes. On the PostToolUse side, an allowed patch is fanned into one synthetic per-file event so the SOLID/tracking/post-edit handlers see every touched file (`runtime/post-fanout.ts`), and a non-blocking security advisory fires on the first qualifying file (`securityAdvisoryForPatch`). | Not wired by `harness init codex` (PreToolUse `Bash\|apply_patch` + PostToolUse only, `src/init/templates.ts:29-38`) — `Stop` (session cleanup + the SOLID/receipt completion check, since Codex never emits `SessionEnd`/`TaskCompleted`, `runtime/lifecycle/stop-core.ts`) and `SessionStart` (plugin agents/commands cache resync, `runtime/lifecycle/codex-resync/`) ARE implemented but, same caveat as claude-code's extra lifecycle above, only fire once the codex-plugins marketplace's own `hooks.json` wires them. | Upstream caveat: Codex itself does not always enforce a correct `apply_patch` deny (openai/codex#27833) — we emit the right verdict; enforcement is theirs. No interactive `ask`. Codex has no native `PostToolUseFailure`; a failure is inferred from the ordinary `PostToolUse` result shape (non-zero exit or an explicit error field only — never a guess) and journaled into the one-shot failure tally (`src/tracking/codex-post-failure.ts`). |
+| **codex** | Bash gated reliably; **`apply_patch` edits are now gated too** — the patch text is parsed per file (`adapters/codex/apply-patch.ts`), each hunk runs the file gates and ONE violating hunk denies the whole patch (`runtime/apply-patch-gate.ts`, sim scenario 22 incl. the multi-file smuggling case). `ask` prompts are **downgraded to explicit deny** (`respond.ts`, sim scenario 23) because Codex fails open on unsupported shapes — the deny now carries a `CONFIRM <code>` recourse (see "CONFIRM code" under [Beyond gating](#beyond-gating-memory-receipts-one-shot-metric) below). On the PostToolUse side, an allowed patch is fanned into one synthetic per-file event so the SOLID/tracking/post-edit handlers see every touched file (`runtime/post-fanout.ts`), and a non-blocking security advisory fires on the first qualifying file (`securityAdvisoryForPatch`). | Not wired by `harness init codex` (PreToolUse `Bash\|apply_patch` + PostToolUse only, `src/init/templates.ts:29-38`) — `Stop` (session cleanup + the SOLID/receipt completion check, since Codex never emits `SessionEnd`/`TaskCompleted`, `runtime/lifecycle/stop-core.ts`) and `SessionStart` (plugin agents/commands cache resync, `runtime/lifecycle/codex-resync/`) ARE implemented but, same caveat as claude-code's extra lifecycle above, only fire once the codex-plugins marketplace's own `hooks.json` wires them. | Upstream caveat: Codex itself does not always enforce a correct `apply_patch` deny (openai/codex#27833) — we emit the right verdict; enforcement is theirs. No interactive `ask`. Codex has no native `PostToolUseFailure`; a failure is inferred from the ordinary `PostToolUse` result shape (non-zero exit or an explicit error field only — never a guess) and journaled into the one-shot failure tally (`src/tracking/codex-post-failure.ts`). |
 | **cursor** | `beforeShellExecution` can deny/ask (shell only, `cursor/index.ts:16-21`) | none | File edits are **advisory only**: `afterFileEdit` always returns `allow` + a `user_message` correction on violation — a `deny` there has no proven effect (hook was "informational only" at launch, and Cursor's deny-enforcement for file ops is confirmed broken upstream, forum.cursor.com/t/154377). Human sees the message; the model is never re-informed. Platform ceiling, documented in `cursor/index.ts`. |
 | **gemini-cli** | `BeforeTool` denies via `{decision:"deny",reason}` (`gemini/index.ts:22-36`) | none | Thin stateless adapter — no session track, no APEX gates wired through it. |
 | **cline** | `PreToolUse` only; block → `{cancel:true}`, non-block → `contextModification` (`cline/index.ts:24-36`) | none | Same as gemini-cli: stateless guard only. |
 | **hermes** | `pre_tool_call` proven: reuses the Claude stdin reader, blocks via `{decision:"block",reason}` (`hermes/index.ts:12-36`) | untested — no lifecycle dispatch wired for Hermes in this repo | `ask`/`inform` degrade to non-blocking `{context}` — Hermes "has no interactive ask state" (`hermes/index.ts:27-28`). |
-| **kimi** | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`; `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop` (`kimi/index.ts`). | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — copy the TOML snippet from [docs/adapters.md](docs/adapters.md#kimi-code--manual-wiring), and emit **no field** beyond `event`/`matcher`/`command`/`timeout` or the whole config fails to load. **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`; validate hand-written config with `kimi doctor`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
+| **kimi** | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`, with a `CONFIRM <code>` recourse appended (see "CONFIRM code" under [Beyond gating](#beyond-gating-memory-receipts-one-shot-metric) below); `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop` (`kimi/index.ts`). | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — copy the TOML snippet from [docs/adapters.md](docs/adapters.md#kimi-code--manual-wiring), and emit **no field** beyond `event`/`matcher`/`command`/`timeout` or the whole config fails to load. **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`; validate hand-written config with `kimi doctor`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
 
 ## What it enforces
 
@@ -141,7 +141,7 @@ Guard/gate chain evaluated before a tool runs (`src/policy/guards/index.ts`,
 |---|---|
 | security | `rm -rf /`, fork bombs, `curl \| sh`; `sudo` (asks) |
 | protected-path | edits to `.claude/plugins\|logs\|cache`, `.git/`, the harness's own state dirs |
-| bash-write | `python3 -c` / `sed -i` / redirects to code files |
+| bash-write | `sed -i` / redirects to code files; `python3 -c` judged on content (mutating script → block, read-only → pass, same as `node -e`) |
 | interface-separation | top-level interface/type/protocol in a component/controller |
 | install | `npm/pip/brew/...` installs (asks) |
 | git | destructive git (`push --force`, `reset --hard`, …) — block; routine git — ask |
@@ -161,6 +161,30 @@ through per window without the full APEX gates (`Write` is never trivial).
 
 Features shipped since 0.1.44, each with its own test:
 
+- **`CONFIRM <code>` — recourse for a degraded `ask`** — Codex and Kimi both
+  ignore `permissionDecision: "ask"` (Kimi's own binary shortcuts on
+  `hookSpecificOutput?.permissionDecision !== "deny"`; Codex fails a hook open
+  on the unsupported shape), so the harness downgrades every `ask` there to a
+  hard `deny`. That deny now appends a short 4-hex-char code; retyping
+  `CONFIRM <code>` in the very next prompt authorizes that **exact** action
+  once (Claude Code is untouched — its native `ask` still shows an interactive
+  confirmation, no code ever appears there,
+  `src/runtime/confirm/confirm-gate.ts`). Guardrails, each independently
+  testable (`test/confirm.test.ts`, `test/confirm-g0.test.ts`): **G0** no token
+  can be placed while a sub-agent is active for this session (a monotone
+  max-write timestamp, window tunable via `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC`,
+  default 300s); **G1** a token is consumed on first use; **G2** a token
+  expires after 5 minutes; **G3** the token is scoped to the action's full
+  SHA-256 hash, never the 4-char display code (which collides by design — it
+  exists only for a human to retype); **G4** irreversible commands
+  (`push --force`, `reset --hard`, `rm -rf`, `git clean -fd`, `branch -D`, …)
+  are never confirmable, regardless of a valid token; **G5** an explicit
+  refusal in the next prompt drops any pending token. **This is a guard
+  against accidental/hasty denial with no recourse, not a security control
+  against an adversarial agent** — an agent with arbitrary shell access can
+  write the token straight into the session-state file it authorizes from and
+  self-approve, same as it could bypass any other stateful gate this harness
+  keeps outside a sandbox.
 - **Deny-loop breaker** — an identical retried call that was already denied gets
   a rewritten `[REPEAT] … STOP` message forcing a different approach, instead of
   looping silently (`src/policy/deny-loop.ts`, `test/deny-loop.test.ts`).
@@ -291,6 +315,7 @@ non-zero exit is swallowed — a broken or absent player can never break a hook
 | `FUSE_DESIGN_GEMINI` | **Opt-in (default off), a *different* gate from the one above.** Enables the design-pipeline's own Gemini gates (`create_frontend` validation + "generate before hand-writing HTML/CSS") — inert unless a design agent is active (`src/policy/design/gates.ts:58-60`, see [docs/design.md](docs/design.md)). |
 | `FUSE_MCP_TTL_SEC` | MCP (Context7/Exa) cache freshness, seconds (default 48h, `src/runtime/mcp-key.ts`). |
 | `FUSE_WEBFETCH_TTL_SEC` | WebFetch cache freshness, seconds (default 24h — pages stale faster than docs). |
+| `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` | G0 cool-down (seconds, default `300`) for the `CONFIRM <code>` mechanism above — no token can be placed within this window of the last SubagentStart/Stop seen for the session. |
 | `RALPH_MODE` | **Opt-in (default off).** Exempts safe git commands (`add`/`commit`/`checkout -b`/`status`/`diff`/`log`) from the confirmation ask and auto-approves project installs. Destructive git (force-push, `reset --hard`) and system installs still gate. |
 | `CLAUDE_PROJECT_DIR` | Overrides the project root used to hash the out-of-tree state dir (`src/runtime/paths.ts:20`). |
 | `FUSE_HARNESS_SOUND` | **On by default.** Set to `0` to disable every lifecycle notification sound. |
@@ -384,6 +409,12 @@ Run `bun run docs:api` for the generated typedoc API reference.
   checkpoint, not continuously.
 - **Hermes coverage beyond `pre_tool_call` is unverified** — no lifecycle events
   have been proven against a live Hermes install in this repo.
+- **`CONFIRM <code>` is not a security boundary.** It guards against an `ask`
+  being silently dropped by Codex/Kimi's degrade-to-deny, i.e. against
+  precipitation and lost recourse — not against an adversarial agent. Any
+  agent with shell access can write its own confirm token into session state
+  and self-approve; this is true of every stateful gate this harness keeps
+  outside a sandbox, not specific to this mechanism.
 
 ## Develop
 

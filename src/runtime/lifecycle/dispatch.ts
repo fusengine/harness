@@ -5,6 +5,7 @@ import { solidDetectStart } from "./solid-detect";
 import { subagentCacheContext } from "./subagent-cache";
 import { trackAgentMemory } from "./agent-memory";
 import { harvestSubagentTrack } from "../../freshness/evidence-harvest-io";
+import { markSubagentSeen } from "../confirm/confirm-subagent";
 import { teammateIdleContext } from "./teammate-idle-check";
 import { failureLessonContext } from "./failure-lesson";
 import { postCompactContext } from "./post-compact";
@@ -59,6 +60,13 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       if (input.scope === "lessons") return dispatchLessons("UserPromptSubmit", input.payload, input.cwd, input.now, input.id ?? "claude-code");
       return null;
     case "SubagentStart":
+      // G0 (CONFIRM-token mechanism, confirm-subagent.ts): mark this session
+      // as having recent sub-agent activity BEFORE the scope branching below,
+      // so it fires regardless of which plugin scope dispatched it. A
+      // monotone max-write timestamp, NOT a counter — see confirm-subagent.ts's
+      // subagentWindowMs doc for why a start/stop counter desyncs unsafely
+      // under this same multi-plugin fan-out.
+      markSubagentSeen(input.payload.session_id, input.now);
       if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
       if (input.scope === "aipilot") return "";
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now, input.id ?? "claude-code");
@@ -67,6 +75,9 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       if (input.scope === "lessons") return dispatchLessons("Stop", input.payload, input.cwd, input.now, input.id ?? "claude-code");
       return input.scope === "core" ? stopCore(input.payload, input.cwd, input.now) : null;
     case "SubagentStop":
+      // G0 counterpart of the SubagentStart branch above — the SAME
+      // monotone max-write, never a decrement (see confirm-subagent.ts).
+      markSubagentSeen(input.payload.session_id, input.now);
       if (input.scope === "aipilot") return "";
       // Retroactively harvest the finishing sub-agent's transcript into the session
       // track BEFORE the reminder — so next turn's freshness gate sees research/
