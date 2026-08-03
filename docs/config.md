@@ -29,6 +29,7 @@ float / `<= 0` all fall back to the default.
 | `FUSE_DESIGN_GEMINI` | _(off)_ | opt-in — a **different** gate from the one above: enables the design-pipeline's own Gemini gates (`policy/design/gates.ts`), inert unless a design agent is active — see [design.md](./design.md) |
 | `FUSE_MCP_TTL_SEC` | `172800` (48h) | Context7/Exa cache freshness (`runtime/mcp-key.ts`) |
 | `FUSE_WEBFETCH_TTL_SEC` | `86400` (24h) | WebFetch cache freshness — pages stale faster than docs |
+| `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` | `300` | G0 cool-down (seconds) for the `CONFIRM <code>` mechanism (`runtime/confirm/confirm-subagent.ts`) — no confirm token can be placed within this window of the last SubagentStart/SubagentStop seen for the session. Reuses `parseEnvInt` directly (not `resolveTtlSec`, whose default is hardcoded to 120 regardless of key) |
 | `RALPH_MODE` | _(off)_ | opt-in autonomous mode — exempts safe git commands (`add`/`commit`/`checkout -b`/`status`/`diff`/`log`) from the confirmation ask and auto-approves project installs; destructive git and system installs still gate (`policy/patterns.ts`) |
 | `FUSE_HARNESS_SOUND` | _(on)_ | set to `0` to disable every lifecycle notification sound (`runtime/notifications.ts`) |
 | `FUSE_HARNESS_SOUND_STOP` | _(bundled `assets/song/finish.mp3`)_ | override path for the Codex-`Stop` sound |

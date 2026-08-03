@@ -27,7 +27,7 @@ wraps `evaluate`/`evaluateApex` the same way, so a bug can never disable enforce
 | `securityGuard` | `rm -rf /\|/etc\|/usr…`, fork bomb, `curl \| sh`, `mkfs`/`shred`/`fdisk`/`diskutil erase`, `> /dev/{sda,hda,nvme}` | block |
 | | `sudo`/`su`/`doas`/`passwd`, `chmod 777`, recursive `chown`, `eval`, `rm`/`unlink`, write to `/etc` | ask |
 | `protectedPathGuard` | Write/Edit under `.claude/plugins\|logs\|cache`, `.git/` | block |
-| `bashWriteGuard` | `python3 -c`, `sed -i`, heredoc/redirect to a code file | block |
+| `bashWriteGuard` | `sed -i`, heredoc/redirect to a code file, `python3 -c` whose inline script mutates files/spawns a process (content-gated — same treatment as `node -e`, a read-only one-liner passes) | block |
 | | redirect to a non-code file, `tee`, `dd of=`, `node -e` writes | ask |
 | `interfaceSeparationGuard` | top-level `interface`/`type`/`protocol`/`record` in a TS/JS/Vue/Svelte, Python, **Go**, **Java/Kotlin**, PHP, or Swift component/view/controller/handler | block |
 | `installGuard` | `npm/yarn/pnpm/bun/pip/cargo/go/gem/composer` + `brew/apt/dnf/pacman` installs | ask |

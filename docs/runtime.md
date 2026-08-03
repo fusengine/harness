@@ -22,8 +22,15 @@ const { stdout, exit } = await handleHook(id, payload, {
   fast path → APEX gates (from the track) → native response via `respond(id, prompt)`.
 - **POST event** → `activityFor(event)` → `recordActivity` (fills the track; agent
   `quality` is derived from the response length), and `mcpPostStore` caches responses.
-- **UserPromptSubmit** (payload carries `prompt`) → `detectCreationIntent` →
-  `recordBrainstormRequired`, so `brainstormGate` can fire on the next edit.
+- **UserPromptSubmit** (payload carries `prompt`) → `promptText(payload.prompt)`
+  normalizes the field first (`./prompt-text.ts`) — a plain string on Claude
+  Code/Codex passes through unchanged, but Kimi 0.31.1 sends an array of
+  content blocks (`[{type,text}]`), which is flattened by joining each
+  block's `.text` with `"\n"`; anything else yields `""`, never a throw — then
+  `detectCreationIntent` → `recordBrainstormRequired` (`brainstormGate` fires
+  on the next edit) and `handleConfirmSubmit` (`./confirm/confirm-submit.ts`)
+  parses the same text for a `CONFIRM <code>` reply or an explicit refusal —
+  see [adapters.md](./adapters.md#confirm-code--recourse-for-a-degraded-ask).
 
 `normalizeEvent(id, payload)` unifies the payload shapes (Claude/Codex/Gemini/
 Cursor `tool_name`+`tool_input`; Cline nested `preToolUse`).
