@@ -23,6 +23,13 @@ export interface PreContext {
   event: NormalizedEvent;
   framework: string;
   mcpDir: string;
+  /**
+   * Session-anchored design-pipeline cache dir (see design-cache-resolve.ts) —
+   * distinct from `mcpDir`. Optional: pre-existing context literals (tests
+   * built before this field existed) omit it and fall back to `mcpDir`
+   * unchanged, so they keep their old, already-passing behavior verbatim.
+   */
+  designCacheDir?: string;
   file: string;
   opts: HandleOptions;
 }
@@ -34,13 +41,14 @@ export interface PreContext {
  */
 export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   const { id, payload, event, framework, mcpDir, file, opts } = ctx;
+  const designCacheDir = ctx.designCacheDir ?? mcpDir;
   const intercept = mcpPreIntercept(id, event.tool, event.input, mcpDir, MCP_TTL_MS, opts.now);
   if (intercept !== null) {
     if (intercept.docSource) await recordActivity(file, { kind: "doc", framework, sessionId: event.sessionId, source: intercept.docSource });
     return { stdout: intercept.stdout, exit: 0 };
   }
 
-  const designBlock = designGate(payload, event, mcpDir, opts.cwd, opts.corpusRoot);
+  const designBlock = designGate(payload, event, designCacheDir, opts.cwd, opts.corpusRoot);
   if (designBlock) return { stdout: withDenyNotice(id, respond(id, designBlock), designBlock, event.sessionId, dirname(file), opts.now), exit: 0 };
 
   // Security scope is advisory-only (ports check-security-skill.py): emit the
@@ -96,5 +104,5 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
   // decision-time lesson + evidence-fresh notice). A deny/ask already returned
   // above, so nothing it emits can block nor override a decision.
-  return allowOutcome(id, event, payload, mcpDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
+  return allowOutcome(id, event, payload, designCacheDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
 }

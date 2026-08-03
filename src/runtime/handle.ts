@@ -11,6 +11,7 @@ import { lifecycleStdout } from "./lifecycle-bridge";
 import { handlePre } from "./handle-pre";
 import { handlePost } from "./handle-post";
 import { asyncScopeStdout } from "./handle-scope-async";
+import { resolveDesignCacheDir } from "./design-cache-resolve";
 import { resyncCodexAgents } from "./lifecycle/codex-resync/resync";
 import { resetFragmentRegistry } from "./fragment-registry";
 import { attachBudgetRecap } from "./inject-budget-recap";
@@ -37,6 +38,10 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   const layout = projectLayout(opts.cwd);
   const file = trackFile(event.sessionId, defaultStateDir(opts.cwd));
   const mcpDir = layout.cacheDir;
+  // Design pipeline (flag + `.design-state-*.json`) is anchored on the session
+  // id, not `mcpDir`/cwd — see design-cache-resolve.ts. `mcpDir` itself stays
+  // cwd-derived for the unrelated MCP/WebFetch cache.
+  const designCacheDir = resolveDesignCacheDir(event.sessionId, mcpDir, opts.home);
   const framework = detectFramework(event.filePath ?? "", event.content ?? "", opts.cwd);
 
   // Design-agent lifecycle (SubagentStart/Stop): init/cleanup the pipeline state machine.
@@ -47,7 +52,7 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // spawn_agent tool RESULT, not the hook payload). `payload.prompt` (design-mode "component"
   // detection below) is absent from Codex's schema — degrades to detectMode's default, not a
   // break. Cursor/Gemini/Cline/Hermes remain unverified — NOT added without the same proof.
-  if ((id === "claude-code" || id === "codex") && designLifecycle(payload, mcpDir, opts.cwd, String(opts.now), opts.now)) {
+  if ((id === "claude-code" || id === "codex") && designLifecycle(payload, designCacheDir, opts.cwd, String(opts.now), opts.now)) {
     return { stdout: "", exit: 0 };
   }
 
@@ -75,8 +80,8 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   }
 
   if (event.phase === "post") {
-    return handlePost({ id, payload, event, framework, mcpDir, file, opts });
+    return handlePost({ id, payload, event, framework, mcpDir, designCacheDir, file, opts });
   }
 
-  return handlePre({ id, payload, event, framework, mcpDir, file, opts });
+  return handlePre({ id, payload, event, framework, mcpDir, designCacheDir, file, opts });
 }

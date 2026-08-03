@@ -43,9 +43,10 @@ import type { Prompt } from "../prompt/types";
  */
 export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   const { id, payload, event, framework, mcpDir, file, opts } = ctx;
+  const designCacheDir = ctx.designCacheDir ?? mcpDir;
   const response = payload.tool_response ?? payload.tool_output;
   mcpPostStore(event.tool, event.input, response, mcpDir);
-  const designWarn = designGate(payload, event, mcpDir, opts.cwd, opts.corpusRoot);
+  const designWarn = designGate(payload, event, designCacheDir, opts.cwd, opts.corpusRoot);
   const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
   for (const activity of activities) await recordActivity(file, activity);
   // Session-scoped evidence (parity track-subagent-research.py): sub-agent hooks
@@ -92,7 +93,7 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
   const noticeLines: string[] = [];
   for (const f of files) {
-    const n = designPassNotice({ agentId, tool: f.tool, filePath: f.filePath ?? "", content: f.content ?? "", url: "", phase: "post" }, mcpDir);
+    const n = designPassNotice({ agentId, tool: f.tool, filePath: f.filePath ?? "", content: f.content ?? "", url: "", phase: "post" }, designCacheDir);
     if (n?.userMessage) noticeLines.push(n.userMessage);
   }
   const notice: Prompt | null = noticeLines.length ? { kind: "inform", title: "Design pipeline", reason: "", userMessage: noticeLines.join("\n") } : null;
