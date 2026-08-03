@@ -15,6 +15,8 @@ import { resolveDesignCacheDir } from "./design-cache-resolve";
 import { resyncCodexAgents } from "./lifecycle/codex-resync/resync";
 import { resetFragmentRegistry } from "./fragment-registry";
 import { attachBudgetRecap } from "./inject-budget-recap";
+import { promptText } from "./prompt-text";
+import { handleConfirmSubmit } from "./confirm/confirm-submit";
 import type { HandleOptions, HandleOutcome } from "./handle-types";
 export type { HandleOptions, HandleOutcome } from "./handle-types";
 
@@ -73,8 +75,14 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   }
 
   // UserPromptSubmit (core scope): brainstorm flag + CLAUDE.md injection.
-  const userPrompt = typeof payload.prompt === "string" ? payload.prompt : undefined;
+  // `payload.prompt` is a string on Claude Code/Codex, an array of content
+  // blocks on Kimi (see promptText) — either shape is normalized to text;
+  // anything else (field absent, or an unrecognized type) stays `undefined`
+  // so the block below is skipped exactly as before promptText existed.
+  const rawPrompt = payload.prompt;
+  const userPrompt = typeof rawPrompt === "string" || Array.isArray(rawPrompt) ? promptText(rawPrompt) : undefined;
   if (userPrompt !== undefined) {
+    handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
     await withTrack(file, (track) => recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
     return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
   }

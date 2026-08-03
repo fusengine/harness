@@ -14,6 +14,7 @@ import { isAgentTool } from "./is-agent-tool";
 import { allowOutcome } from "./pre-allow";
 import { applyPatchGate } from "./apply-patch-gate";
 import { isBypassPermissions } from "../adapters/codex/permission-mode";
+import { confirmGate } from "./confirm/confirm-gate";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -100,7 +101,19 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
     neverApproval: id === "codex" && isBypassPermissions(event.permissionMode),
   });
-  if (prompt) return { stdout: withDenyNotice(id, respond(id, prompt), prompt, event.sessionId, dirname(file), opts.now), exit: 0 };
+  if (prompt) {
+    // CONFIRM <code> flow: ONLY changes anything when Codex/Kimi are about to
+    // downgrade THIS `ask` to a hard deny (confirmGate returns null in every
+    // other case — including every claude-code call, unconditionally, and
+    // every non-`ask` prompt kind — so the line below is byte-identical to
+    // the pre-CONFIRM behavior whenever it applies).
+    const confirm = confirmGate(id, prompt, event.command, event.sessionId, opts.now, opts.home);
+    if (confirm?.allow) {
+      return allowOutcome(id, event, payload, designCacheDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
+    }
+    const finalPrompt = confirm ? confirm.prompt : prompt;
+    return { stdout: withDenyNotice(id, respond(id, finalPrompt), finalPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
+  }
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
   // decision-time lesson + evidence-fresh notice). A deny/ask already returned
   // above, so nothing it emits can block nor override a decision.
