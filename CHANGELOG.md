@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.90] - 2026-08-12
+
+### Fixed
+
+- **Codex-mangled MCP tool names silently broke the design gate, APEX freshness credit, and doc-cache gate** (`src/runtime/mcp-tool-name.ts`, `src/runtime/normalize.ts`, `src/adapters/codex/index.ts`, `src/runtime/lifecycle/aipilot/{doc-cache-gate,cache-doc,dispatch-aipilot}.ts`) — Codex CLI globally rewrites every `-` to `_` across the qualified MCP tool identifier before it reaches any hook (`sanitize_responses_api_tool_name()`, openai/codex#14605 — Code Mode exposes tools as TypeScript identifiers, where `-` is illegal). This harness compared against the hyphenated form everywhere, so on Codex only: `SHOT_TOOLS.has()` always missed (design pipeline stuck at phase 1), `classifyExplore` never credited `research-expert` (APEX freshness gate), and the doc-cache gate never fired. New `canonicalizeMcpToolName(id, tool)` — a pure function guarded by `id !== "codex"` first, two closed null-prototype tables (`Object.create(null)`, server-scoped `TOOL_ALIASES` to avoid corrupting segments with a legitimate underscore) — wired into all 5 ingestion paths. Verified against a 660-line before/after characterization (15 harness ids × 44 tools): 12 lines changed, all `id: "codex"`, zero regression elsewhere. Confirmed live on Codex 0.147 — a real `design-expert` subagent session now reaches `screenshotsCount: 5` and completes the identity phase.
+
 ## [0.1.89] - 2026-08-03
 
 ### Security

@@ -10,6 +10,7 @@ import { readJsonFile, writeJsonFile } from "../../../util/json-io";
 import { readText, writeText, pathExists, sleep } from "../../../util/runtime-io";
 import { hashText16, cacheDirFor } from "./cache-base";
 import { transcriptFilePaths, projectRootFromPaths } from "./transcript";
+import { canonicalizeMcpToolName } from "../../mcp-tool-name";
 import type { CacheEntry, CacheIndex } from "./types";
 
 const TOOL_PATTERN = /context7__query-docs|exa__get_code_context|exa__web_search/;
@@ -18,8 +19,13 @@ const MIN_TEXT_SIZE = 200;
 const MAX_DOCS = 15;
 const RETRY_DELAYS = [500, 1000, 2000];
 
-/** Extract the longest assistant synthesis + queried library ids from a transcript. */
-async function extractSynthesis(path: string): Promise<{ text: string; libraries: string[] }> {
+/**
+ * Extract the longest assistant synthesis + queried library ids from a transcript.
+ * @param id - Harness adapter id, used to canonicalize `block.name` (Codex-mangled
+ *   underscore tool names) before the {@link TOOL_PATTERN} match — see
+ *   {@link cacheDocFromTranscript} for why this is a defensive, unconfirmed-case cover.
+ */
+async function extractSynthesis(path: string, id: string): Promise<{ text: string; libraries: string[] }> {
   const lines = readText(path).split("\n").filter(Boolean);
   const libraries: string[] = [];
   let synthesis = "";
@@ -30,7 +36,7 @@ async function extractSynthesis(path: string): Promise<{ text: string; libraries
       const contents = entry?.message?.content;
       if (!Array.isArray(contents)) continue;
       for (const block of contents) {
-        if (block.type === "tool_use" && TOOL_PATTERN.test(block.name ?? "")) {
+        if (block.type === "tool_use" && TOOL_PATTERN.test(canonicalizeMcpToolName(id, block.name ?? ""))) {
           const lib = block.input?.libraryId ?? block.input?.query ?? "";
           if (lib && !libraries.includes(lib)) libraries.push(lib);
         }
@@ -48,19 +54,30 @@ async function extractSynthesis(path: string): Promise<{ text: string; libraries
  * @param transcript - Path to the agent JSONL transcript.
  * @param cwd - Fallback project root.
  * @param home - Home dir (defaults to `~`).
+ * @param id - Harness adapter id (defaults to "claude-code"). On `"codex"`,
+ *   every `tool_use.name` read from the transcript is canonicalized before the
+ *   {@link TOOL_PATTERN} match, defensively covering the SAME Codex-mangled
+ *   underscore form as `doc-cache-gate.ts`'s `docCacheGate`. UNLIKE that gate,
+ *   this is NOT a confirmed-reproduced bug: the proof that Codex emits the
+ *   underscore form (`sanitize_responses_api_tool_name()`, openai/codex#14605,
+ *   `SCENARIO_DASH_TOOL` in #18385) is about the live PreToolUse HOOK payload,
+ *   never observed here against transcript `tool_use.name` content. The
+ *   canonicalization is a no-op when the transcript already carries the dash
+ *   form (idempotence proven in `test/mcp-tool-name.test.ts`, test 2), so this
+ *   costs nothing if the hypothesis turns out false.
  */
-export async function cacheDocFromTranscript(transcript: string | undefined, cwd: string, home: string = homedir()): Promise<void> {
+export async function cacheDocFromTranscript(transcript: string | undefined, cwd: string, home: string = homedir(), id: string = "claude-code"): Promise<void> {
   if (!transcript || !pathExists(transcript)) return;
   const allPaths = await transcriptFilePaths(transcript);
   const projPath = projectRootFromPaths(allPaths) ?? process.env.CLAUDE_PROJECT_DIR ?? cwd;
   const cacheDir = cacheDirFor("doc", projPath, home);
   const docsDir = join(cacheDir, "docs");
 
-  let result = await extractSynthesis(transcript);
+  let result = await extractSynthesis(transcript, id);
   for (const delay of RETRY_DELAYS) {
     if (result.text.length >= MIN_TEXT_SIZE && result.libraries.length > 0) break;
     await sleep(delay);
-    result = await extractSynthesis(transcript);
+    result = await extractSynthesis(transcript, id);
   }
   const { text, libraries } = result;
   if (text.length < MIN_TEXT_SIZE || libraries.length === 0) return;

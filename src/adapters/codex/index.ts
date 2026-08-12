@@ -20,6 +20,7 @@ import { formatPrompt, type Prompt } from "../../prompt/types";
 import { parseApplyPatch } from "./apply-patch";
 import { commandToString } from "../../runtime/command-string";
 import { canonicalizeCodexShellTool } from "../../runtime/codex-shell-tool";
+import { canonicalizeMcpToolName } from "../../runtime/mcp-tool-name";
 import { contextResponse, denyResponse, informResponse, type ClaudeHookInput } from "../claude";
 import { isBypassPermissions } from "./permission-mode";
 
@@ -60,7 +61,7 @@ function resolvePrompt(input: ClaudeHookInput): Prompt | null {
     // Code Mode-wrapped exec_command surfaces its raw function-tool name here
     // instead of "Bash" (see codex-shell-tool.ts) — canonicalize so the SOLID/
     // protected-path/bash-write guards recognize it like a native Bash call.
-    tool: canonicalizeCodexShellTool("codex", input.tool_name ?? "Write"),
+    tool: canonicalizeCodexShellTool("codex", canonicalizeMcpToolName("codex", input.tool_name ?? "Write")),
     filePath: i?.file_path,
     content: i?.content ?? i?.new_string,
     command: commandToString(i?.command),

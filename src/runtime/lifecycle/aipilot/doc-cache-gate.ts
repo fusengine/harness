@@ -13,6 +13,7 @@ import { pathExists } from "../../../util/runtime-io";
 import { denyResponse } from "../../../adapters/claude";
 import { cacheDirFor, cacheAge, projectHash, DOC_CACHE_TTL_SECONDS } from "./cache-base";
 import { logCacheEvent } from "./analytics";
+import { canonicalizeMcpToolName } from "../../mcp-tool-name";
 import type { CacheIndex } from "./types";
 
 const GATED_TOOLS = /context7__query-docs|exa__get_code_context|exa__web_search/;
@@ -39,10 +40,14 @@ function libraryOf(payload: Record<string, unknown>): string {
  * @param cwd - Fallback project root (uses `CLAUDE_PROJECT_DIR` first).
  * @param now - Clock (defaults to `Date.now()`).
  * @param home - Home dir (defaults to `~`).
+ * @param id - Harness adapter id (defaults to "claude-code"); on `"codex"`,
+ *   `payload.tool_name` is canonicalized before the {@link GATED_TOOLS} match
+ *   so the Codex-mangled underscore form (`mcp__context7__query_docs`) gates
+ *   exactly like the dash form does on every other harness.
  * @returns A native deny response, or `null` to fall through to the live call.
  */
-export async function docCacheGate(payload: Record<string, unknown>, cwd: string, now: number = Date.now(), home: string = homedir()): Promise<string | null> {
-  const tool = String(payload.tool_name ?? "");
+export async function docCacheGate(payload: Record<string, unknown>, cwd: string, now: number = Date.now(), home: string = homedir(), id: string = "claude-code"): Promise<string | null> {
+  const tool = canonicalizeMcpToolName(id, String(payload.tool_name ?? ""));
   if (!GATED_TOOLS.test(tool)) return null;
   const library = libraryOf(payload);
   if (!library) return null;
