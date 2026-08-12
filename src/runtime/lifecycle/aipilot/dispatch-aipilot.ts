@@ -68,11 +68,11 @@ async function onSubagentStart(payload: Record<string, unknown>, cwd: string, no
   return combineContext(apex, lessons, typeSpecific);
 }
 
-/** SubagentStop routing: transcript-driven cache writers, then the universal SOLID check. */
-async function onSubagentStop(payload: Record<string, unknown>, cwd: string, home: string): Promise<string> {
+/** SubagentStop routing: transcript-driven cache writers, then the universal SOLID check. `id` selects the harness target (defaults to "claude-code"), threaded into `cacheDocFromTranscript`. */
+async function onSubagentStop(payload: Record<string, unknown>, cwd: string, home: string, id: string): Promise<string> {
   const agent = agentTypeOf(payload);
   const transcript = transcriptOf(payload);
-  if (agent.includes("research-expert")) await cacheDocFromTranscript(transcript, cwd, home);
+  if (agent.includes("research-expert")) await cacheDocFromTranscript(transcript, cwd, home, id);
   if (agent.includes("sniper")) {
     await cacheSniperLessons(transcript, cwd, home);
     await cacheTestResults(transcript, cwd, home);
@@ -87,10 +87,10 @@ async function onSubagentStop(payload: Record<string, unknown>, cwd: string, hom
  */
 export async function dispatchAipilot(event: string, payload: Record<string, unknown>, cwd: string, now: number, home: string = homedir(), id: string = "claude-code"): Promise<string | null> {
   if (event === "SubagentStart") return onSubagentStart(payload, cwd, now, home, id);
-  if (event === "SubagentStop") return onSubagentStop(payload, cwd, home);
+  if (event === "SubagentStop") return onSubagentStop(payload, cwd, home, id);
   // Stop too: Codex emits no SessionEnd, so its ai-pilot hooks.json wires Stop here as the sole analytics-flush trigger — reusing the SessionEnd handler verbatim (codex-plugins/docs/reference/hooks.md).
   if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(home, now); return ""; }
-  if (event === "PreToolUse") return docCacheGate(payload, cwd, now, home);
+  if (event === "PreToolUse") return docCacheGate(payload, cwd, now, home, id);
   return null;
 }
 
