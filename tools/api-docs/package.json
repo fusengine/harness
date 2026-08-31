@@ -1,0 +1,12 @@
+{
+  "name": "@fusengine/api-docs-toolchain",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "typedoc --options ../../typedoc.json --tsconfig ../../tsconfig.json"
+  },
+  "devDependencies": {
+    "typedoc": "0.28.20",
+    "typescript": "6.0.3"
+  }
+}

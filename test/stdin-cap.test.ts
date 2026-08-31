@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { openSync, closeSync, mkdtempSync, writeFileSync } from "node:fs";
+import { openSync, closeSync, mkdtempSync, readSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readBounded, oversizeStdout } from "../src/cli/hook-io";
@@ -62,4 +62,14 @@ test("override: FUSE_HOOK_STDIN_MAX_BYTES pins the cap; default is 16 MiB", () =
   expect(resolveStdinMaxBytes({})).toBe(16 * 1024 * 1024);
   expect(resolveStdinMaxBytes({ FUSE_HOOK_STDIN_MAX_BYTES: "2048" })).toBe(2048);
   expect(resolveStdinMaxBytes({ FUSE_HOOK_STDIN_MAX_BYTES: "nope" })).toBe(16 * 1024 * 1024);
+});
+
+test("non-Cursor bounded reads retain the historical immediate overflow return", () => {
+  const file = join(mkdtempSync(join(tmpdir(), "stdin-cap-immediate-")), "payload.json");
+  writeFileSync(file, "x".repeat(3 * 64 * 1024));
+  const fd = openSync(file, "r");
+  try {
+    expect(readBounded(fd, 128).kind).toBe("oversize");
+    expect(readSync(fd, Buffer.alloc(1), 0, 1, null)).toBe(1);
+  } finally { closeSync(fd); }
 });

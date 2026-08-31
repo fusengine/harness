@@ -41,10 +41,39 @@ export const TRIVIAL_BUDGET = 4;
  */
 export async function gate(input: GateInput): Promise<Prompt | null> {
   const prompt = await runGates(input);
-  const op = { filePath: input.filePath, content: input.content, command: input.command };
+  return finalizeGate(input, prompt, input.command);
+}
+
+/**
+ * Gate independent Cursor command candidates without merging their shell syntax.
+ * Stateful outcome bookkeeping runs once, against the command that decided the
+ * aggregate result. A single distinct candidate follows {@link gate} verbatim.
+ */
+export async function gateCommandCandidates(input: GateInput, candidates: readonly string[]): Promise<Prompt | null> {
+  const distinct = [...new Set(candidates)];
+  if (distinct.length <= 1) return gate(input);
+
+  let decisive: { prompt: Prompt; command: string } | undefined;
+  for (const command of distinct) {
+    const prompt = await runGates({ ...input, command });
+    if (!prompt) continue;
+    if (!decisive || promptRank(prompt) > promptRank(decisive.prompt)) decisive = { prompt, command };
+    if (prompt.kind === "block") break;
+  }
+  return finalizeGate(input, decisive?.prompt ?? null, decisive?.command ?? input.command);
+}
+
+/** Persist one final gate outcome and apply deny-loop enrichment exactly once. */
+function finalizeGate(input: GateInput, prompt: Prompt | null, command: string | undefined): Prompt | null {
+  const op = { filePath: input.filePath, content: input.content, command };
   const dir = dirname(input.trackFile);
   recordOneShot(prompt, op, { now: input.now, dir, sessionId: input.sessionId });
   return withDenyLoop(prompt, input.tool, op, { now: input.now, dir, windowMs: input.windowMs ?? DEFAULT_WINDOW_MS, sessionId: input.sessionId });
+}
+
+/** Higher numeric values dominate while equal values preserve wire order. */
+function promptRank(prompt: Prompt): number {
+  return prompt.kind === "block" ? 3 : prompt.kind === "ask" ? 2 : 1;
 }
 
 /** Stateless guards, then the trivial fast path, then the stateful APEX gates. */

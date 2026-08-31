@@ -39,6 +39,20 @@ test("fanOutFiles: add→Write, update→Edit; delete drops content and maps off
   ]);
 });
 
+test("fanOutFiles: Cursor afterFileEdit preserves each old/new pair", () => {
+  const event = base({
+    tool: "Edit",
+    files: [
+      { filePath: "app.ts", oldString: "a", content: "b", op: "update" },
+      { filePath: "app.ts", oldString: "c", content: "d", op: "update" },
+    ],
+  });
+  expect(fanOutFiles(event).map((file) => [file.tool, file.filePath, file.oldString, file.content])).toEqual([
+    ["Edit", "app.ts", "a", "b"],
+    ["Edit", "app.ts", "c", "d"],
+  ]);
+});
+
 test("firstFileMatch: OR across files, first non-empty wins (parity applyPatchGate)", () => {
   const files = fanOutFiles(base({ files: [{ filePath: "ok.ts", content: "", op: "add" }, { filePath: "bad.ts", content: "", op: "add" }] }));
   expect(firstFileMatch(files, (_t, p) => (p === "bad.ts" ? "BAD" : ""))).toBe("BAD");

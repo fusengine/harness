@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import { loadRefs } from "../refs/loader";
-import { gate } from "./gate";
+import { gate, gateCommandCandidates } from "./gate";
 import { MCP_TTL_MS, mcpPreIntercept } from "./mcp";
 import type { NormalizedEvent } from "./normalize";
 import { recordActivity } from "./record";
@@ -14,6 +14,7 @@ import { isAgentTool } from "./is-agent-tool";
 import { allowOutcome } from "./pre-allow";
 import { applyPatchGate } from "./apply-patch-gate";
 import { isBypassPermissions } from "../adapters/codex/permission-mode";
+import { evaluate } from "../policy/evaluate";
 import { confirmGate } from "./confirm/confirm-gate";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
@@ -50,7 +51,17 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   }
 
   const designBlock = designGate(payload, event, designCacheDir, opts.cwd, opts.corpusRoot);
-  if (designBlock) return { stdout: withDenyNotice(id, respond(id, designBlock), designBlock, event.sessionId, dirname(file), opts.now), exit: 0 };
+  if (designBlock) return { stdout: withDenyNotice(id, respond(id, designBlock, event.eventName ?? "PreToolUse"), designBlock, event.sessionId, dirname(file), opts.now), exit: 0 };
+
+  if (id === "cursor" && (event.eventName === "beforeReadFile" || event.eventName === "beforeTabFileRead")) {
+    const readPolicy = evaluate({ tool: event.tool, filePath: event.filePath });
+    return {
+      stdout: readPolicy.prompt
+        ? respond(id, readPolicy.prompt, event.eventName)
+        : JSON.stringify({ permission: "allow" }),
+      exit: 0,
+    };
+  }
 
   // Security scope is advisory-only (ports check-security-skill.py): emit the
   // non-blocking advisory when the skill is unread, else allow — NEVER run the
@@ -79,10 +90,11 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
   // envelope. `event.files` is undefined for every other tool/harness.
   if (event.files && event.files.length > 0) {
     const patchPrompt = applyPatchGate(event.files, opts.cwd);
-    if (patchPrompt) return { stdout: withDenyNotice(id, respond(id, patchPrompt), patchPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
+    if (patchPrompt) return { stdout: withDenyNotice(id, respond(id, patchPrompt, event.eventName ?? "PreToolUse"), patchPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   }
 
-  const prompt = await gate({
+  const refs = opts.refsDir ? await loadRefs(opts.refsDir) : undefined;
+  const gateInput = {
     sessionId: event.sessionId,
     framework,
     tool: event.tool,
@@ -90,7 +102,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     content: event.content,
     command: event.command,
     cwd: opts.cwd,
-    refs: opts.refsDir ? await loadRefs(opts.refsDir) : undefined,
+    refs,
     isReplaceAll: event.input.replace_all === true,
     oldString: event.oldString,
     agentType: event.agentType,
@@ -100,19 +112,23 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     trackFile: file,
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
     neverApproval: id === "codex" && isBypassPermissions(event.permissionMode),
-  });
+  };
+  const prompt = id === "cursor" && (event.commandCandidates?.length ?? 0) > 1
+    ? await gateCommandCandidates(gateInput, event.commandCandidates!)
+    : await gate(gateInput);
   if (prompt) {
     // CONFIRM <code> flow: ONLY changes anything when Codex/Kimi are about to
     // downgrade THIS `ask` to a hard deny (confirmGate returns null in every
     // other case — including every claude-code call, unconditionally, and
     // every non-`ask` prompt kind — so the line below is byte-identical to
     // the pre-CONFIRM behavior whenever it applies).
-    const confirm = confirmGate(id, prompt, event.command, event.sessionId, opts.now, opts.home);
+    const confirm = confirmGate(id, prompt, event.command, event.sessionId, opts.now, opts.home,
+      id === "codex" ? { tool: event.tool, cwd: event.cwd ?? opts.cwd, toolUseId: event.toolUseId } : undefined);
     if (confirm?.allow) {
       return allowOutcome(id, event, payload, designCacheDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
     }
     const finalPrompt = confirm ? confirm.prompt : prompt;
-    return { stdout: withDenyNotice(id, respond(id, finalPrompt), finalPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
+    return { stdout: withDenyNotice(id, respond(id, finalPrompt, event.eventName ?? "PreToolUse"), finalPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   }
   // Every gate allowed: hand off to the ALLOW-path assembly (pass notice +
   // decision-time lesson + evidence-fresh notice). A deny/ask already returned

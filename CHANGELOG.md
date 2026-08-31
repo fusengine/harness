@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.91] - 2026-09-01
+
+### Fixed
+
+- Complete native Cursor hook handling and harden confirmation and shell-write enforcement.
+
 ## [0.1.90] - 2026-08-12
 
 ### Fixed

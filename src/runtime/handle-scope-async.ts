@@ -5,6 +5,8 @@
  */
 import { dispatchAipilot } from "./lifecycle";
 import { dispatchMemory } from "./lifecycle/memory/dispatch";
+import { cursorEventContract } from "../adapters/cursor/events";
+import { toCursorLifecycleResponse } from "../adapters/cursor/respond";
 import type { PluginScope } from "./lifecycle";
 
 /**
@@ -18,7 +20,10 @@ import type { PluginScope } from "./lifecycle";
  * @returns The native stdout when intercepted, or `null` to fall through.
  */
 export async function asyncScopeStdout(scope: PluginScope | undefined, event: string, payload: Record<string, unknown>, cwd: string, now: number, id: string = "claude-code"): Promise<string | null> {
-  if (scope === "aipilot") return dispatchAipilot(event, payload, cwd, now, undefined, id);
-  if (scope === "memory") return dispatchMemory(event, payload, cwd, now);
-  return null;
+  const dispatchedEvent = id === "cursor" ? cursorEventContract(event).lifecycle : event;
+  if (dispatchedEvent === null) return null;
+  let stdout: string | null = null;
+  if (scope === "aipilot") stdout = await dispatchAipilot(dispatchedEvent, payload, cwd, now, undefined, id);
+  if (scope === "memory") stdout = await dispatchMemory(dispatchedEvent, payload, cwd, now);
+  return id === "cursor" && stdout !== null ? toCursorLifecycleResponse(stdout, event) : stdout;
 }

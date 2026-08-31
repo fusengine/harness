@@ -28,12 +28,20 @@ const { stdout, exit } = await handleHook(id, payload, {
   content blocks (`[{type,text}]`), which is flattened by joining each
   block's `.text` with `"\n"`; anything else yields `""`, never a throw — then
   `detectCreationIntent` → `recordBrainstormRequired` (`brainstormGate` fires
-  on the next edit) and `handleConfirmSubmit` (`./confirm/confirm-submit.ts`)
-  parses the same text for a `CONFIRM <code>` reply or an explicit refusal —
-  see [adapters.md](./adapters.md#confirm-code--recourse-for-a-degraded-ask).
+  on the next edit). Kimi then uses the legacy `handleConfirmSubmit`; Codex
+  processes the same reply before scope-specific early returns and binds it to
+  a versioned action identity (tool, canonical cwd, canonical command). Its
+  atomic consumed receipt authorizes sibling callbacks sharing one
+  `tool_use_id`; it proves authorization at PreToolUse, not command execution.
+  See [adapters.md](./adapters.md#confirm-code--recourse-for-a-degraded-ask).
 
-`normalizeEvent(id, payload)` unifies the payload shapes (Claude/Codex/Gemini/
-Cursor `tool_name`+`tool_input`; Cline nested `preToolUse`).
+`normalizeEvent(id, payload)` unifies the payload shapes. Cursor has a dedicated
+branch for its native events: top-level `beforeShellExecution.command` and
+`preToolUse` `Shell` both become `Bash`, `Write` becomes `Edit`, and
+`afterFileEdit.edits[]` becomes ordered per-edit post fan-out. That post fan-out
+improves observation and framework detection only; it cannot block an edit that
+already happened. Claude/Codex/Gemini keep `tool_name`+`tool_input`, and Cline
+keeps its nested `preToolUse` shape.
 
 ## `gate(input)`
 

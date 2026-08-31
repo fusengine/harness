@@ -21,7 +21,7 @@ import { homedir } from "node:os";
 import { checkStaged, stagedContent, stagedFiles } from "./run";
 import { runDoctor, runningVersion, versionBanner } from "./doctor";
 import { parseScope } from "./scope";
-import { isOversize, oversizeStdout, readStdin, traceHook } from "./hook-io";
+import { isMalformedCursorStdin, isOversize, oversizeStdout, readStdin, traceHook } from "./hook-io";
 import { maybePlaySound } from "./hook-sound";
 
 const cmd = process.argv[2];
@@ -43,12 +43,13 @@ if (cmd === "--version" || cmd === "-v") {
   traceHook("args", { id, scope });
   let outcome: Awaited<ReturnType<typeof handleHook>>;
   try {
-    const stdin = await readStdin();
+    const stdin = await readStdin(id);
     if (isOversize(stdin)) {
       const stdout = oversizeStdout(id, stdin.head);
       if (stdout) process.stdout.write(stdout);
       process.exit(0);
     }
+    if (isMalformedCursorStdin(stdin)) process.exit(1);
     outcome = await handleHook(id, stdin, { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
   } catch (e) { traceHook("handleHook-threw", e instanceof Error ? `${e.message}\n${e.stack}` : String(e)); throw e; }
   traceHook("outcome", { stdoutLength: outcome.stdout.length, exit: outcome.exit });

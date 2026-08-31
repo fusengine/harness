@@ -2,7 +2,6 @@ import { extractText } from "../cache/mcp-response";
 import { activityFor } from "./activity";
 import { mcpPostStore } from "./mcp";
 import { recordActivity } from "./record";
-import { respond } from "./respond";
 import { designGate } from "./design";
 import { postEditContext } from "./lifecycle-bridge";
 import { postTrackingSideEffects } from "./lifecycle/post-tracking";
@@ -12,14 +11,18 @@ import { classifyAgentEvidence, recordAgentEvidence } from "../freshness/agent-e
 import { recordCodexSpawnEvidence } from "../freshness/codex-spawn-evidence";
 import { captureBashReceipt } from "./receipt-capture";
 import { recordCodexPostFailure } from "../tracking/codex-post-failure";
-import { designPassNotice } from "../policy/design/gates";
-import { attachSystemMessage } from "../adapters/claude";
-import { refCreditNoticeFor } from "./notices";
 import { defaultStateDir } from "./paths";
 import { fanOutFiles, firstFileMatch } from "./post-fanout";
+import { postOutcome } from "./post-outcome";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
-import type { Prompt } from "../prompt/types";
+
+function isCursorAfterFileEdit(id: string, payload: Record<string, unknown>): boolean {
+  if (id !== "cursor") return false;
+  const hookEvent = typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
+  if (hookEvent) return /^afterFileEdit$/i.test(hookEvent);
+  return typeof payload.file_path === "string" && Array.isArray(payload.edits);
+}
 
 /**
  * Run the PostToolUse pipeline: store the MCP response, emit a design warning,
@@ -43,8 +46,16 @@ import type { Prompt } from "../prompt/types";
  */
 export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   const { id, payload, event, framework, mcpDir, file, opts } = ctx;
+  const cursorAfterFileEdit = isCursorAfterFileEdit(id, payload);
   const designCacheDir = ctx.designCacheDir ?? mcpDir;
-  const response = payload.tool_response ?? payload.tool_output;
+  let response = payload.tool_response ?? payload.tool_output;
+  if (id === "cursor" && /^afterMCPExecution$/i.test(event.eventName ?? "")) {
+    try {
+      response = typeof payload.result_json === "string" ? JSON.parse(payload.result_json) : payload.result_json;
+    } catch {
+      response = undefined;
+    }
+  }
   mcpPostStore(event.tool, event.input, response, mcpDir);
   const designWarn = designGate(payload, event, designCacheDir, opts.cwd, opts.corpusRoot);
   const activities = activityFor({ tool: event.tool, input: event.input, sessionId: event.sessionId, framework, now: opts.now, responseLength: extractText(response).length });
@@ -60,56 +71,34 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // (Kimi's string `tool_output` would forge a success receipt; see module).
   await captureBashReceipt(file, event.tool, event.command, payload.tool_result, response, opts.now);
   if (id === "codex") recordCodexPostFailure(event.tool, payload.tool_result ?? response, { now: opts.now, dir: defaultStateDir(opts.cwd), sessionId: event.sessionId });
-  // Codex `apply_patch` fans into per-file events here (tracking, SOLID size,
-  // Tailwind, post-edit context, and the notice below); every other tool is a
-  // single-element identity array, so behavior below is unchanged for them.
+  // Codex `apply_patch` and Cursor `afterFileEdit` fan into per-file events for
+  // tracking, validation, post-edit context, and notices.
   const files = fanOutFiles(event);
   for (const f of files) postTrackingSideEffects(opts.scope ?? "core", f, f.input, opts.now, payload, opts.cwd);
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
-  if (seoDeny) return { stdout: seoDeny, exit: 0 };
+  if (seoDeny && !cursorAfterFileEdit) return { stdout: seoDeny, exit: 0 };
   if (opts.scope === "solid") {
     const solidWarn = firstFileMatch(files, checkFileSize);
-    if (solidWarn) return { stdout: solidWarn, exit: 0 };
+    if (solidWarn && !cursorAfterFileEdit) return { stdout: solidWarn, exit: 0 };
   }
   if (opts.scope === "tailwindcss") {
     const tailwindWarn = firstFileMatch(files, validateTailwind);
-    if (tailwindWarn) return { stdout: tailwindWarn, exit: 0 };
+    if (tailwindWarn && !cursorAfterFileEdit) return { stdout: tailwindWarn, exit: 0 };
   }
   if (opts.scope === "aipilot" && (event.tool === "TaskCreate" || event.tool === "TaskUpdate" || event.tool === "Write" || event.tool === "Edit")) {
     const out = await aipilotPostToolUse(payload, opts.cwd, id);
-    if (out) return { stdout: out, exit: 0 };
+    if (out && !cursorAfterFileEdit) return { stdout: out, exit: 0 };
   }
   let extra = "";
   for (const f of files) {
     extra = await postEditContext(opts.scope ?? "core", f, opts.now, id);
     if (extra) break;
   }
-  // Python-parity `post_pass`: user-visible pass notice, merged into whatever else fires
-  // (deny paths above returned already — a deny stays byte-identical). Run
-  // per fanned file (event.tool/filePath/content are always undefined on the
-  // raw apply_patch envelope) and CONCATENATE every non-empty line — unlike
-  // designWarn, a notice is advisory-only, so every file's line is kept, not
-  // just the first.
-  const agentId = typeof payload.agent_id === "string" ? payload.agent_id : "";
-  const noticeLines: string[] = [];
-  for (const f of files) {
-    const n = designPassNotice({ agentId, tool: f.tool, filePath: f.filePath ?? "", content: f.content ?? "", url: "", phase: "post" }, designCacheDir);
-    if (n?.userMessage) noticeLines.push(n.userMessage);
-  }
-  const notice: Prompt | null = noticeLines.length ? { kind: "inform", title: "Design pipeline", reason: "", userMessage: noticeLines.join("\n") } : null;
-  // Compact compliance notice: a skill/SOLID `.md` reference credited by THIS
-  // PostToolUse call (dedup'd against the ×11 hook fan-out inside refCreditNoticeFor).
-  const refNotice = refCreditNoticeFor(activities, event.sessionId, opts.now, defaultStateDir(opts.cwd));
-  const userMessage = [notice?.userMessage, refNotice].filter(Boolean).join("\n") || undefined;
-  if (designWarn) return { stdout: respond(id, userMessage ? { ...designWarn, userMessage } : designWarn, "PostToolUse"), exit: 0 };
-  if (!userMessage) return { stdout: extra, exit: 0 };
-  const withUserMessage: Prompt = notice ? { ...notice, userMessage } : { kind: "inform", title: "Compliance", reason: "", userMessage };
-  if (!extra) return { stdout: respond(id, withUserMessage, "PostToolUse"), exit: 0 };
-  // `extra` is already-rendered Claude-shaped stdout (postEditContext): claude/codex get the
-  // notice attached onto it; other harnesses cannot parse `extra` anyway, so the notice —
-  // rendered natively by respond() — replaces it (cline's pure notice is "", keeping extra;
-  // kimi never inherits the Claude-shaped `extra` — it could not parse it).
-  if (id === "claude-code" || id === "codex") return { stdout: attachSystemMessage(extra, userMessage), exit: 0 };
-  if (id === "kimi") return { stdout: respond(id, withUserMessage, "PostToolUse"), exit: 0 };
-  return { stdout: respond(id, withUserMessage, "PostToolUse") || extra, exit: 0 };
+  return postOutcome({
+    id, agentId: typeof payload.agent_id === "string" ? payload.agent_id : "", sessionId: event.sessionId,
+    now: opts.now, cwd: opts.cwd, activities, files,
+    designCacheDir, designWarn, extra,
+    cursorAfterFileEdit,
+    cursorEventName: typeof payload.hook_event_name === "string" ? payload.hook_event_name : "",
+  });
 }

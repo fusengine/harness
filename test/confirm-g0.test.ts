@@ -16,7 +16,7 @@ const cwd = (): string => mkdtempSync(join(tmpdir(), "fh-confirm-g0-cwd-"));
 const home = (): string => mkdtempSync(join(tmpdir(), "fh-confirm-g0-home-"));
 const sid = (label: string): string => `${label}-${randomUUID()}`;
 
-const pre = (id: string, s: string, command: string) => ({ hook_event_name: "PreToolUse", session_id: s, tool_name: "Bash", tool_input: { command } });
+const pre = (id: string, s: string, command: string) => ({ hook_event_name: "PreToolUse", session_id: s, tool_use_id: randomUUID(), tool_name: "Bash", tool_input: { command } });
 const submit = (s: string, prompt: string) => ({ hook_event_name: "UserPromptSubmit", session_id: s, prompt });
 
 /** Extract the 4-hex-char code from a "Pour autoriser, réponds : CONFIRM xxxx" deny message. */
@@ -46,7 +46,7 @@ test("G0 unit: the cool-down is a monotone window, not a start/stop toggle — i
   expect(consumeConfirmToken(s, hashForAction("anything"), past + 1, h)).toBe(true);
 });
 
-test("G0 wiring: a real SubagentStart/Stop keeps CONFIRM blocked for the WHOLE cool-down window, not just until Stop", async () => {
+test("G0 wiring: explicit subagent prompts stay blocked while provenance-free root prompts bypass the cool-down", async () => {
   // Uses the REAL default OS home (no `home` override) because dispatch.ts's
   // SubagentStart/SubagentStop path does not thread HandleOptions.home — a
   // unique session id keeps this isolated from any other run/session. The
@@ -59,21 +59,21 @@ test("G0 wiring: a real SubagentStart/Stop keeps CONFIRM blocked for the WHOLE c
     const denied = await handleHook("codex", pre("codex", s, cmd), opts);
     const code = codeFromDeny(denied.stdout);
     await handleHook("codex", { hook_event_name: "SubagentStart", session_id: s, agent_id: "a1", agent_type: "x" }, { ...opts, now: 1050 });
-    await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100 });
+    await handleHook("codex", { ...submit(s, `CONFIRM ${code}`), agent_id: "a1", agent_type: "x" }, { ...opts, now: 1100 });
     const stillDenied = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: 1200 });
     expect(JSON.parse(stillDenied.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-    // SubagentStop fires — but there is no decrement/clear anywhere in this
-    // design, so a confirmation attempt shortly after Stop must STILL be blocked.
+
+    await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1225 });
+    const allowedDuringStartCooldown = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: 1230 });
+    expect(allowedDuringStartCooldown.stdout.includes('"permissionDecision":"deny"')).toBe(false);
+
     await handleHook("codex", { hook_event_name: "SubagentStop", session_id: s, agent_id: "a1", agent_type: "x" }, { ...opts, now: 1250 });
-    await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1300 });
-    const stillDeniedAfterStop = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: 1400 });
-    expect(JSON.parse(stillDeniedAfterStop.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-    // Only once the whole window has elapsed since the LAST sighting (the
-    // Stop at 1250) does a fresh confirmation succeed.
-    const past = 1250 + SUBAGENT_WINDOW_MS + 1000;
-    await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: past });
-    const allowedNow = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: past + 100 });
-    expect(allowedNow.stdout.includes('"permissionDecision":"deny"')).toBe(false);
+    const cmdAfterStop = "git commit -m confirm-g0-after-stop";
+    const deniedAfterStop = await handleHook("codex", pre("codex", s, cmdAfterStop), { ...opts, now: 1300 });
+    const codeAfterStop = codeFromDeny(deniedAfterStop.stdout);
+    await handleHook("codex", submit(s, `CONFIRM ${codeAfterStop}`), { ...opts, now: 1350 });
+    const allowedAfterStop = await handleHook("codex", pre("codex", s, cmdAfterStop), { ...opts, now: 1400 });
+    expect(allowedAfterStop.stdout.includes('"permissionDecision":"deny"')).toBe(false);
   } finally {
     rmSync(sessionStatePath(s), { force: true });
   }

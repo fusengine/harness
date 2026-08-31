@@ -86,12 +86,12 @@ export async function allowOutcome(
   if (lesson) {
     const userMessage = [notice?.userMessage, evidenceNotice].filter(Boolean).join("\n") || undefined;
     const merged = userMessage ? { ...lesson, userMessage } : lesson;
-    return { stdout: respond(id, merged), exit: 0 };
+    return { stdout: respond(id, merged, event.eventName ?? "PreToolUse"), exit: 0 };
   }
   if (evidenceNotice) {
     const userMessage = [notice?.userMessage, evidenceNotice].filter(Boolean).join("\n");
     const prompt: Prompt = notice ? { ...notice, userMessage } : { kind: "inform", title: "APEX freshness", reason: "", userMessage };
-    return { stdout: respond(id, prompt), exit: 0 };
+    return { stdout: respond(id, prompt, event.eventName ?? "PreToolUse"), exit: 0 };
   }
-  return { stdout: notice ? respond(id, notice) : "", exit: 0 };
+  return { stdout: notice ? respond(id, notice, event.eventName ?? "PreToolUse") : "", exit: 0 };
 }

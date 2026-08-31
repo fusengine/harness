@@ -8,6 +8,8 @@ export type PromptKind = "ask" | "block" | "inform";
  */
 export interface Prompt {
   kind: PromptKind;
+  /** Stable policy identifier for confirmation diagnostics. */
+  ruleId?: string;
   /** Short title, e.g. "SOLID file-size limit". */
   title: string;
   /** Why this fired. */

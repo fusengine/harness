@@ -2,8 +2,15 @@
 export interface CursorShellPayload {
   command?: string;
   cwd?: string;
+  sandbox?: boolean;
   workspace_roots?: string[];
   hook_event_name?: string;
+}
+
+/** `preToolUse` stdin payload subset consumed by the adapter. */
+export interface CursorToolPayload {
+  tool_name?: string;
+  tool_input?: Record<string, unknown>;
 }
 
 /** `afterFileEdit` stdin payload (subset). */
@@ -12,19 +19,59 @@ export interface CursorEditPayload {
   edits?: { old_string: string; new_string: string }[];
 }
 
-/**
- * `afterFileEdit` stdout response. Its schema (cursor.com/docs/hooks#afterFileEdit)
- * is DELIBERATELY narrower than the "before" hooks: `permission` + `user_message`
- * only — there is NO `agent_message` and NO `updated_input`. Since the edit is
- * already on disk when this "after" hook fires, `deny` cannot revert it and the
- * correction reaches only the HUMAN (`user_message`), never the model — so this
- * path is strictly ADVISORY, not an enforceable gate.
- */
-export interface CursorEditResponse {
-  permission: "allow" | "deny";
-  /** User-visible correction — snake_case (#141516); the only channel afterFileEdit exposes. */
-  user_message?: string;
+/** One extracted Cursor file edit used by runtime post fan-out. */
+export interface CursorExtractedFile {
+  filePath: string;
+  oldString?: string;
+  content: string;
+  op: "update";
 }
+
+/** Shared Cursor extraction result consumed by runtime and public adapter. */
+export interface CursorExtractedEvent {
+  eventName: string;
+  lifecycleEvent: string | null;
+  responseKind: CursorResponseKind;
+  blockable: boolean;
+  cwd?: string;
+  workspaceRoots?: string[];
+  phase: "pre" | "post";
+  tool: string;
+  input: Record<string, unknown>;
+  filePath?: string;
+  content?: string;
+  oldString?: string;
+  command?: string;
+  /** Distinct beforeMCPExecution root and nested commands, in wire order. */
+  commandCandidates?: string[];
+  files?: CursorExtractedFile[];
+}
+
+/** Native Cursor stdout contract selected for one hook event. */
+export type CursorResponseKind =
+  | "permission"
+  | "post-context"
+  | "session-context"
+  | "submit-control"
+  | "followup"
+  | "compact-notice"
+  | "plugin-paths"
+  | "neutral";
+
+/** Routing metadata for a documented Cursor lifecycle event. */
+export interface CursorEventContract {
+  phase: "pre" | "post";
+  lifecycle: string | null;
+  response: CursorResponseKind;
+  blockable: boolean;
+  known: boolean;
+}
+
+/**
+ * Empty afterFileEdit callback. Cursor documents no output fields for this
+ * post hook, so pre-execution permission fields are intentionally impossible.
+ */
+export type CursorEditResponse = Record<string, never>;
 
 /**
  * `beforeShellExecution` stdout response. Message keys are snake_case:
@@ -34,7 +81,6 @@ export interface CursorEditResponse {
  */
 export interface CursorResponse {
   permission: "allow" | "deny" | "ask";
-  continue?: boolean;
   /** User-visible message — snake_case required (#141516, #142589). */
   user_message?: string;
   /** Agent-visible message — snake_case required (#141516, #142589). */

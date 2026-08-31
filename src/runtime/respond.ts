@@ -2,6 +2,7 @@ import { formatPrompt, type Prompt } from "../prompt/types";
 import { denyResponse, contextResponse, informResponse } from "../adapters/claude";
 import { toHermesResponse } from "../adapters/hermes";
 import { toKimiResponse } from "../adapters/kimi";
+import { toCursorResponse } from "../adapters/cursor/respond";
 
 /**
  * Map a portable {@link Prompt} to a harness's native hook response, honoring
@@ -14,8 +15,8 @@ import { toKimiResponse } from "../adapters/kimi";
  * - gemini-cli/cline: their real hook schemas have no interactive "ask"
  *   state (deny is the only blocking outcome), so `ask` and `inform` already
  *   both resolve to non-blocking context injection — unchanged.
- * - cursor: `ask` keeps its current best-effort `permission:"ask"` shape;
- *   only `inform` is fixed to a non-blocking `permission:"allow"` note.
+ * - cursor: `ask` degrades to a native `permission:"deny"` because Cursor does
+ *   not reliably apply `ask` on `preToolUse`; `inform` stays non-blocking.
  * - hermes: delegated to the adapter's `toHermesResponse` — `block` ->
  *   `{decision:"block",reason}`; `ask`/`inform` degrade to non-blocking
  *   `{context}` (Hermes has no interactive "ask" state).
@@ -73,14 +74,7 @@ export function respond(id: string, prompt: Prompt, event: string = "PreToolUse"
       if (userMessage) return JSON.stringify({ ...(reason ? { hookSpecificOutput: { additionalContext: message } } : {}), systemMessage: userMessage });
       return JSON.stringify({ hookSpecificOutput: { additionalContext: message } });
     case "cursor":
-      // snake_case required — camelCase silently ignored (#141516). The preToolUse
-      // output schema documents user_message/agent_message on deny (+ask in the
-      // official examples), NOT on allow — the allow-notice below is best-effort.
-      if (kind === "inform") {
-        if (userMessage) return JSON.stringify({ permission: "allow", user_message: userMessage, ...(reason ? { agent_message: message } : {}) });
-        return JSON.stringify({ permission: "allow", user_message: message, agent_message: message });
-      }
-      return JSON.stringify({ permission: kind === "block" ? "deny" : "ask", continue: false, user_message: message, agent_message: message });
+      return toCursorResponse(prompt, event === "PreToolUse" ? "preToolUse" : event);
     case "hermes":
       // Single source of truth for the Hermes wire shape lives in the adapter
       // (same JSON.stringify contract as the inline cases above).

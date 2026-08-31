@@ -1,41 +1,55 @@
 {
   "name": "cursor-shell-destructive-deny",
   "harness": "cursor",
-  "doc": "Cursor `beforeShellExecution` can block a shell command (cursor.com/docs/hooks). The harness routes through the shared evaluate() chain and respond.ts:55-63 renders the cursor envelope: `{permission:\"deny\"|\"ask\", continue:false, user_message, agent_message}` — snake_case required (#141516/#142589, camelCase silently ignored). A destructive git force-push and a heredoc-into-code-file both deny; a plain read allows (empty stdout). Real output verified 2026-07-06 against `bun src/cli/bin.ts hook cursor core`. NOTE: cursor `afterFileEdit` is observe-only (cannot block) — file-edit enforcement on Cursor is best-effort, unlike the shell path proven here.",
+  "doc": "Documented Cursor beforeShellExecution and preToolUse payloads reach the shared runtime gate. Git force-push, dependency install, and a heredoc write to code all deny; a benign read returns native permission allow.",
   "env": { "FUSE_ENFORCE_TTL_SEC": "3600" },
   "steps": [
     {
       "scope": "core",
-      "doc": "`git push --force` → GIT_BLOCKED deny → `permission:\"deny\"` (respond.ts:63). Asserts the permission field, the load-bearing shell-block signal Cursor honors.",
+      "doc": "Documented beforeShellExecution top-level command → GIT_BLOCKED → native permission deny.",
       "event": {
         "hook_event_name": "beforeShellExecution",
-        "session_id": "sc21",
-        "tool_name": "Bash",
-        "tool_input": { "command": "git push origin main --force" }
+        "session_id": "sc21-force",
+        "command": "git push origin main --force",
+        "cwd": "$TMP",
+        "sandbox": false
       },
       "expect": { "exit": 0, "stdout": { "jsonPath": "permission", "equals": "deny" } }
     },
     {
       "scope": "core",
-      "doc": "Heredoc redirected into a .ts file → bashWriteGuard deny, same `permission:\"deny\"` envelope. Proves the runGuards chain (not just the git gate) reaches the cursor shell path. Assert the [BLOCKED] tag in user_message.",
+      "doc": "Documented preToolUse Shell payload → dependency-install ask degraded to native permission deny.",
+      "event": {
+        "hook_event_name": "preToolUse",
+        "session_id": "sc21-install",
+        "tool_name": "Shell",
+        "tool_input": { "command": "npm install", "working_directory": "$TMP" }
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "permission", "equals": "deny" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Documented beforeShellExecution heredoc write → shared bashWriteGuard deny.",
       "event": {
         "hook_event_name": "beforeShellExecution",
-        "session_id": "sc21",
-        "tool_name": "Bash",
-        "tool_input": { "command": "cat <<EOF > $TMP/x.ts\nexport const x = 1;\nEOF" }
+        "session_id": "sc21-heredoc",
+        "command": "cat <<EOF > $TMP/x.ts\nexport const x = 1;\nEOF",
+        "cwd": "$TMP",
+        "sandbox": false
       },
       "expect": { "exit": 0, "stdout": { "contains": "[BLOCKED] Bash write to code file" } }
     },
     {
       "scope": "core",
-      "doc": "A plain read (`ls`) → allowed → empty stdout (verified). Parity: a benign shell command is silent on cursor, exactly like every other harness.",
+      "doc": "A documented benign beforeShellExecution payload returns native permission allow.",
       "event": {
         "hook_event_name": "beforeShellExecution",
-        "session_id": "sc21",
-        "tool_name": "Bash",
-        "tool_input": { "command": "ls -la $TMP" }
+        "session_id": "sc21-read",
+        "command": "ls -la $TMP",
+        "cwd": "$TMP",
+        "sandbox": true
       },
-      "expect": { "exit": 0, "stdout": { "empty": true } }
+      "expect": { "exit": 0, "stdout": { "jsonPath": "permission", "equals": "allow" } }
     }
   ]
 }

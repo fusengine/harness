@@ -1,17 +1,21 @@
 import { parseApplyPatch } from "../adapters/codex/apply-patch";
+import { extractCursorEvent } from "../adapters/cursor/normalize";
 import { commandToString } from "./command-string";
 import { canonicalizeCodexShellTool } from "./codex-shell-tool";
 import { canonicalizeMcpToolName } from "./mcp-tool-name";
 
-/** One file fanned out of a multi-file edit primitive (Codex `apply_patch`). */
+/** One file/edit fanned out from Codex `apply_patch` or Cursor `afterFileEdit`. */
 export interface NormalizedFile {
   filePath: string;
   content: string;
+  oldString?: string;
   op: "add" | "update" | "delete";
 }
 
 /** A hook event normalized across harnesses. */
 export interface NormalizedEvent {
+  /** Native event name when the adapter exposes one explicitly (Cursor). */
+  eventName?: string;
   phase: "pre" | "post";
   tool: string;
   input: Record<string, unknown>;
@@ -21,15 +25,21 @@ export interface NormalizedEvent {
   /** Edit only: the tool_input.old_string being replaced — lets the file-size gate (policy/evaluate.ts + policy/edit-outcome.ts) compute the post-edit outcome instead of judging the stale on-disk count alone. Undefined for Write (no such field) and for cline/apply_patch (parsed separately, no equivalent field). */
   oldString?: string;
   command?: string;
+  /** Cursor-only independent command candidates from beforeMCPExecution. */
+  commandCandidates?: string[];
   /** Subagent type, if the tool-use came from one (Explore/Plan are file-size-exempt). */
   agentType?: string;
   /** Harness-resolved permission mode (Claude emits it natively; Codex maps `AskForApproval::Never` to the same "bypassPermissions" string — see adapters/codex/permission-mode.ts). Generic field, Codex-only consumer today. */
   permissionMode?: string;
+  /** Codex logical tool-use identity, shared by sibling hook callbacks. */
+  toolUseId?: string;
+  /** Harness-reported working directory used to scope Codex authorization. */
+  cwd?: string;
+  /** Validated Cursor multi-root workspace paths in wire order. */
+  workspaceRoots?: string[];
   /**
-   * Per-file changes when the tool is a multi-file edit primitive (Codex
-   * `apply_patch`). Present ONLY for `apply_patch`; the file gates OR each
-   * entry's verdict so one violating hunk blocks the whole envelope. Left
-   * undefined for every other tool/harness (single-file `filePath`/`content`).
+   * Per-file changes for Codex `apply_patch` and per-edit changes for Cursor
+   * `afterFileEdit`; undefined for single-file events.
    */
   files?: NormalizedFile[];
 }
@@ -39,9 +49,7 @@ function str(v: unknown): string | undefined {
 }
 
 /**
- * Normalize a harness hook payload into a uniform event. Handles Cline's nested
- * `preToolUse`/`postToolUse` shape and the top-level `tool_name`/`tool_input`
- * shape used by Claude, Codex, Gemini, and Cursor.
+ * Normalize a hook payload, including Cline nesting and native Cursor events.
  */
 export function normalizeEvent(id: string, payload: Record<string, unknown>): NormalizedEvent {
   if (id === "cline") {
@@ -58,6 +66,14 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
       command: str(params.command),
     };
   }
+  if (id === "cursor") {
+    return {
+      ...extractCursorEvent(payload),
+      sessionId: str(payload.session_id) ?? str(payload.conversation_id) ?? "",
+      agentType: str(payload.agent_type),
+      permissionMode: str(payload.permission_mode),
+    };
+  }
   const event = str(payload.hook_event_name) ?? "";
   const input = (payload.tool_input as Record<string, unknown> | undefined) ?? payload;
   const tool = canonicalizeCodexShellTool(id, canonicalizeMcpToolName(id, str(payload.tool_name) ?? ""));
@@ -68,6 +84,8 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     sessionId: str(payload.session_id) ?? str(payload.conversation_id) ?? "",
     agentType: str(payload.agent_type) ?? str(input.subagent_type),
     permissionMode: str(payload.permission_mode),
+    toolUseId: str(payload.tool_use_id),
+    cwd: str(payload.cwd),
   };
   // Codex's `apply_patch` (its PRIMARY edit primitive) carries the whole change
   // set as a freeform patch in `command` — no `file_path`/`content`, so the
