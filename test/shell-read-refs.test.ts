@@ -59,3 +59,7 @@ test("absent/unparseable command yields nothing", () => {
 test("a flag-like token ending in .md is not credited", () => {
   expect(shellReadRefPaths("cat --foo.md")).toEqual([]);
 });
+
+test("greater-than inside a quoted rg pattern does not hide the read target", () => {
+  expect(shellReadRefPaths('rg "x > y" docs/reference.md')).toEqual(["docs/reference.md"]);
+});

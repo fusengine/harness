@@ -1,8 +1,9 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
 import { hasSafeWriteTarget, isSafeCommandTarget, isSafeWritePath } from "./bash-write-safe-paths";
+import { shellOutputRedirects } from "./bash-write-redirects";
 import {
-  ASK_WRITERS, CODE_COMMAND_WRITE, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, NODE_WRITES,
+  ASK_WRITERS, CODE_COMMAND_WRITE, CODE_MUTATORS, NODE_WRITES,
   PYTHON_C_ANCHOR, PYTHON_WRITES, RUBY_WRITES, SAFE_PREFIXES, SESSION_STATE_FRAGMENT,
 } from "./bash-write-patterns";
 
@@ -11,8 +12,8 @@ export { ASK_WRITERS, CODE_MUTATORS, CODE_REDIRECT, FILE_REDIRECT, SAFE_PREFIXES
 function blockCodeWrite(reason: string): Prompt {
   return { kind: "block", title: "Bash write to code file", reason, actions: ["Use the Write/Edit tool instead"] };
 }
-function askFileWrite(reason: string): Prompt {
-  return { kind: "ask", title: "Bash file write", reason, actions: ["Use the Write/Edit tool instead"] };
+function askFileWrite(reason: string, ruleId = "bash-write:file-write"): Prompt {
+  return { kind: "ask", ruleId, title: "Bash file write", reason, actions: ["Use the Write/Edit tool instead"] };
 }
 
 /**
@@ -33,6 +34,7 @@ export function bashWriteGuard(ctx: GuardContext): Prompt | null {
   if (ctx.tool !== "Bash" || !ctx.command) return null;
   const cmd: string = ctx.command;
   const stripped = cmd.trim();
+  const redirects = shellOutputRedirects(cmd).filter((redirect) => redirect.target !== "/dev/null");
 
   const mutator = CODE_MUTATORS.find((m) => m.re.test(cmd));
   if (mutator) return blockCodeWrite(`${mutator.desc} — Use Edit/Write tools instead`);
@@ -41,7 +43,7 @@ export function bashWriteGuard(ctx: GuardContext): Prompt | null {
     return blockCodeWrite("Python inline script mutates files/spawns a process — Use Edit/Write tools instead");
   }
 
-  if (SAFE_PREFIXES.some((p) => stripped.startsWith(p)) && !FILE_REDIRECT.test(stripped)) {
+  if (SAFE_PREFIXES.some((p) => stripped.startsWith(p)) && redirects.length === 0) {
     return null;
   }
 
@@ -54,11 +56,11 @@ export function bashWriteGuard(ctx: GuardContext): Prompt | null {
     };
   }
 
-  if (FILE_REDIRECT.test(cmd)) {
+  if (redirects.length > 0) {
     if (isSafeWritePath(cmd)) return null;
-    return CODE_REDIRECT.test(cmd)
+    return redirects.some((redirect) => /\.(?:ts|tsx|js|jsx|py|go|rb|rs|java|kt|php|swift|vue|svelte|astro|css|c|cpp|h)\b/.test(redirect.target))
       ? blockCodeWrite("Bash redirect to code file — Use Write/Edit tools (enforces APEX + SOLID specs)")
-      : askFileWrite("Shell redirect to file detected. Authorize?");
+      : askFileWrite("Shell redirect to file detected. Authorize?", "bash-write:file-redirect");
   }
 
   if (/\bnode\s+-e\b/.test(cmd) && NODE_WRITES.test(cmd)) {

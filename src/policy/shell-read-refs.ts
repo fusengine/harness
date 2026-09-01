@@ -16,6 +16,7 @@
  * @packageDocumentation
  */
 import { commandToString } from "../runtime/command-string";
+import { shellOutputRedirects } from "./guards/bash-write-redirects";
 
 /** Read-only shell commands that can target a `.md` reference by path. */
 const READ_COMMANDS = new Set(["cat", "head", "tail", "sed", "rg", "ripgrep", "less", "more", "bat"]);
@@ -33,8 +34,8 @@ function segments(command: string): string[] {
 
 /** Strip a redirection (`>`, `>>`, `<`, `2>`, `&>`, …) and everything after — its target is WRITTEN, not read. */
 function beforeRedirect(segment: string): string {
-  const m = segment.match(/\s(?:\d*>{1,2}|<|&>)\s*\S/);
-  return m ? segment.slice(0, m.index) : segment;
+  const first = shellOutputRedirects(segment)[0];
+  return first ? segment.slice(0, first.start) : segment;
 }
 
 /** Naive shell tokenizer: whitespace-split, stripping one matching layer of quotes per token. */

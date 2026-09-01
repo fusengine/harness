@@ -1,6 +1,7 @@
 import { join, normalize } from "node:path";
 import { homedir } from "node:os";
 import { claudeHome, fusengineCache } from "../../runtime/home-state";
+import { shellOutputRedirects } from "./bash-write-redirects";
 
 /**
  * Writable paths the harness owns — writes here never need Write/Edit's APEX
@@ -22,16 +23,12 @@ function resolvePath(raw: string): string {
   return normalize(expanded.replace(/\$HOME/g, homedir()));
 }
 
-/** Extract the file path after a `>`/`>>` redirect (parity extract_redirect_target). */
-function extractRedirectTarget(cmd: string): string | null {
-  const m = cmd.match(/>>\s*(\S+)|(?<![0-9&])>\s*(\S+)/);
-  return m ? resolvePath(m[1] ?? m[2] ?? "") : null;
-}
-
 /** True when a `>`/`>>` redirect targets a harness-owned safe path (parity is_safe_write_path). */
 export function isSafeWritePath(cmd: string): boolean {
-  const target = extractRedirectTarget(cmd);
-  return target !== null && SAFE_WRITE_PATHS.some((safe) => target === safe || target.startsWith(safe + "/"));
+  const targets = shellOutputRedirects(cmd)
+    .map((redirect) => resolvePath(redirect.target))
+    .filter((target) => target !== "/dev/null");
+  return targets.length > 0 && targets.every((target) => SAFE_WRITE_PATHS.some((safe) => target === safe || target.startsWith(safe + "/")));
 }
 
 /** Extract the file argument of `tee`/`dd of=` (parity extract_command_target). */

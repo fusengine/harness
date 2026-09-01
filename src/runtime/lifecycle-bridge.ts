@@ -1,6 +1,8 @@
 import { dispatchLifecycle, postEditTypescript, trackSessionChanges, type PluginScope } from "./lifecycle";
 import { autoDocumentRead } from "./lifecycle/auto-document-reads";
 import { contextResponse } from "../adapters/claude";
+import { cursorEventContract } from "../adapters/cursor/events";
+import { toCursorLifecycleResponse } from "../adapters/cursor/respond";
 import type { NormalizedEvent } from "./normalize";
 
 /** Raw event name from a payload (Cline lacks one; lifecycle is Claude-only). */
@@ -32,7 +34,20 @@ function additionalContextOf(stdout: string): string {
  * @returns The native stdout, or `null` when unhandled.
  */
 export function lifecycleStdout(payload: Record<string, unknown>, cwd: string, scope: PluginScope, now: number, id: string = "claude-code"): string | null {
-  return dispatchLifecycle({ event: rawEvent(payload), payload, cwd, scope, now, id });
+  const wireEvent = rawEvent(payload);
+  if (id !== "cursor") return dispatchLifecycle({ event: wireEvent, payload, cwd, scope, now, id });
+  const lifecycleEvent = cursorEventContract(wireEvent).lifecycle;
+  if (lifecycleEvent === null) return null;
+  const sessionId = typeof payload.session_id === "string" ? payload.session_id : payload.conversation_id;
+  const stdout = dispatchLifecycle({
+    event: lifecycleEvent,
+    payload: { ...payload, session_id: sessionId },
+    cwd,
+    scope,
+    now,
+    id,
+  });
+  return stdout === null ? null : toCursorLifecycleResponse(stdout, wireEvent);
 }
 
 /**

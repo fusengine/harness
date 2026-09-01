@@ -1,5 +1,6 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
+import { shellOutputRedirects } from "./bash-write-redirects";
 
 /**
  * Path fragments that mark a location as internal/generated state.
@@ -65,7 +66,7 @@ function extractWriteTargets(cmd: string): string[] {
     const v: string = unquote((t ?? "").trim());
     if (v && v !== "/dev/null") out.push(v);
   };
-  for (const m of cmd.matchAll(/(?<![2&\d])>{1,2}\s*('[^']+'|"[^"]+"|\S+)/g)) push(m[1]);
+  for (const redirect of shellOutputRedirects(cmd)) push(redirect.target);
   for (const m of cmd.matchAll(/\btee\b(?:\s+-\S+)*\s+('[^']+'|"[^"]+"|\S+)/g)) push(m[1]);
   for (const m of cmd.matchAll(/\bdd\b[^|;&]*\bof=('[^']+'|"[^"]+"|\S+)/g)) push(m[1]);
   for (const seg of cmd.split(/[;&|]+/)) {

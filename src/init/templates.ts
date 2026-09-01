@@ -33,17 +33,22 @@ export function codexInit(command: string): InitFile[] {
     content: json({ hooks: {
       PreToolUse: [{ matcher: "Bash|apply_patch", hooks: [{ type: "command", command }] }],
       PostToolUse: [{ matcher: "", hooks: [{ type: "command", command }] }],
+      UserPromptSubmit: [{ matcher: "", hooks: [{ type: "command", command }] }],
     } }),
   }];
 }
 
-/** Cursor: `.cursor/hooks.json` (version 1) — shell + tool gate + file-edit observe. */
+/** Cursor: `.cursor/hooks.json` (version 1) — supported pre gates and post observers. */
 export function cursorInit(command: string): InitFile[] {
   return [{
     path: ".cursor/hooks.json",
     content: json({ version: 1, hooks: {
-      beforeShellExecution: [{ command }],
-      preToolUse: [{ command }],
+      beforeShellExecution: [{ command, failClosed: true }],
+      preToolUse: [{ command, failClosed: true }],
+      beforeMCPExecution: [{ command, failClosed: true }],
+      beforeReadFile: [{ command, failClosed: true }],
+      afterShellExecution: [{ command }],
+      postToolUse: [{ command }],
       afterFileEdit: [{ command }],
     } }),
   }];

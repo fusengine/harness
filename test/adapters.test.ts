@@ -1,21 +1,22 @@
 import { test, expect } from "bun:test";
-import { beforeShellExecution, afterFileEdit } from "../src/adapters/cursor";
+import { beforeShellExecution, preToolUse as cursorPreToolUse, afterFileEdit } from "../src/adapters/cursor";
 import { preToolUse } from "../src/adapters/cline";
 import { beforeTool } from "../src/adapters/gemini";
 import { resolveMaxLines } from "../src/config/limits";
 
-// Tracks the gate's own resolver (`FUSE_SOLID_MAX_LINES` ?? default) so this
-// fixture stays oversized regardless of the ambient env override.
 const oversized = "x\n".repeat(resolveMaxLines() + 50);
 
-test("cursor: shell deny on git --force, allow safe; edit is advisory (user_message only)", () => {
+test("cursor: shell deny on git --force, allow safe; edit returns no unsupported fields", () => {
   expect(beforeShellExecution({ command: "git push --force" }).permission).toBe("deny");
   expect(beforeShellExecution({ command: "git status" }).permission).toBe("allow");
-  // afterFileEdit is advisory: ALWAYS allow (never a false deny), violation rides user_message.
-  const advice = afterFileEdit({ file_path: "a.ts", edits: [{ old_string: "", new_string: oversized }] });
-  expect(advice.permission).toBe("allow");
-  expect(advice.user_message).toContain("max");
-  expect(afterFileEdit({ file_path: "a.ts", edits: [{ old_string: "", new_string: "x" }] }).user_message).toBeUndefined();
+  expect(afterFileEdit({ file_path: "a.ts", edits: [{ old_string: "", new_string: "x\n".repeat(250) }] })).toEqual({});
+  expect(afterFileEdit({ file_path: "a.ts", edits: [{ old_string: "", new_string: "x" }] })).toEqual({});
+});
+
+test("cursor: native shell events share extraction and degrade install asks to deny", () => {
+  expect(beforeShellExecution({ command: "npm install", cwd: "/project", sandbox: false }).permission).toBe("deny");
+  expect(cursorPreToolUse({ tool_name: "Shell", tool_input: { command: "npm install", working_directory: "/project" } }).permission).toBe("deny");
+  expect(cursorPreToolUse({ tool_name: "Shell", tool_input: { command: "git status" } }).permission).toBe("allow");
 });
 
 test("cline: cancel on oversized code, pass small", () => {

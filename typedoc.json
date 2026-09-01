@@ -5,6 +5,7 @@
   "exclude": ["**/*.test.ts", "**/cli/bin.ts"],
   "out": "docs/api",
   "readme": "none",
+  "disableSources": true,
   "skipErrorChecking": true,
   "excludeInternal": true,
   "githubPages": false,

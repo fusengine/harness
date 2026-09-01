@@ -18,12 +18,43 @@ test("normalizeEvent: claude pre/post + cline nesting", () => {
   expect(c.filePath).toBe("a.ts");
 });
 
+test("normalizeEvent: documented Cursor shell hooks arm Bash guards", () => {
+  const before = normalizeEvent("cursor", { hook_event_name: "beforeShellExecution", command: "git push --force", cwd: "/project", sandbox: false });
+  expect([before.phase, before.tool, before.command]).toEqual(["pre", "Bash", "git push --force"]);
+  const generic = normalizeEvent("cursor", { hook_event_name: "preToolUse", tool_name: "Shell", tool_input: { command: "npm install", working_directory: "/project" } });
+  expect([generic.phase, generic.tool, generic.command]).toEqual(["pre", "Bash", "npm install"]);
+  const write = normalizeEvent("cursor", { hook_event_name: "preToolUse", tool_name: "Write", tool_input: {} });
+  expect([write.phase, write.tool, write.input]).toEqual(["pre", "Edit", {}]);
+});
+
+test("normalizeEvent: documented Cursor afterFileEdit derives Edit and preserves every edit", () => {
+  const event = normalizeEvent("cursor", {
+    hook_event_name: "afterFileEdit",
+    file_path: "/project/src/app.ts",
+    edits: [
+      { old_string: "const a = 1", new_string: "const a = 2" },
+      { old_string: "const b = 1", new_string: "const b = 2" },
+    ],
+  });
+  expect([event.phase, event.tool, event.filePath]).toEqual(["post", "Edit", "/project/src/app.ts"]);
+  expect(event.content).toBe("const a = 2\nconst b = 2");
+  expect(event.files?.map(({ filePath, oldString, content, op }) => [filePath, oldString, content, op])).toEqual([
+    ["/project/src/app.ts", "const a = 1", "const a = 2", "update"],
+    ["/project/src/app.ts", "const b = 1", "const b = 2", "update"],
+  ]);
+});
+
 test("respond: native block shape per harness", () => {
   const p = { kind: "block", title: "t", reason: "r" } as const;
   expect(JSON.parse(respond("claude-code", p)).hookSpecificOutput.permissionDecision).toBe("deny");
   expect(JSON.parse(respond("gemini-cli", p)).decision).toBe("deny");
   expect(JSON.parse(respond("cline", p)).cancel).toBe(true);
   expect(JSON.parse(respond("cursor", p)).permission).toBe("deny");
+});
+
+test("respond: Cursor degrades policy ask to native deny", () => {
+  const ask = { kind: "ask", title: "Dependency install", reason: "confirm" } as const;
+  expect(JSON.parse(respond("cursor", ask)).permission).toBe("deny");
 });
 
 test("respond: hookEventName defaults to PreToolUse, a POST-phase caller stamps the real event (PostToolUse→PreToolUse fix)", () => {

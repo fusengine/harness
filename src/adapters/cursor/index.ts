@@ -1,46 +1,43 @@
-/**
- * Cursor adapter (hook-mode). Schemas per cursor.com/docs/hooks (2026):
- * `beforeShellExecution` can block; `afterFileEdit` is observe-only.
- */
+/** Cursor hook adapter; post-edit handling remains observe-only. */
 import { evaluate } from "../../policy/evaluate";
-import { formatPrompt, type PromptKind } from "../../prompt/types";
-import type { CursorShellPayload, CursorEditPayload, CursorResponse, CursorEditResponse } from "./interfaces/types";
+import { formatPrompt } from "../../prompt/types";
+import { extractCursorEvent } from "./normalize";
+import type { CursorShellPayload, CursorToolPayload, CursorEditPayload, CursorResponse, CursorEditResponse } from "./interfaces/types";
 
-export type { CursorShellPayload, CursorEditPayload, CursorResponse, CursorEditResponse } from "./interfaces/types";
+export type { CursorShellPayload, CursorToolPayload, CursorEditPayload, CursorResponse, CursorEditResponse } from "./interfaces/types";
 
-function toPermission(kind: PromptKind): "allow" | "deny" | "ask" {
-  return kind === "block" ? "deny" : kind === "ask" ? "ask" : "allow";
+function guardCursor(payload: object): CursorResponse {
+  const event = extractCursorEvent(payload);
+  const result = evaluate({ tool: event.tool, filePath: event.filePath, content: event.content, oldString: event.oldString, command: event.command });
+  if (result.decision === "allow" || !result.prompt) return { permission: "allow" };
+  const message = formatPrompt(result.prompt);
+  const userMessage = result.prompt.kind === "ask"
+    ? `[downgraded from ask — Cursor preToolUse does not reliably enforce ask]\n${message}`
+    : message;
+  return { permission: "deny", user_message: userMessage, agent_message: message };
+}
+
+function namedPayload(payload: object, eventName: string): object {
+  return Object.hasOwn(payload, "hook_event_name") ? payload : { ...payload, hook_event_name: eventName };
 }
 
 /** Guard a shell command (git/install policies). */
 export function beforeShellExecution(payload: CursorShellPayload): CursorResponse {
-  const r = evaluate({ tool: "Bash", command: payload.command });
-  if (r.decision === "allow" || !r.prompt) return { permission: "allow" };
-  const msg = formatPrompt(r.prompt);
-  return { permission: toPermission(r.prompt.kind), continue: false, user_message: msg, agent_message: msg };
+  return guardCursor(namedPayload(payload, "beforeShellExecution"));
+}
+
+/** Guard a generic Cursor tool call using the same extraction as the runtime. */
+export function preToolUse(payload: CursorToolPayload): CursorResponse {
+  return guardCursor(namedPayload(payload, "preToolUse"));
 }
 
 /**
- * Advise on a file edit AFTER Cursor has written it — a HUMAN-VISIBLE audit note,
- * never a gate. This is an "after" hook: the edit is already on disk. On a
- * SOLID/DRY violation we surface the correction through `user_message` (the only
- * channel afterFileEdit exposes — no `agent_message`, so the model is never
- * re-informed) while ALWAYS returning `permission: "allow"`.
- *
- * We deliberately never emit `permission: "deny"` here, for two distinct reasons:
- * (1) structural — afterFileEdit was "informational only" at launch (Chacon,
- * Cursor hooks beta 1.7, 2025-09: no channel to stop the agent), and a post-write
- * deny has no documented rollback; (2) empirical — Cursor staff confirm the
- * deny-enforcement path is broken for file operations (forum.cursor.com/t/154377,
- * v2.6.18, 2026-03, open) — proven for file READS, plausibly the same for writes.
- * So a `deny` would be a false blocking signal; `allow` + `user_message` is the
- * only proven-safe shape.
+ * Complete an observed file edit without emitting pre-execution permission
+ * fields. Cursor does not define a callback schema for this post hook.
  * @param payload - The `afterFileEdit` stdin payload.
- * @returns Always an allow; carries the user-visible correction on a violation.
+ * @returns An empty successful response.
  */
 export function afterFileEdit(payload: CursorEditPayload): CursorEditResponse {
-  const content = payload.edits?.map((e) => e.new_string).join("\n") ?? "";
-  const r = evaluate({ tool: "Edit", filePath: payload.file_path, content });
-  if (r.decision !== "deny" || !r.prompt) return { permission: "allow" };
-  return { permission: "allow", user_message: formatPrompt(r.prompt) };
+  void payload;
+  return {};
 }

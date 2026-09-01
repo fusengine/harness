@@ -20,6 +20,23 @@ test("asks before redirect to a non-code file", () => {
   expect(bashWriteGuard({ tool: "Bash", command: "echo log >> out.txt" })?.kind).toBe("ask");
 });
 
+test("quoted and escaped greater-than characters are not shell redirects", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "rg '->between' fichier.php" })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: 'rg "x > y" fichier.php' })).toBeNull();
+  expect(bashWriteGuard({ tool: "Bash", command: "rg x\\>y fichier.php" })).toBeNull();
+});
+
+test("active redirects include fd append and are found after a quoted motif", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: "command 2>> errors.log" })?.kind).toBe("ask");
+  expect(bashWriteGuard({ tool: "Bash", command: "rg '->between' fichier.php > result.log" })?.kind).toBe("ask");
+  expect(bashWriteGuard({ tool: "Bash", command: "rg '->between' fichier.php > result.ts" })?.kind).toBe("block");
+});
+
+test("redirects inside command substitutions stay active, including within double quotes", () => {
+  expect(bashWriteGuard({ tool: "Bash", command: 'echo "$(printf x > result.log)"' })?.kind).toBe("ask");
+  expect(bashWriteGuard({ tool: "Bash", command: 'echo "$(printf x > result.ts)"' })?.kind).toBe("block");
+});
+
 test("passes a plain read + non-Bash tool", () => {
   expect(bashWriteGuard({ tool: "Bash", command: "ls -la src" })).toBeNull();
   expect(bashWriteGuard({ tool: "Write", command: "sed -i x a.ts" })).toBeNull();

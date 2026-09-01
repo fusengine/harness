@@ -9,7 +9,26 @@ test("templates: pre + post wiring per harness", () => {
   const claude = JSON.parse(claudeInit("c")[0]!.content) as { hooks: { PreToolUse: { matcher: string }[]; PostToolUse: unknown[] } };
   expect(claude.hooks.PreToolUse[0]?.matcher).toBe("Write|Edit|Bash");
   expect(claude.hooks.PostToolUse.length).toBe(1);
-  expect((JSON.parse(cursorInit("x")[0]!.content) as { version: number }).version).toBe(1);
+  const cursor = JSON.parse(cursorInit("x")[0]!.content) as {
+    version: number;
+    hooks: Record<string, { command: string; failClosed?: boolean }[]>;
+  };
+  expect(cursor.version).toBe(1);
+  expect(Object.keys(cursor.hooks)).toEqual([
+    "beforeShellExecution",
+    "preToolUse",
+    "beforeMCPExecution",
+    "beforeReadFile",
+    "afterShellExecution",
+    "postToolUse",
+    "afterFileEdit",
+  ]);
+  for (const event of ["beforeShellExecution", "preToolUse", "beforeMCPExecution", "beforeReadFile"]) {
+    expect(cursor.hooks[event]).toEqual([{ command: "x", failClosed: true }]);
+  }
+  for (const event of ["afterShellExecution", "postToolUse", "afterFileEdit"]) {
+    expect(cursor.hooks[event]).toEqual([{ command: "x" }]);
+  }
   const gemini = JSON.parse(geminiInit("x")[0]!.content) as { hooks: { AfterTool: unknown[] } };
   expect(gemini.hooks.AfterTool.length).toBe(1);
   const cline = clineInit("npx harness hook cline");

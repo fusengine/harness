@@ -17,6 +17,10 @@ import { resetFragmentRegistry } from "./fragment-registry";
 import { attachBudgetRecap } from "./inject-budget-recap";
 import { promptText } from "./prompt-text";
 import { handleConfirmSubmit } from "./confirm/confirm-submit";
+import { submitCodexConfirmation } from "./confirm/codex-confirm";
+import { codexPromptOrigin } from "./confirm/codex-prompt-origin";
+import { cursorProjectCwd } from "../adapters/cursor/context";
+import { toCursorLifecycleResponse } from "../adapters/cursor/respond";
 import type { HandleOptions, HandleOutcome } from "./handle-types";
 export type { HandleOptions, HandleOutcome } from "./handle-types";
 
@@ -31,8 +35,17 @@ function rawEventName(payload: Record<string, unknown>): string {
  * POST event it records the activity into the track. The loop that makes the
  * package behave like the Claude plugin, on any harness.
  */
-export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
+async function handleHookCore(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
   const event = normalizeEvent(id, payload);
+  if (id === "cursor") {
+    const cursorCwd = cursorProjectCwd(event.cwd, event.workspaceRoots ?? [], event.filePath, opts.cwd);
+    if (cursorCwd !== opts.cwd) opts = { ...opts, cwd: cursorCwd };
+  }
+  const rawPrompt = payload.prompt;
+  const userPrompt = typeof rawPrompt === "string" || Array.isArray(rawPrompt) ? promptText(rawPrompt) : undefined;
+  if (id === "codex" && rawEventName(payload) === "UserPromptSubmit" && userPrompt !== undefined) {
+    submitCodexConfirmation(event.sessionId, userPrompt, opts.now, opts.home, codexPromptOrigin(payload));
+  }
   // Fresh slate for this invocation's capFragment tally — one hook event is
   // exactly one lifecycle branch below (see dispatchLifecycle), so a single
   // reset here can never mix fragments across unrelated events.
@@ -79,10 +92,8 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   // blocks on Kimi (see promptText) — either shape is normalized to text;
   // anything else (field absent, or an unrecognized type) stays `undefined`
   // so the block below is skipped exactly as before promptText existed.
-  const rawPrompt = payload.prompt;
-  const userPrompt = typeof rawPrompt === "string" || Array.isArray(rawPrompt) ? promptText(rawPrompt) : undefined;
   if (userPrompt !== undefined) {
-    handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
+    if (id !== "codex") handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
     await withTrack(file, (track) => recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
     return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
   }
@@ -92,4 +103,14 @@ export async function handleHook(id: string, payload: Record<string, unknown>, o
   }
 
   return handlePre({ id, payload, event, framework, mcpDir, designCacheDir, file, opts });
+}
+
+/**
+ * Run one hook and adapt every Cursor scope outcome at the common runtime exit.
+ * Other harnesses retain the core handler's stdout and exit status unchanged.
+ */
+export async function handleHook(id: string, payload: Record<string, unknown>, opts: HandleOptions): Promise<HandleOutcome> {
+  const outcome = await handleHookCore(id, payload, opts);
+  if (id !== "cursor") return outcome;
+  return { ...outcome, stdout: toCursorLifecycleResponse(outcome.stdout, rawEventName(payload)) };
 }

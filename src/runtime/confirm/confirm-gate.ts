@@ -3,6 +3,7 @@ import { displayCodeForAction, hashForAction } from "./confirm-code";
 import { isIrreversible } from "./confirm-irreversible";
 import { recordPendingDeny } from "./confirm-pending";
 import { consumeConfirmToken } from "./confirm-state";
+import { authorizeCodexAction, codexAction } from "./codex-confirm";
 
 /**
  * Harnesses where `respond.ts` silently downgrades `kind: "ask"` to a hard
@@ -29,9 +30,26 @@ export type ConfirmVerdict = { allow: true } | { allow: false; prompt: Prompt };
  * @param now - Epoch ms.
  * @param home - Test-only OS home override.
  */
-export function confirmGate(id: string, prompt: Prompt, command: string | undefined, sessionId: string, now: number, home?: string): ConfirmVerdict | null {
+export function confirmGate(
+  id: string,
+  prompt: Prompt,
+  command: string | undefined,
+  sessionId: string,
+  now: number,
+  home?: string,
+  codex?: Readonly<{ tool: string; cwd: string; toolUseId?: string }>,
+): ConfirmVerdict | null {
   if (prompt.kind !== "ask" || !DEGRADES_ASK_TO_DENY.has(id) || !command || isIrreversible(command)) return null;
   try {
+    if (id === "codex" && codex) {
+      const action = codexAction(codex.tool, codex.cwd, command, now);
+      if (!action) return null;
+      const verdict = authorizeCodexAction(sessionId, action, codex.toolUseId, now, home);
+      if (verdict.allow) return verdict;
+      const ruleId = prompt.ruleId ?? "policy:ask";
+      const diagnostic = `rule ID: ${ruleId}\ncanonical command: ${action.command}\nexpected token: CONFIRM ${action.code}\nrejection: ${verdict.reason}`;
+      return { allow: false, prompt: { ...prompt, reason: `${prompt.reason}\nPour autoriser, réponds : CONFIRM ${action.code}\n${diagnostic}` } };
+    }
     const hash = hashForAction(command);
     if (consumeConfirmToken(sessionId, hash, now, home)) return { allow: true };
     const code = displayCodeForAction(command);
