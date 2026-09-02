@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.92] - 2026-09-02
+
+### Fixed
+
+- **Cursor native adapter hardening** (`src/adapters/cursor/`, `src/runtime/handle.ts`, `src/runtime/lifecycle/{rules-root,aipilot/dispatch-aipilot,failure-lesson}.ts`) — plugin-root discovery now follows an explicit precedence (`CURSOR_PLUGIN_ROOT` → `CLAUDE_PLUGIN_ROOT` → cwd marker) with a stderr diagnostic on miss, and project cwd resolution honors `CURSOR_PROJECT_DIR`/`CLAUDE_PROJECT_DIR`. Scope dispatchers now receive a canonical payload projection (`tool_name`, `cwd`, `tool_input` coerced string→object), and `MCP:<tool>` names are canonicalized via a closed server table. The doc-cache gate is now reachable on `beforeMCPExecution` under a cursor-only guard. Added per-event native response schemas with an exhaustive renderer, plus an `additional_context` 10,000-char cap backed by a session-level budget ledger (keyed `session|event|generation|tool_use_id`, fail-open, idempotent truncation). Covered by 23 provenance-labelled fixtures and byte-level stdout tests; test hygiene improved (tmp cwd/HOME, env restore, hex-free nonce for a pre-existing flake).
+
 ## [0.1.91] - 2026-09-01
 
 ### Fixed
