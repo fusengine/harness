@@ -1,0 +1,19 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture; multi-root workspace_roots is a synthetic augmentation (no authentic capture observed a length > 1, see gaps.md)"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000001401",
+    "generation_id": "00000000-0000-4000-8000-000000001402",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "Read",
+    "tool_input": { "file_path": "/Users/user/project-b/README.md" },
+    "tool_use_id": "call-00000000-0000-4000-8000-000000001403-1\nfc_00000000-0000-4000-8000-000000001404_0",
+    "session_id": "00000000-0000-4000-8000-000000001401",
+    "hook_event_name": "preToolUse",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project-a", "/Users/user/project-b"],
+    "user_email": "user@example.com",
+    "transcript_path": null
+  }
+}

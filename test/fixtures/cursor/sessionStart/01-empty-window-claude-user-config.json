@@ -1,0 +1,32 @@
+{
+  "provenance": {
+    "source": "cursor.hooks log",
+    "cursor_version": "3.17.8",
+    "log": "20260823T231148/window1_wb0/output_20260823T231150/cursor.hooks.workspaceId-empty-window.log",
+    "captured_at": "2026-08-23T21:11:50.887Z",
+    "hook_command": "bun /Users/user/.claude/plugins/marketplaces/example-plugins/scripts/hooks-loader.ts SessionStart",
+    "config_source": "claude-user config",
+    "sanitization": "v1"
+  },
+  "stdin": {
+    "conversation_id": "empty-state-draft",
+    "generation_id": "",
+    "model": "unknown",
+    "model_id": "default",
+    "is_background_agent": false,
+    "composer_mode": "agent",
+    "session_id": "empty-state-draft",
+    "hook_event_name": "sessionStart",
+    "cursor_version": "3.17.8",
+    "workspace_roots": [],
+    "user_email": null,
+    "transcript_path": null
+  },
+  "observed_output": "(empty)",
+  "observed_exit": 0,
+  "observed_duration_ms": 1120,
+  "cursor_reaction": [
+    "Hook 1 produced no output",
+    "All hooks for step sessionStart completed but none returned a valid response"
+  ]
+}

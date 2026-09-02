@@ -110,6 +110,39 @@ test("Cursor multi-root selection canonicalizes symlinks before choosing the fil
   }
 });
 
+test("cursorProjectCwd: filePath in the second of two workspace roots selects the second", () => {
+  const roots = ["/ws/root-a", "/ws/root-b"];
+  expect(cursorProjectCwd(undefined, roots, "/ws/root-b/src/app.ts", "/fallback")).toBe("/ws/root-b");
+});
+
+test("cursorProjectCwd: filePath outside every workspace root falls back to the first root", () => {
+  const roots = ["/ws/root-a", "/ws/root-b"];
+  expect(cursorProjectCwd(undefined, roots, "/elsewhere/app.ts", "/fallback")).toBe("/ws/root-a");
+});
+
+test("cursorProjectCwd: empty workspaceRoots + CURSOR_PROJECT_DIR env wins over fallback", () => {
+  expect(cursorProjectCwd(undefined, [], undefined, "/fallback", { CURSOR_PROJECT_DIR: "/env/project" }))
+    .toBe("/env/project");
+});
+
+test("cursorProjectCwd: CLAUDE_PROJECT_DIR used only when CURSOR_PROJECT_DIR is absent", () => {
+  expect(cursorProjectCwd(undefined, [], undefined, "/fallback", { CLAUDE_PROJECT_DIR: "/env/claude-project" }))
+    .toBe("/env/claude-project");
+  expect(cursorProjectCwd(undefined, [], undefined, "/fallback", {
+    CURSOR_PROJECT_DIR: "/env/cursor-project",
+    CLAUDE_PROJECT_DIR: "/env/claude-project",
+  })).toBe("/env/cursor-project");
+});
+
+test("cursorProjectCwd: everything absent falls back to the explicit fallback, never process.cwd()", () => {
+  expect(cursorProjectCwd(undefined, [], undefined, "/fallback", {})).toBe("/fallback");
+});
+
+test("cursorProjectCwd: payload cwd still wins over env when present", () => {
+  expect(cursorProjectCwd("/payload/cwd", [], undefined, "/fallback", { CURSOR_PROJECT_DIR: "/env/project" }))
+    .toBe("/payload/cwd");
+});
+
 test("Cursor payload cwd scopes lifecycle project detection instead of process fallback", async () => {
   const payloadCwd = mkdtempSync(join(tmpdir(), "cursor-payload-cwd-"));
   const fallbackCwd = mkdtempSync(join(tmpdir(), "cursor-fallback-cwd-"));
@@ -120,7 +153,7 @@ test("Cursor payload cwd scopes lifecycle project detection instead of process f
       conversation_id: "cursor-project-cwd",
       cwd: payloadCwd,
       workspace_roots: [payloadCwd],
-    }, { now: 1000, cwd: fallbackCwd });
+    }, { now: 1000, cwd: fallbackCwd, home: payloadCwd });
     const response = JSON.parse(outcome.stdout) as { additional_context?: string };
     expect(response.additional_context).toContain("Project: Node.js");
   } finally {

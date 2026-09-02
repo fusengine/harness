@@ -125,15 +125,21 @@ test("agent metadata remains irrelevant to non-Codex UserPromptSubmit handling",
   for (const id of ["claude-code", "kimi", "cursor"]) {
     const opts: HandleOptions = { now: 1000, cwd: temp("confirm-cross-cwd"), home: temp("confirm-cross-home") };
     const event = "UserPromptSubmit";
+    // Nonces strip a-f so no DEV_VERBS alternative (e.g. "add") can appear
+    // inside the hex UUID by chance (DEV_VERBS has no \b word boundary — see
+    // src/policy/claude-md-context.ts). Kept distinct (root vs attributed)
+    // so inject-dedup's 3s window does not collapse them into one prompt.
+    const rootNonce = randomUUID().replace(/[a-f]/g, "");
+    const attributedNonce = `${randomUUID().replace(/[a-f]/g, "")}-1`;
     const root = await handleHook(id, {
       hook_event_name: event,
       session_id: `cross-root-${randomUUID()}`,
-      prompt: `ordinary root prompt ${randomUUID()}`,
+      prompt: `ordinary root prompt ${rootNonce}`,
     }, opts);
     const attributed = await handleHook(id, {
       hook_event_name: event,
       session_id: `cross-agent-${randomUUID()}`,
-      prompt: `ordinary attributed prompt ${randomUUID()}`,
+      prompt: `ordinary attributed prompt ${attributedNonce}`,
       agent_id: "agent-1",
       agent_type: "worker",
     }, opts);

@@ -1,0 +1,19 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000000101",
+    "generation_id": "00000000-0000-4000-8000-000000000102",
+    "model": "cursor-grok-4.6-medium",
+    "command": "ls -la",
+    "cwd": "/Users/user/project",
+    "sandbox": false,
+    "hook_event_name": "beforeShellExecution",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000000101/00000000-0000-4000-8000-000000000101.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000101"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "provenance": {
+    "source": "cursor.hooks log",
+    "cursor_version": "3.18.9",
+    "log": "20260901T164203/window1_wb2/output_20260901T164220/cursor.hooks.workspaceId-7836681c53300201c3d1e17a4405c32b.log",
+    "captured_at": "2026-09-01T15:10:43.814Z",
+    "hook_command": "/private/tmp/claude-501/-Users-user-Labo-docker-lab-dev-local-Dev-ai-claude-code-claude-plugins/70aefd0e-de58-5623-b9a0-22e958c9331b/scratchpad/cursor-hook-probe.sh preToolUse",
+    "config_source": "user config",
+    "sanitization": "v1"
+  },
+  "stdin": {
+    "conversation_id": "b5d7cfe9-d332-5262-ba6f-ed5f57cbe843",
+    "generation_id": "f357cdfe-3cc1-5855-91db-8bc9a00b2e79",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "/Users/user/.cursor/plugins/cache/example-cursor-plugins/fuse-ai-pilot/308b1e77cbce7a677469ae5f402a9524d09d997e/skills/research/SKILL.md"
+    },
+    "tool_use_id": "call-58385325-ce51-5cb2-a50e-a478c0ec0a20-1\nfc_332f13d4-f67d-5f36-9f24-39b7e37498cd_1",
+    "session_id": "b5d7cfe9-d332-5262-ba6f-ed5f57cbe843",
+    "hook_event_name": "preToolUse",
+    "cursor_version": "3.18.9",
+    "workspace_roots": [
+      "/Users/user/project"
+    ],
+    "user_email": "user@example.com",
+    "transcript_path": null
+  },
+  "observed_output": "(empty)",
+  "observed_exit": 0,
+  "observed_duration_ms": 61,
+  "cursor_reaction": [
+    "Hook 1 produced no output",
+    "All hooks for step preToolUse completed but none returned a valid response"
+  ]
+}

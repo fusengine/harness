@@ -110,7 +110,7 @@ test("Cursor sessionStart converts lifecycle context to its native envelope", as
   try {
     const outcome = await handleHook("cursor", {
       hook_event_name: "sessionStart", conversation_id: "cursor-session-start", workspace_roots: [cwd], cwd,
-    }, { now: 1000, cwd });
+    }, { now: 1000, cwd, home: cwd });
     const response = JSON.parse(outcome.stdout) as Record<string, unknown>;
     expect(typeof response.additional_context).toBe("string");
     expect(response).not.toHaveProperty("hookSpecificOutput");

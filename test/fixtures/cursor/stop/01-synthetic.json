@@ -1,0 +1,22 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000000901",
+    "generation_id": "00000000-0000-4000-8000-000000000902",
+    "model": "cursor-grok-4.6-medium",
+    "status": "completed",
+    "loop_count": 3,
+    "input_tokens": 1200,
+    "output_tokens": 400,
+    "cache_read_tokens": 800,
+    "cache_write_tokens": 100,
+    "hook_event_name": "stop",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000000901/00000000-0000-4000-8000-000000000901.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000901"
+  }
+}

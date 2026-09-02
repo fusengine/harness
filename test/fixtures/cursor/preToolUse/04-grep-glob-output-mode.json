@@ -1,0 +1,39 @@
+{
+  "provenance": {
+    "source": "cursor.hooks log",
+    "cursor_version": "3.18.9",
+    "log": "20260901T164203/window1_wb2/output_20260901T164220/cursor.hooks.workspaceId-7836681c53300201c3d1e17a4405c32b.log",
+    "captured_at": "2026-09-01T15:10:41.280Z",
+    "hook_command": "/private/tmp/claude-501/-Users-user-Labo-docker-lab-dev-local-Dev-ai-claude-code-claude-plugins/70aefd0e-de58-5623-b9a0-22e958c9331b/scratchpad/cursor-hook-probe.sh preToolUse",
+    "config_source": "user config",
+    "sanitization": "v1"
+  },
+  "stdin": {
+    "conversation_id": "6fc0777b-8cf7-54f9-a0ad-ab48c164f152",
+    "generation_id": "19af6223-10e8-5190-90da-15c15c37d58a",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "Grep",
+    "tool_input": {
+      "pattern": "",
+      "file_path": "/Users/user/project",
+      "glob": "**/logo.svg",
+      "output_mode": "files_with_matches"
+    },
+    "tool_use_id": "call-8647657a-a469-5180-aec4-f2f5a2b9ff20-3\nfc_b13805dc-aa8c-5513-bb21-e9ae61e2c1c4_3",
+    "session_id": "6fc0777b-8cf7-54f9-a0ad-ab48c164f152",
+    "hook_event_name": "preToolUse",
+    "cursor_version": "3.18.9",
+    "workspace_roots": [
+      "/Users/user/project"
+    ],
+    "user_email": "user@example.com",
+    "transcript_path": null
+  },
+  "observed_output": "(empty)",
+  "observed_exit": 0,
+  "observed_duration_ms": 67,
+  "cursor_reaction": [
+    "Hook 1 produced no output",
+    "All hooks for step preToolUse completed but none returned a valid response"
+  ]
+}

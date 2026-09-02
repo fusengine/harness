@@ -1,0 +1,45 @@
+{
+  "provenance": {
+    "source": "cursor.hooks log",
+    "cursor_version": "3.18.9",
+    "log": "20260901T164203/window1_wb2/output_20260901T164220/cursor.hooks.workspaceId-7836681c53300201c3d1e17a4405c32b.log",
+    "captured_at": "2026-09-01T15:09:48.960Z",
+    "hook_command": "/private/tmp/claude-501/-Users-user-Labo-docker-lab-dev-local-Dev-ai-claude-code-claude-plugins/70aefd0e-de58-5623-b9a0-22e958c9331b/scratchpad/cursor-hook-probe.sh beforeSubmitPrompt",
+    "config_source": "user config",
+    "sanitization": "v1"
+  },
+  "stdin": {
+    "conversation_id": "b3f17b66-e4ba-5fd0-8f3b-dc5b32fc4f8c",
+    "generation_id": "21d4a1c8-b010-5b28-a58c-0c16eb56cd82",
+    "model": "cursor-grok-4.6-medium",
+    "model_id": "grok-4.6",
+    "model_params": [
+      {
+        "id": "effort",
+        "value": "medium"
+      },
+      {
+        "id": "fast",
+        "value": "false"
+      }
+    ],
+    "composer_mode": "agent",
+    "prompt": "<redacted prompt, 136 chars>",
+    "attachments": [],
+    "session_id": "b3f17b66-e4ba-5fd0-8f3b-dc5b32fc4f8c",
+    "hook_event_name": "beforeSubmitPrompt",
+    "cursor_version": "3.18.9",
+    "workspace_roots": [
+      "/Users/user/project"
+    ],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/b3f17b66-e4ba-5fd0-8f3b-dc5b32fc4f8c/b3f17b66-e4ba-5fd0-8f3b-dc5b32fc4f8c.jsonl"
+  },
+  "observed_output": "(empty)",
+  "observed_exit": 0,
+  "observed_duration_ms": 71,
+  "cursor_reaction": [
+    "Hook 1 produced no output",
+    "All hooks for step beforeSubmitPrompt completed but none returned a valid response"
+  ]
+}
