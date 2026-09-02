@@ -1,0 +1,24 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000001201",
+    "generation_id": "00000000-0000-4000-8000-000000001202",
+    "model": "cursor-grok-4.6-medium",
+    "subagent_id": "00000000-0000-4000-8000-000000001203",
+    "subagent_type": "explore-codebase",
+    "task": "Map the src/adapters directory",
+    "parent_conversation_id": "00000000-0000-4000-8000-000000001299",
+    "tool_call_id": "00000000-0000-4000-8000-000000001204",
+    "subagent_model": "cursor-grok-4.6-medium",
+    "is_parallel_worker": false,
+    "git_branch": "main",
+    "hook_event_name": "subagentStart",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000001201/00000000-0000-4000-8000-000000001201.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000001201"
+  }
+}

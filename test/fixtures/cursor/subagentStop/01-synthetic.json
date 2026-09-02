@@ -1,0 +1,26 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000001301",
+    "generation_id": "00000000-0000-4000-8000-000000001302",
+    "model": "cursor-grok-4.6-medium",
+    "subagent_id": "00000000-0000-4000-8000-000000001303",
+    "subagent_type": "explore-codebase",
+    "status": "completed",
+    "duration_ms": 8421,
+    "summary": "Mapped src/adapters: 5 harness adapters, shared interfaces under interfaces/.",
+    "parent_conversation_id": "00000000-0000-4000-8000-000000001399",
+    "message_count": 6,
+    "tool_call_count": 9,
+    "error_message": null,
+    "agent_transcript_path": null,
+    "hook_event_name": "subagentStop",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000001301/00000000-0000-4000-8000-000000001301.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000001301"
+  }
+}

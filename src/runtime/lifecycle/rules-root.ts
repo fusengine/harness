@@ -2,8 +2,15 @@
  * Dynamic rules-plugin root resolution. The historical `CLAUDE_PLUGIN_ROOT ??
  * cwd` chain only worked when the harness exported the plugin root — Kimi
  * injects `KIMI_PLUGIN_ROOT` instead, and a bare cwd fallback never held a
- * `rules/` dir. Resolution order (first hit wins):
- * 1. `CLAUDE_PLUGIN_ROOT` (claude-code/codex plugin-declared hooks);
+ * `rules/` dir.
+ *
+ * `id === "cursor"` is resolved by a SEPARATE branch (`resolveCursorPluginRoot`)
+ * before any of the below, because Cursor's env contract differs from the
+ * other harnesses (see `../../adapters/cursor/plugin-root.ts`) — it is never
+ * folded into the shared switch. For every other id, resolution order (first
+ * hit wins, unchanged):
+ * 1. `CLAUDE_PLUGIN_ROOT` (read for ALL non-cursor ids, historical quirk —
+ *    frozen by non-regression tests, do not "fix" without an explicit ask);
  * 2. `KIMI_PLUGIN_ROOT` (kimi plugin-declared hooks);
  * 3. Per-harness install probe (claude marketplace, codex versioned cache,
  *    kimi managed plugins) — first `<plugin>/rules` dir whose plugin folder
@@ -14,6 +21,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { maxSemver } from "../../util/semver";
+import { resolveCursorPluginRoot } from "../../adapters/cursor/plugin-root";
 
 /** Immediate child dir names of `dir`, or [] when unreadable. */
 function children(dir: string): string[] {
@@ -72,6 +80,14 @@ export function resolveRulesRoot(
   cwd: string,
   env: Record<string, string | undefined> = process.env,
 ): string {
+  if (id === "cursor") {
+    const result = resolveCursorPluginRoot(env, cwd);
+    if (result.root) return result.root;
+    process.stderr.write(
+      `[fuse-harness] cursor: no plugin root proven (checked: ${result.checked.join("; ")}); rules root falls back to ${cwd}\n`,
+    );
+    return cwd;
+  }
   if (env.CLAUDE_PLUGIN_ROOT) return env.CLAUDE_PLUGIN_ROOT;
   if (env.KIMI_PLUGIN_ROOT) return env.KIMI_PLUGIN_ROOT;
   const home = env.HOME ?? homedir();

@@ -5,8 +5,12 @@
  * matches the failure message — reusing the PreToolUse {@link lessonFor} index and
  * its cooldown (idempotent under the ~11-process fan-out). Fail-open throughout.
  *
- * Claude-Code-only: no equivalent `PostToolUseFailure` hook exists on Codex or
- * Hermes, so this handler is never reached through those adapters.
+ * Claude-Code-only in the sense that no equivalent `PostToolUseFailure` hook
+ * exists on Codex or Hermes — but Cursor's own `postToolUseFailure` DOES
+ * arrive here too, via `lifecycle-bridge.ts`'s `lifecycleStdout` translating
+ * the wire event name and forwarding to `dispatchLifecycle`'s
+ * `"PostToolUseFailure"` case (see `handle.ts`'s `cursorRawPayloadProjection`
+ * for how `data.tool_name` below arrives already canonicalized on Cursor).
  * @packageDocumentation
  */
 import { homedir } from "node:os";

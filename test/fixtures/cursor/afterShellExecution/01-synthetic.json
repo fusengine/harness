@@ -1,0 +1,20 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000000201",
+    "generation_id": "00000000-0000-4000-8000-000000000202",
+    "model": "cursor-grok-4.6-medium",
+    "command": "ls -la",
+    "output": "total 0\ndrwxr-xr-x  2 user  staff  64 Jan  1 00:00 .\n",
+    "duration": 42,
+    "sandbox": false,
+    "hook_event_name": "afterShellExecution",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000000201/00000000-0000-4000-8000-000000000201.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000201"
+  }
+}

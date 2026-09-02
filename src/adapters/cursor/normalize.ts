@@ -49,12 +49,77 @@ function sanitizedCursorInput(input: Record<string, unknown>): Record<string, un
   return safe;
 }
 
+/**
+ * Closed table: Cursor's `MCP:<tool>` tool_name form on preToolUse/
+ * postToolUse/postToolUseFailure LOSES the MCP server name (ground truth:
+ * Cursor CLI 3.18.25 + official docs — only beforeMCPExecution/
+ * afterMCPExecution carry `mcp_server_name`). This reconstructs the real
+ * server for the closed set of tool names this repo's gates actually depend
+ * on (GATED_TOOLS in doc-cache-gate.ts, CONTEXT7_SOURCE, RESEARCH_TOOLS,
+ * SHOT_TOOLS, gemini-mcp-gate, shadcn-skill-gate) — same closed-table
+ * philosophy as `mcp-tool-name.ts`'s Codex aliasing, never a blanket
+ * reversal. Coordinator decision: a tool name OUTSIDE this table (server
+ * genuinely unrecoverable, and no safe placeholder) is left as Cursor's raw
+ * `MCP:<tool>` string — `test/cursor-followup-normalize.test.ts` pins this
+ * as the committed contract ("commandless MCP tools keep their name"), so a
+ * fabricated `mcp__cursor__<tool>` placeholder is never introduced for the
+ * unknown case.
+ */
+const CURSOR_MCP_TOOL_SERVERS: Readonly<Record<string, string>> = Object.assign(Object.create(null), {
+  "query-docs": "context7",
+  "resolve-library-id": "context7",
+  web_search_exa: "exa",
+  get_code_context_exa: "exa",
+  deep_researcher_start: "exa",
+  deep_researcher_check: "exa",
+  create_frontend: "gemini-design",
+  modify_frontend: "gemini-design",
+  snippet_frontend: "gemini-design",
+  search_items_in_registries: "shadcn",
+  view_items_in_registries: "shadcn",
+  get_item_examples_from_registries: "shadcn",
+  get_add_command_for_items: "shadcn",
+  get_audit_checklist: "shadcn",
+});
+
+/**
+ * The real MCP server for a bare Cursor tool name (the part after `MCP:`),
+ * or `undefined` when it isn't in the closed table. fuse-browser is inferred
+ * from the `browser_*` prefix — every fuse-browser tool is named that way
+ * and no other server in this ecosystem uses it — the remaining,
+ * non-distinctive tool names go through {@link CURSOR_MCP_TOOL_SERVERS}.
+ * NO placeholder fallback (coordinator decision, see {@link CURSOR_MCP_TOOL_SERVERS}):
+ * an unknown tool name means the server is genuinely unrecoverable, so the
+ * caller leaves the raw `MCP:<tool>` string untouched instead of fabricating one.
+ */
+function cursorMcpServer(bareTool: string): string | undefined {
+  if (bareTool.startsWith("browser_")) return "fuse-browser";
+  return CURSOR_MCP_TOOL_SERVERS[bareTool];
+}
+
+/**
+ * Canonicalize Cursor's `MCP:<tool>` tool_name (preToolUse/postToolUse/
+ * postToolUseFailure) into the shared `mcp__<server>__<tool>` shape every
+ * other harness/gate expects. Returns `undefined` — meaning "leave the raw
+ * `MCP:<tool>` string as-is" — both when `tool` isn't the `MCP:` form and
+ * when the bare tool name is outside the closed {@link CURSOR_MCP_TOOL_SERVERS}
+ * table (server unrecoverable, no placeholder fabricated).
+ */
+function cursorBareMcpToolName(tool: string | undefined): string | undefined {
+  if (!tool || !tool.startsWith("MCP:")) return undefined;
+  const bare = tool.slice(4);
+  const server = cursorMcpServer(bare);
+  return server ? `mcp__${server}__${bare}` : undefined;
+}
+
 function cursorToolName(raw: Record<string, unknown>, event: string, tool: string | undefined, hasCommand: boolean): string {
   if (hasCommand) return "Bash";
   const server = str(raw.mcp_server_name)?.trim().replace(/[^A-Za-z0-9_-]+/g, "_");
   if (/^(before|after)MCPExecution$/i.test(event) && server && tool && !tool.startsWith("mcp__")) {
     return `mcp__${server}__${tool}`;
   }
+  const bareMcp = cursorBareMcpToolName(tool);
+  if (bareMcp) return bareMcp;
   if (tool === "Write") return "Edit";
   return tool ?? "";
 }

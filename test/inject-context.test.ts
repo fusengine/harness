@@ -65,19 +65,35 @@ test("buildApexTaskInjection: null without .claude/apex, text with it", () => {
 test("handleHook: PreToolUse Task injects APEX context when apex dir exists", async () => {
   const cwd = root();
   mkdirSync(join(cwd, ".claude", "apex"), { recursive: true });
+  // Pin CLAUDE_PROJECT_DIR for the call, restored in `finally` — other test
+  // files leave it set process-wide otherwise (see test/mcp-tool-name.test.ts
+  // for the same pattern), which previously leaked into later, unrelated
+  // tests sharing the same `bun test` process.
+  const prevProjDir = process.env.CLAUDE_PROJECT_DIR;
   process.env.CLAUDE_PROJECT_DIR = cwd;
-  const opts: HandleOptions = { now: 1000, cwd };
-  const payload = { hook_event_name: "PreToolUse", session_id: "s", tool_name: "Task", tool_input: { subagent_type: "x" } };
-  const out = await handleHook("claude-code", payload, opts);
-  const parsed = JSON.parse(out.stdout);
-  expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
-  expect(parsed.hookSpecificOutput.additionalContext).toContain("APEX MODE");
+  try {
+    const opts: HandleOptions = { now: 1000, cwd };
+    const payload = { hook_event_name: "PreToolUse", session_id: "s", tool_name: "Task", tool_input: { subagent_type: "x" } };
+    const out = await handleHook("claude-code", payload, opts);
+    const parsed = JSON.parse(out.stdout);
+    expect(parsed.hookSpecificOutput.hookEventName).toBe("PreToolUse");
+    expect(parsed.hookSpecificOutput.additionalContext).toContain("APEX MODE");
+  } finally {
+    if (prevProjDir === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = prevProjDir;
+  }
 });
 
 test("handleHook: PreToolUse Task stays silent without apex dir", async () => {
   const cwd = root();
+  const prevProjDir = process.env.CLAUDE_PROJECT_DIR;
   process.env.CLAUDE_PROJECT_DIR = cwd;
-  const opts: HandleOptions = { now: 1000, cwd };
-  const payload = { hook_event_name: "PreToolUse", session_id: "s", tool_name: "Task", tool_input: { subagent_type: "x" } };
-  expect((await handleHook("claude-code", payload, opts)).stdout).toBe("");
+  try {
+    const opts: HandleOptions = { now: 1000, cwd };
+    const payload = { hook_event_name: "PreToolUse", session_id: "s", tool_name: "Task", tool_input: { subagent_type: "x" } };
+    expect((await handleHook("claude-code", payload, opts)).stdout).toBe("");
+  } finally {
+    if (prevProjDir === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = prevProjDir;
+  }
 });

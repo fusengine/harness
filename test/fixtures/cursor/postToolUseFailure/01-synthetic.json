@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000000801",
+    "generation_id": "00000000-0000-4000-8000-000000000802",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "Shell",
+    "tool_input": { "command": "false", "cwd": "" },
+    "error_message": "command exited with status 1",
+    "failure_type": "tool_error",
+    "duration": 5,
+    "tool_use_id": "00000000-0000-4000-8000-000000000803",
+    "is_interrupt": false,
+    "hook_event_name": "postToolUseFailure",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000000801/00000000-0000-4000-8000-000000000801.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000801"
+  }
+}

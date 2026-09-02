@@ -90,7 +90,13 @@ export async function dispatchAipilot(event: string, payload: Record<string, unk
   if (event === "SubagentStop") return onSubagentStop(payload, cwd, home, id);
   // Stop too: Codex emits no SessionEnd, so its ai-pilot hooks.json wires Stop here as the sole analytics-flush trigger — reusing the SessionEnd handler verbatim (codex-plugins/docs/reference/hooks.md).
   if (event === "SessionEnd" || event === "Stop") { await cacheAnalyticsSave(home, now); return ""; }
-  if (event === "PreToolUse") return docCacheGate(payload, cwd, now, home, id);
+  // "BeforeMCPExecution" is a Cursor-only lifecycle literal (produced solely
+  // by cursorEventContract in adapters/cursor/events.ts); asyncScopeStdout
+  // forwards every non-Cursor id's `hook_event_name` RAW and unvalidated, so
+  // gating on the literal alone would let a claude-code/codex payload that
+  // happens to carry this exact string reach docCacheGate — the guard must
+  // be structural (`id === "cursor"`), never event-name-only.
+  if (event === "PreToolUse" || (id === "cursor" && event === "BeforeMCPExecution")) return docCacheGate(payload, cwd, now, home, id);
   return null;
 }
 

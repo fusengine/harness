@@ -1,0 +1,21 @@
+{
+  "provenance": {
+    "source": "binary-verified shape (Cursor 3.18.25, agent-cli 190.index.js / workbench.desktop.main.js) — NOT a live capture"
+  },
+  "stdin": {
+    "conversation_id": "00000000-0000-4000-8000-000000000401",
+    "generation_id": "00000000-0000-4000-8000-000000000402",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "query-docs",
+    "tool_input": "{\"libraryId\":\"/vercel/next.js\",\"query\":\"routing\"}",
+    "result_json": "{\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}",
+    "duration": 812,
+    "mcp_server_name": "context7",
+    "hook_event_name": "afterMCPExecution",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["/Users/user/project"],
+    "user_email": "user@example.com",
+    "transcript_path": "/Users/user/.cursor/projects/Users-user-project/agent-transcripts/00000000-0000-4000-8000-000000000401/00000000-0000-4000-8000-000000000401.jsonl",
+    "session_id": "00000000-0000-4000-8000-000000000401"
+  }
+}

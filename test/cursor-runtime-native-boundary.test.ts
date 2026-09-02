@@ -13,7 +13,7 @@ test("Cursor security advisory crosses the runtime boundary as native agent cont
     conversation_id: "cursor-security",
     tool_name: "Write",
     tool_input: { file_path: join(cwd, "app.ts"), content: "export {};" },
-  }, { now: 1, cwd, scope: "security" });
+  }, { now: 1, cwd, scope: "security", home: cwd });
   expect(out).toEqual({
     stdout: expect.stringContaining('"permission":"allow"'),
     exit: 0,
@@ -33,7 +33,7 @@ test("Cursor solid deny crosses the runtime boundary as native permission", asyn
       conversation_id: "cursor-solid",
       tool_name: "Write",
       tool_input: { file_path: join(cwd, "store.go"), content: "type Store interface {\n}\n" },
-    }, { now: 1, cwd, scope: "solid" });
+    }, { now: 1, cwd, scope: "solid", home: cwd });
     const parsed = JSON.parse(out.stdout) as Record<string, unknown>;
     expect(parsed.permission).toBe("deny");
     expect(parsed.agent_message).toContain("internal/interfaces/");
@@ -56,7 +56,7 @@ test("Cursor scoped postToolUse crosses the runtime boundary as native post cont
     tool_input: { file_path: file, content: "" },
     tool_output: "ok",
     cwd,
-  }, { now: 1, cwd, scope: "seo" });
+  }, { now: 1, cwd, scope: "seo", home: cwd });
   const parsed = JSON.parse(out.stdout) as Record<string, unknown>;
   expect(parsed.additional_context).toContain("missing SEO elements");
   expect(parsed).not.toHaveProperty("decision");
