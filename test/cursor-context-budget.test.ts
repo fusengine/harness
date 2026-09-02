@@ -1,13 +1,14 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { toCursorLifecycleResponse } from "../src/adapters/cursor/respond";
 import { reserveAdditionalContext, recordAdditionalContext } from "../src/adapters/cursor/context-budget";
-import { defaultStateDir, projectHash } from "../src/runtime/paths";
+import { projectHash } from "../src/runtime/paths";
 import { fuseHarnessHome } from "../src/runtime/home-state";
 import { handleHook } from "../src/runtime/handle";
+import { apexDocName, harnessHomeSegment } from "../src/policy/apex-target";
 
 const BIN = join(import.meta.dir, "..", "src", "cli", "bin.ts");
 const TRUNCATION_MARKER = "\n[fuse-harness] additional_context truncated to Cursor's 10000-char limit";
@@ -32,8 +33,13 @@ function sessionStartWith(length: number): string {
 export function isolatedStateDir(home: string, cwd: string): string {
   return join(fuseHarnessHome(home), "state", projectHash(cwd));
 }
-function run(id: string, scope: string, payload: unknown, cwd: string): { stdout: string; status: number | null } {
-  const r = spawnSync("bun", [BIN, "hook", id, scope], { input: JSON.stringify(payload), cwd, encoding: "utf8" });
+function run(id: string, scope: string, payload: unknown, cwd: string, env?: Record<string, string>): { stdout: string; status: number | null } {
+  const r = spawnSync("bun", [BIN, "hook", id, scope], {
+    input: JSON.stringify(payload),
+    cwd,
+    encoding: "utf8",
+    ...(env ? { env: { ...process.env, ...env } } : {}),
+  });
   return { stdout: r.stdout, status: r.status };
 }
 test("1st hook: intact, registry written with the full length", () => {
@@ -137,31 +143,36 @@ test("corrupt registry JSON fails open the same way", () => {
   }
 });
 
+/** status===0 and stdout empty-or-valid-JSON — the only claim independent of ambient $HOME content. */
+function expectWellFormed(r: { stdout: string; status: number | null }): void {
+  expect(r.status).toBe(0);
+  const t = r.stdout.trim();
+  expect(t === "" || (() => { JSON.parse(t); return true; })()).toBe(true);
+}
+
 test("non-regression: claude-code and codex never touch the budget registry, stdout stays well-formed", () => {
-  // One call per fresh dir, not two on the same one: a pre-existing, unrelated
-  // dedup mechanism (inject-dedup.ts, 3s window) legitimately makes a 2nd
-  // SessionStart call on the SAME cwd/session omit fragments already injected
-  // by the 1st — that statefulness predates this change and isn't in scope.
+  // Hermetic (was the CI bug): dedicated tmp HOME per id + a planted minimal
+  // root doc as a positive witness — a bare CI $HOME has neither doc, so "" was legit and JSON.parse("") threw.
   const dirs = [tmp("cursor-budget-7-a-"), tmp("cursor-budget-7-b-"), tmp("cursor-budget-7-c-"), tmp("cursor-budget-7-d-")];
+  const homes = [tmp("cursor-budget-7-home-a-"), tmp("cursor-budget-7-home-b-")];
   try {
-    let i = 0;
+    let i = 0, h = 0;
     for (const id of ["claude-code", "codex"]) {
-      const sessionCwd = dirs[i++]!;
-      const promptCwd = dirs[i++]!;
-      const sessionStart = run(id, "core", { hook_event_name: "SessionStart", session_id: "reg-sid", cwd: sessionCwd }, sessionCwd);
-      expect(sessionStart.status).toBe(0);
-      expect(JSON.parse(sessionStart.stdout)).toHaveProperty("hookSpecificOutput.hookEventName", "SessionStart");
-      const promptSubmit = run(id, "core", { hook_event_name: "UserPromptSubmit", session_id: "reg-sid", cwd: promptCwd, prompt: "hello" }, promptCwd);
-      expect(promptSubmit.status).toBe(0);
-      expect(JSON.parse(promptSubmit.stdout)).toHaveProperty("hookSpecificOutput.hookEventName", "UserPromptSubmit");
-      expect(() => registryOf(defaultStateDir(sessionCwd))).toThrow();
-      expect(() => registryOf(defaultStateDir(promptCwd))).toThrow();
+      const sessionCwd = dirs[i++]!, promptCwd = dirs[i++]!, home = homes[h++]!;
+      const docDir = join(home, harnessHomeSegment(id));
+      mkdirSync(docDir, { recursive: true });
+      writeFileSync(join(docDir, apexDocName(id)), "# fixture\nRules.\n");
+      const sessionStart = run(id, "core", { hook_event_name: "SessionStart", session_id: "reg-sid", cwd: sessionCwd }, sessionCwd, { HOME: home, CURSOR_PROJECT_DIR: sessionCwd });
+      expectWellFormed(sessionStart);
+      if (sessionStart.stdout.trim()) expect(JSON.parse(sessionStart.stdout)).toHaveProperty("hookSpecificOutput.hookEventName", "SessionStart");
+      const promptSubmit = run(id, "core", { hook_event_name: "UserPromptSubmit", session_id: "reg-sid", cwd: promptCwd, prompt: "hello" }, promptCwd, { HOME: home, CURSOR_PROJECT_DIR: promptCwd });
+      expectWellFormed(promptSubmit);
+      if (promptSubmit.stdout.trim()) expect(JSON.parse(promptSubmit.stdout)).toHaveProperty("hookSpecificOutput.hookEventName", "UserPromptSubmit");
+      expect(() => registryOf(isolatedStateDir(home, sessionCwd))).toThrow();
+      expect(() => registryOf(isolatedStateDir(home, promptCwd))).toThrow();
     }
   } finally {
-    for (const dir of dirs) {
-      rmSync(dir, { recursive: true, force: true });
-      rmSync(defaultStateDir(dir), { recursive: true, force: true });
-    }
+    for (const dir of [...dirs, ...homes]) rmSync(dir, { recursive: true, force: true });
   }
 });
 
