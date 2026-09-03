@@ -163,9 +163,14 @@ invented.
     `.claude/apex/prd/auth-refactor-prd.json` is now
     `{ "status": "validated", "files": [...], "validated-at": "2026-09-02T21:04:10.223Z" }`.
 
+    On Codex, this step is never a surprise: the coordinator's Stop right
+    after step 10 already carried the compact hint below, naming
+    `auth-refactor` and the exact command to run.
+
 ## What the guards do
 
-Five enforcement points, all inert unless PRD is active:
+Six enforcement points, all inert unless PRD is active — the last one is a
+pure information, never a block:
 
 | Guard | When | Who it applies to | What the agent sees |
 |---|---|---|---|
@@ -174,7 +179,8 @@ Five enforcement points, all inert unless PRD is active:
 | PostToolUse cross-check (`prd-post-check.ts`) | Right after the router or a task PRD is written | Silent — no immediate message | Nothing at the time; a mismatch between what a task PRD assigned and what an agent actually reported is recorded, and can later trigger the lead's `Stop` block below |
 | `SubagentStart` context (`prd-subagent-context.ts`) | A sub-agent's session starts | That sub-agent only | Its own file/sub-task slice injected as context (the `## PRD assignment` block in the example above) |
 | `SubagentStop` block-once (`prd-subagent-stop.ts`) | A sub-agent tries to stop with an undone sub-task | That sub-agent, once | `"PRD sub-task(s) not done for <agent> on task \"<task>\": <sub1, sub2, ...>. Finish the work (or ask the coordinator to reassign) before stopping."` — never fires on Cursor (identity is unlinkable there, see Known limitations) |
-| Lead `Stop` block-once (`prd-stop-gate.ts`) | The lead tries to stop with an unresolved cross-check violation | The lead, once | `"PRD cross-check found unresolved violation(s): a task/sub-task is marked validated without a matching done report. Run \`harness prd status\` for details."` — never fires on Cursor |
+| Lead `Stop` block-once (`prd-stop-gate.ts`) | The lead tries to stop with an unresolved cross-check violation | The gate itself is target-agnostic and verified correct on every id when invoked — but with **today's real marketplace wiring** it is only ever actually invoked on Codex. claude-code's and Kimi's own Stop hook always carries `--sound stop`, which exits in `maybePlaySound()` (`src/cli/hook-sound.ts`) before the harness reads its payload at all — the gate never runs there, block or no block. Never fires on Cursor either (`stop` isn't gated there — design doc §5). See Known limitations for the full measurement. | `"PRD cross-check found unresolved violation(s): a task/sub-task is marked validated without a matching done report. Run \`harness prd status\` for details."` |
+| Lead `Stop` compact hint (`prd-stop-gate.ts`) | The lead's Stop fires with **no** violation and at least one task is fully validated (every agent, every sub-task) but not yet compacted | Target-agnostic in code — it mirrors the SAME per-target form choice as the block-once row above, with no id allowlist. In practice it is reached by the SAME targets as the block-once gate above, for the SAME wiring reasons: today, that means Codex only. See Known limitations. | `hookSpecificOutput.additionalContext`: `"PRD task \"<task>\" is fully validated and ready to compact. Run \`harness prd compact <task>\`."` (or, with several tasks ready at once, `"PRD tasks fully validated and ready to compact: <t1>, <t2>. Run \`harness prd compact <task>\` for each."`) |
 
 A malformed (unparseable JSON) router with `FUSE_PRD=1` active is its own
 case: every in-scope PRD write is denied with
@@ -199,7 +205,7 @@ Per capability, not per adapter — coverage splits unevenly across targets:
 | Bash-under-`prd/` deny | yes | yes | yes | yes | yes |
 | `SubagentStart` slice injection | yes | yes | **no** — the slice IS built (identical to claude-code's), but `adapters/cursor/respond.ts`'s `toCursorLifecycleResponse` collapses any non-denied `subagentStart` to bare `{"permission":"allow"}`, dropping it; measured byte-identical output with a matching PRD assignment, with no router at all, and with `FUSE_PRD` unset | delivered, ignored (observation-only) | gemini-cli: yes, delivered — routed through `respond()`'s native "inform" shape, then re-wrapped by `joinContextResponses` into the shared Claude-style `hookSpecificOutput.hookEventName/additionalContext` envelope plus a `[NOTE]` title line (not gemini-cli's own minimal shape, but the text arrives). hermes: yes, delivered — same Claude-style `contextResponse` as claude-code; Hermes's own documented non-blocking shape is `{context}`, not `hookSpecificOutput`, so whether a real Hermes client reads it is unverified. cline: yes, delivered in its own native `{contextModification}` shape — `joinContextResponses` keeps whichever envelope its parts came from instead of assuming the Claude one (measured 476 bytes where an earlier build emitted none; the six other targets stay byte-identical, gemini-cli 529 = 529, the Claude-family four 506 = 506) |
 | `SubagentStop` block-once | yes | yes | delivered, response ignored | delivered, response ignored | yes — each in its OWN native block shape via `respond()`: gemini-cli `{"decision":"deny","reason"}`, cline `{"cancel":true,"errorMessage"}`, hermes `{"decision":"block","reason"}` (via `blockResponse`, which happens to match Hermes's own documented block contract). Block-once verified: 1st call blocks, an identical replay is silent (empty stdout) on all three, under both the default journal-based session track and legacy `FUSE_TRACK_JOURNAL=0` |
-| Lead `Stop` block-once | yes | yes | not applicable (`stop` isn't gated on Cursor today) | best effort — Kimi's `Stop` is a documented blocking event, but this has not been verified live | yes — same per-adapter native shapes and block-once behavior as `SubagentStop` above (gemini-cli/cline/hermes), verified under both tracking modes |
+| Lead `Stop` block-once | **no** — the gate itself is correct and fires when invoked (verified byte-for-byte), but claude-code's real marketplace Stop hook always calls the harness with `--sound stop`, which exits in `maybePlaySound()` before stdin is read — the gate is never reached | yes | not applicable (`stop` isn't gated on Cursor today) | **no** — same root cause as claude-code: Kimi's own marketplace Stop hook also always carries `--sound stop` | yes — same per-adapter native shapes and block-once behavior as `SubagentStop` above (gemini-cli/cline/hermes), verified under both tracking modes |
 
 Cursor and Kimi never hard-block on file ownership: the harness cannot
 correlate a sub-agent's write back to its own identity on either target
@@ -328,9 +334,9 @@ router file — either one alone returns the module to fully inert.
   file directly in a terminal) isn't something any guard here can see.
 - **Kimi's `SubagentStop` block-once is best-effort.** Kimi delivers the
   `SubagentStop` event but ignores its response by protocol, so the
-  block never actually stops anything there. The lead `Stop` block
-  should work on Kimi (`Stop` is one of its documented blocking events)
-  but this has not been verified against a live Kimi session.
+  block never actually stops anything there. The lead `Stop` gate is a
+  DIFFERENT problem on Kimi — see the wiring bullet below, it never even
+  runs.
 - **Block-once persistence is tracking-mode-independent, verified.** Both
   `SubagentStop` and lead `Stop` block-once markers are written on
   whichever side `trackJournalEnabled()` reads from — the default
@@ -338,3 +344,31 @@ router file — either one alone returns the module to fully inert.
   `FUSE_TRACK_JOURNAL=0` — so a replay is silent (empty stdout) after the
   first block in both modes. Verified live in both modes; this used to
   only hold under the (default) journal mode.
+- **The lead `Stop` gate (block AND compact hint) never runs on
+  claude-code or Kimi today — a wiring gap, not a harness bug.** Both
+  `prd-stop-gate.ts` functions are target-agnostic in code: no id
+  allowlist, same per-target form choice throughout (verified correct on
+  every id when invoked directly — see the B5/B6 test suites). The gap is
+  entirely on the OTHER side of the boundary: checked against the real
+  `hooks.json`/`kimi.plugin.json` this project ships for each target
+  (`claude-plugins`/`codex-plugins`/`kimi-code-plugins`), claude-code's and
+  Kimi's own marketplace Stop hook always calls the harness with
+  `--sound stop`, and `maybePlaySound()` (`src/cli/hook-sound.ts`) plays
+  the sound and exits **before stdin is even read** — the harness never
+  sees the Stop payload at all, so neither function can run, block or
+  hint alike. This is a marketplace wiring defect (the fix is dropping
+  `--sound stop` from that one `Stop` hook entry, or adding a second,
+  flag-less `hook <id> core` entry alongside it), not something
+  `prd-stop-gate.ts` itself can compensate for. Codex's own Stop wiring
+  has no such flag, so it is the only target where this gate is reachable
+  today. Hermes (26 `VALID_HOOKS`, per its own plugin docs) and Gemini CLI
+  (11 lifecycle events, per its own hook reference) have no event literally
+  named `Stop` at all; their closest analogs (`on_session_end`,
+  `SessionEnd`) either ignore the hook's return value or are documented
+  "Best Effort" with all flow-control fields ignored. Cline's own init
+  template this harness ships (`clineInit`) wires only
+  `PreToolUse`/`PostToolUse`. Should any of these five targets grow a
+  genuinely reachable non-blocking Stop channel, nothing in
+  `prd-stop-gate.ts` needs to change — it already mirrors the block path's
+  per-target form for every id; only the external wiring would need to
+  change.
