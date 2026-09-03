@@ -4,6 +4,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.94] - 2026-09-03
+
+### Added
+
+- **Lead `Stop` compact hint** (`src/runtime/prd/prd-stop-gate.ts`) — when the coordinator's Stop fires with no unresolved cross-check violation and at least one task is fully validated but not yet compacted, emits a one-shot, non-blocking reminder naming the task(s) and the `harness prd compact <task>` command. No PRD write; compaction stays an explicit, agent-identity-bound command.
+
+### Fixed
+
+- **PRD support matrix (docs)** — the 0.1.93 matrix incorrectly listed the lead `Stop` block as functional on claude-code. claude-code's and Kimi's own marketplace `Stop` hook of scope `core` always passes `--sound stop`, and `src/cli/bin.ts` exits 0 in `maybePlaySound()` before stdin is read, so the gate is never reached on either target. `docs/prd.md` and `docs/adapters.md` now name that wiring cause and separate it from the gate itself, verified correct whenever actually invoked.
+
 ## [0.1.93] - 2026-09-03
 
 ### Added
