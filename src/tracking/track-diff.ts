@@ -46,5 +46,8 @@ export function diffTrackEvents(prev: SessionTrack, next: SessionTrack, now: num
   for (const ts of added(prev.trivialEdits ?? [], next.trivialEdits ?? [])) out.push({ field: "trivialEdits", op: "add", value: ts, ts });
   if (next.target && JSON.stringify(next.target) !== JSON.stringify(prev.target)) out.push({ field: "target", op: "set", value: next.target, ts: Date.parse(next.target.set_at) || now });
   if (next.brainstormRequired !== prev.brainstormRequired) out.push({ field: "brainstormRequired", op: "set", value: next.brainstormRequired, ts: now });
+  for (const [aid, name] of Object.entries(next.prdOwners ?? {})) if (prev.prdOwners?.[aid] !== name) out.push({ field: "prdOwners", op: "merge", value: [aid, name], ts: now });
+  for (const v of tail(prev.prdViolations ?? [], next.prdViolations ?? [])) out.push({ field: "prdViolations", op: "append", value: v, ts: v.ts ?? now });
+  for (const [key, ts] of Object.entries(next.prdStopBlocked ?? {})) if (prev.prdStopBlocked?.[key] !== ts) out.push({ field: "prdStopBlocked", op: "merge", value: [key, ts], ts });
   return out;
 }

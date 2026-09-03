@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "source": "live capture — claude-code PreToolUse, the sub-agent's OWN Write (agent_id+agent_type present) (probe/out/claude.jsonl line 5)",
+    "cli_version": "claude-code (model claude-opus-5[1m], effort:high — no separate CLI version field in the payload)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "session_id": "00000000-1111-4000-8000-000000000001",
+    "transcript_path": "/Users/user/.claude/projects/fake-project/00000000-1111-4000-8000-000000000001.jsonl",
+    "cwd": "$TMP",
+    "scratchpad_dir": "$TMP/scratchpad",
+    "prompt_id": "00000000-2222-4000-8000-000000000001",
+    "permission_mode": "default",
+    "agent_id": "agent0000000000001",
+    "agent_type": "general-purpose",
+    "effort": { "level": "high" },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_input": { "file_path": "$TMP/note.txt", "content": "hello\n" },
+    "tool_use_id": "toolu_fake0000000000000002"
+  }
+}

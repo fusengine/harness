@@ -54,3 +54,35 @@ their own chain via `evaluateApex(ctx)`:
 
 Each is individually exported and overridable — pass your own array to
 `evaluateApex(ctx, gates)`.
+
+## PRD ownership
+
+Opt-in (`FUSE_PRD=1`), documented in full at [prd.md](./prd.md). It adds a
+per-file write-ownership check on top of the chain above: only the
+coordinator may write the router or a task PRD, and only the named agent
+may write its own `prd/agents/<agent>-prd.json` report.
+
+This authorized PRD traffic is what actually needs a carve-out from
+`protectedPathGuard` above: that guard already lists `.claude/apex/`
+under its blocked fragments, so every PRD file lives inside a path the
+chain blocks by default. When PRD is active, a write the ownership check
+allows short-circuits past the rest of `evaluate()` — including the
+file-size and APEX-freshness gates — the same way `Explore`/`Plan`
+agents are already exempt from file-size today. Nothing changes when PRD
+is off: `protectedPathGuard` keeps blocking `.claude/apex/**` exactly as
+it always has.
+
+**A mixed `apply_patch` envelope never gets this short-circuit, even for
+its legitimate file.** `prdPreGate` only allows-through a PURE-PRD
+envelope, where every candidate file classifies in-scope
+(`inScope.length === files.length`); the moment a single `apply_patch`
+call mixes one PRD-scoped file with any other, unrelated file,
+`prdPreGate` returns `null` for the whole call and it falls through to
+`applyPatchGate`'s ordinary per-file `protectedPathGate` — which
+unconditionally blocks the `.claude/apex/` file, same as if PRD were off.
+Verified live: an `apply_patch` envelope touching only the agent's own
+`prd/agents/<agent>-prd.json` report is allowed; the identical hunk for
+that same file, bundled in ONE envelope with an unrelated `Add File:` for
+a normal source file, is denied with `[BLOCKED] Protected path` — not
+`[BLOCKED] PRD ownership` — even though the PRD file's own ownership
+would otherwise have been legitimate.

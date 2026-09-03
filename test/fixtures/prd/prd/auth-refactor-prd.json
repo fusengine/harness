@@ -1,0 +1,10 @@
+{
+  "backend-expert": {
+    "files": ["src/auth/login.ts"],
+    "sub-tasks": { "jwt-validation": { "status": "assigned" } }
+  },
+  "backend-expert-2": {
+    "files": ["src/auth/session.ts"],
+    "sub-tasks": { "session-store": { "status": "assigned" } }
+  }
+}

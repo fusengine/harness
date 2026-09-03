@@ -39,6 +39,7 @@ for Bun; a built `dist` (`.mjs` + `.d.mts`) serves Node/bundler consumers.
 | [modules.md](./modules.md) | cache · freshness · refs · state · memory · statusline · util |
 | [adapters.md](./adapters.md) | adapters + `harness init`/`hook` wiring |
 | [design.md](./design.md) | design-agent pipeline — state machine, gates, opt-in Gemini |
+| [prd.md](./prd.md) | PRD task/agent ownership coordination — opt-in, `FUSE_PRD=1` |
 
 Generated API reference: `bun run docs:api` → `docs/api/`.
 See also: [CHANGELOG](../CHANGELOG.md) · [CONTRIBUTING](../CONTRIBUTING.md) · [README](../README.md).

@@ -1,0 +1,25 @@
+{
+  "provenance": {
+    "source": "live capture — claude-code PreToolUse, lead session dispatching a sub-agent via the Agent tool (probe/out/claude.jsonl line 1)",
+    "cli_version": "claude-code (model claude-opus-5[1m], effort:high — no separate CLI version field in the payload)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "session_id": "00000000-1111-4000-8000-000000000001",
+    "transcript_path": "/Users/user/.claude/projects/fake-project/00000000-1111-4000-8000-000000000001.jsonl",
+    "cwd": "$TMP",
+    "scratchpad_dir": "$TMP/scratchpad",
+    "prompt_id": "00000000-2222-4000-8000-000000000001",
+    "permission_mode": "default",
+    "effort": { "level": "high" },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Create note.txt",
+      "prompt": "<redacted prompt, 520 chars>",
+      "subagent_type": "general-purpose"
+    },
+    "tool_use_id": "toolu_fake0000000000000001"
+  }
+}

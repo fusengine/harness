@@ -30,6 +30,26 @@ assuming a gate that works on Claude Code also works elsewhere.
 | **hermes** | `adapters/hermes/index.ts` | `pre_tool_call` proven: reuses the Claude stdin reader, blocks via `{decision:"block",reason}` (lines 12-36) | untested — no lifecycle dispatch wired for Hermes in this repo | `ask`/`inform` degrade to non-blocking `{context}` — Hermes "has no interactive ask state" (lines 27-28). |
 | **kimi** | `adapters/kimi/index.ts` | `PreToolUse` denies via the camelCase JSON channel `{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"…"}}` on stdout at **exit 0** (verified live against kimi-code v0.27.0 — exit 2 with stderr = reason also blocks, but is not required) — only `deny` is documented. `ask` is **downgraded to deny** prefixed `[downgraded from ask — Kimi Code has no interactive approval]`, with a `CONFIRM <code>` recourse appended (`runtime/confirm/`, see below); `inform` rides plain stdout text at exit 0, never wrapped in JSON. Blocking events: `UserPromptSubmit`, `PreToolUse`, `Stop`. | Observation only: `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `PermissionResult`, `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `StopFailure`, `Interrupt`, `PreCompact`, `PostCompact`, `Notification` — Kimi delivers them but **ignores any response**, so no verdict can be returned from them. | A **hook** cannot request approval — Kimi's `ask` lives in a parallel, hook-unreachable system (`[[permission.rules]] decision = "ask"` in `config.toml`), hence the ask→deny downgrade. Hooks are configured **only** in the global `~/.kimi-code/config.toml` (no project-local hooks file), so `harness init` writes no kimi wiring — see [Kimi Code — manual wiring](#kimi-code--manual-wiring). **Fail-open by design**: any exit code other than 0/2, a timeout, or a crash lets the call through. Stdin payload is snake_case and carries only `hook_event_name`, `session_id`, `cwd`, `tool_name`, `tool_input.command` and an undocumented `tool_call_id` (unused here) — no `transcript_path`, no `permission_mode`, no `tool_response`. Verified live against kimi-code v0.27.0 for `PreToolUse`/`Bash`. Instructions file is `AGENTS.md`, not `CLAUDE.md`. |
 
+### PRD capabilities
+
+Opt-in (`FUSE_PRD=1`), documented in full at [prd.md](./prd.md). Coverage
+splits by **capability**, not by adapter — a single per-adapter verdict
+would be misleading here:
+
+| Capability | claude-code | codex | cursor | kimi | cline / gemini-cli / hermes |
+|---|---|---|---|---|---|
+| Write ownership block | full | full | consultative only (never blocks) | consultative only (never blocks) | full, if the consumer wires `PreToolUse` |
+| Bash-under-`prd/` deny | yes | yes | yes | yes | yes |
+| `SubagentStart` slice injection | yes | yes | **no** — the slice IS built (identical to claude-code's), but `adapters/cursor/respond.ts`'s `toCursorLifecycleResponse` collapses any non-denied `subagentStart` to bare `{"permission":"allow"}`, dropping it; measured byte-identical output with a matching PRD assignment, with no router at all, and with `FUSE_PRD` unset | delivered, ignored (observation-only) | gemini-cli: yes, delivered — routed through `respond()`'s native "inform" shape, then re-wrapped by `joinContextResponses` into the shared Claude-style `hookSpecificOutput.hookEventName/additionalContext` envelope plus a `[NOTE]` title line (not gemini-cli's own minimal shape, but the text arrives). hermes: yes, delivered — same Claude-style `contextResponse` as claude-code; Hermes's own documented non-blocking shape is `{context}`, not `hookSpecificOutput`, so whether a real Hermes client reads it is unverified. cline: yes, delivered in its own native `{contextModification}` shape — `joinContextResponses` keeps whichever envelope its parts came from instead of assuming the Claude one (measured 476 bytes where an earlier build emitted none; the six other targets stay byte-identical, gemini-cli 529 = 529, the Claude-family four 506 = 506) |
+| `SubagentStop` block-once | yes | yes | delivered, response ignored | delivered, response ignored | yes — each in its OWN native block shape via `respond()`: gemini-cli `{"decision":"deny","reason"}`, cline `{"cancel":true,"errorMessage"}`, hermes `{"decision":"block","reason"}` (via `blockResponse`, which happens to match Hermes's own documented block contract). Block-once verified: 1st call blocks, an identical replay is silent (empty stdout) on all three, under both the default journal-based session track and legacy `FUSE_TRACK_JOURNAL=0` |
+| Lead `Stop` block-once | yes | yes | not applicable | best effort — Kimi's `Stop` is a documented blocking event, but not verified live | yes — same per-adapter native shapes and block-once behavior as `SubagentStop` above (gemini-cli/cline/hermes), verified under both tracking modes |
+
+Cursor and Kimi never send an agent-identity field on a Write/Edit
+payload, and a Cursor sub-agent's write runs under a session ID
+unrelated to its own `SubagentStart` event — so per-write ownership
+enforcement isn't possible on either target. Both stay consultative
+permanently; the PostToolUse cross-check is the only enforcement there.
+
 ## `CONFIRM <code>` — recourse for a degraded `ask`
 
 Both harnesses above downgrade `ask` to a hard `deny`: Kimi's binary

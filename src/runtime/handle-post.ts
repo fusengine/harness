@@ -14,6 +14,7 @@ import { recordCodexPostFailure } from "../tracking/codex-post-failure";
 import { defaultStateDir } from "./paths";
 import { fanOutFiles, firstFileMatch } from "./post-fanout";
 import { postOutcome } from "./post-outcome";
+import { prdPostCheck } from "./prd";
 import type { PreContext } from "./handle-pre";
 import type { HandleOutcome } from "./handle";
 
@@ -75,6 +76,7 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // tracking, validation, post-edit context, and notices.
   const files = fanOutFiles(event);
   for (const f of files) postTrackingSideEffects(opts.scope ?? "core", f, f.input, opts.now, payload, opts.cwd);
+  await prdPostCheck(id, event, opts.cwd, file, opts.now); // PRD cross-check — advisory only, never returns stdout
   const seoDeny = opts.scope === "seo" ? seoPostToolUseResponse(payload) : null;
   if (seoDeny && !cursorAfterFileEdit) return { stdout: seoDeny, exit: 0 };
   if (opts.scope === "solid") {

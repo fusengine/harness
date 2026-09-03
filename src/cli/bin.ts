@@ -23,6 +23,7 @@ import { runDoctor, runningVersion, versionBanner } from "./doctor";
 import { parseScope } from "./scope";
 import { isMalformedCursorStdin, isOversize, oversizeStdout, readStdin, traceHook } from "./hook-io";
 import { maybePlaySound } from "./hook-sound";
+import { runPrd } from "./prd";
 
 const cmd = process.argv[2];
 
@@ -77,6 +78,8 @@ if (cmd === "--version" || cmd === "-v") {
   const dir = process.argv[3] ?? process.cwd();
   process.stdout.write(JSON.stringify(runSecurityScan(dir), null, 2) + "\n");
   process.exit(0);
+} else if (cmd === "prd") {
+  process.exit(await runPrd(process.argv.slice(3), process.cwd(), process.env));
 } else if (cmd === "codex-rules") {
   const outIdx = process.argv.indexOf("--out");
   const outPath = outIdx !== -1 ? process.argv[outIdx + 1] : undefined;

@@ -16,6 +16,7 @@ import { applyPatchGate } from "./apply-patch-gate";
 import { isBypassPermissions } from "../adapters/codex/permission-mode";
 import { evaluate } from "../policy/evaluate";
 import { confirmGate } from "./confirm/confirm-gate";
+import { prdPreGate } from "./prd";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
 /** Context the PreToolUse pipeline needs (resolved once by {@link handleHook}). */
@@ -84,6 +85,16 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     const taskCtx = taskContext(opts.cwd, id);
     if (taskCtx) return { stdout: taskCtx, exit: 0 };
   }
+
+  // PRD (task/agent ownership coordination): inert unless FUSE_PRD=1 AND a
+  // router is present — see runtime/prd/prd-pre-gate.ts. Runs BEFORE the
+  // apply_patch gate below: `applyPatchGate` runs `evaluate()` per file, whose
+  // `runGuards()` already includes `protectedPathGuard` — which unconditionally
+  // blocks every `.claude/apex/` path, PRD included. A PRD write this gate just
+  // authorized must short-circuit past both `applyPatchGate` and the gate chain
+  // further down, never reach either.
+  const prdOutcome = await prdPreGate(id, payload, event, opts.cwd, file, opts.now);
+  if (prdOutcome) return prdOutcome;
 
   // Codex `apply_patch`: normalize.ts fanned the freeform patch into per-file
   // changes. OR their static verdicts — one violating hunk blocks the whole

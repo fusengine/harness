@@ -14,7 +14,7 @@ import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { computeMac, loadOrCreateKey } from "./integrity";
 import { withTrackLockSyncBlocking } from "./track-lock-sync";
-import { emptyTrack, type SessionTrack } from "./session-state";
+import { emptyTrack, PRD_VIOLATIONS_CAP, type PrdViolationRecord, type SessionTrack } from "./session-state";
 import type { AuthEntry } from "../freshness/doc-helpers";
 import type { SessionTarget } from "../policy/apex-authorization";
 import type { Receipt } from "./receipts";
@@ -78,6 +78,9 @@ export function foldEvents(events: TrackEvent[], base: SessionTrack = emptyTrack
   const at: Record<string, number> = { ...base.refsReadAt };
   const receipts: Receipt[] = [...(base.receipts ?? [])];
   const trivial = new Set(base.trivialEdits ?? []);
+  const prdOwners: Record<string, string> = { ...base.prdOwners };
+  const prdViolations: PrdViolationRecord[] = [...(base.prdViolations ?? [])];
+  const prdStopBlocked: Record<string, number> = { ...base.prdStopBlocked };
   let targetTs = base.target ? Date.parse(base.target.set_at) || 0 : 0, brainstormTs = 0; // a base flag is unstamped: any event overrides it
   for (const ev of [...events].sort((a, b) => a.ts - b.ts)) { // stable: log order breaks ts ties
     if (ev.field === "refsRead") { const p = String(ev.value); if (!t.refsRead.includes(p)) t.refsRead.push(p); }
@@ -88,9 +91,15 @@ export function foldEvents(events: TrackEvent[], base: SessionTrack = emptyTrack
     else if (ev.field === "trivialEdits") trivial.add(Number(ev.value));
     else if (ev.field === "target" && ev.ts >= targetTs) { t.target = ev.value as SessionTarget; targetTs = ev.ts; }
     else if (ev.field === "brainstormRequired" && ev.ts >= brainstormTs) { t.brainstormRequired = Boolean(ev.value); brainstormTs = ev.ts; }
+    else if (ev.field === "prdOwners") { const [aid, name] = ev.value as [string, string]; prdOwners[aid] = name; }
+    else if (ev.field === "prdViolations") { prdViolations.push(ev.value as PrdViolationRecord); }
+    else if (ev.field === "prdStopBlocked") { const [key, ts] = ev.value as [string, number]; prdStopBlocked[key] = ts; }
   }
   if (Object.keys(at).length) t.refsReadAt = at;
   if (receipts.length) t.receipts = receipts;
+  if (Object.keys(prdOwners).length) t.prdOwners = prdOwners;
+  if (prdViolations.length) t.prdViolations = prdViolations.slice(-PRD_VIOLATIONS_CAP);
+  if (Object.keys(prdStopBlocked).length) t.prdStopBlocked = prdStopBlocked;
   const maxT = Math.max(0, ...trivial);
   t.trivialEdits = [...trivial].filter((x) => x > maxT - TRIVIAL_WINDOW_MS).sort((a, b) => a - b);
   return t;

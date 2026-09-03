@@ -1,0 +1,18 @@
+{
+  "provenance": {
+    "source": "live capture — claude-code SubagentStart (probe/out/claude.jsonl line 2)",
+    "cli_version": "claude-code (no separate CLI version field in the payload)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "session_id": "00000000-1111-4000-8000-000000000001",
+    "transcript_path": "/Users/user/.claude/projects/fake-project/00000000-1111-4000-8000-000000000001.jsonl",
+    "cwd": "$TMP",
+    "scratchpad_dir": "$TMP/scratchpad",
+    "prompt_id": "00000000-2222-4000-8000-000000000001",
+    "agent_id": "agent0000000000001",
+    "agent_type": "general-purpose",
+    "hook_event_name": "SubagentStart"
+  }
+}

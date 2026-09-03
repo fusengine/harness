@@ -17,6 +17,10 @@ import { cartoSessionStart } from "./cartographer/session-start";
 import { dispatchLessons } from "./lessons/dispatch";
 import { withSnapshot } from "./snapshot";
 import { stopCore } from "./stop-core";
+import { prdSubagentContext, prdSubagentStopGate, prdStopGate } from "../prd";
+import { joinContextResponses } from "../../policy/prd";
+import { sanitizeSessionId } from "../home-state";
+import { defaultStateDir, trackFile } from "../paths";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
 export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss";
@@ -70,11 +74,14 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
       if (input.scope === "aipilot") return "";
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now, input.id ?? "claude-code");
-      return subagentCacheContext(input.payload.session_id);
-    case "Stop":
+      return joinContextResponses(subagentCacheContext(input.payload.session_id), prdSubagentContext(input.payload, input.cwd, input.id ?? "claude-code"));
+    case "Stop": {
       if (input.scope === "lessons") return dispatchLessons("Stop", input.payload, input.cwd, input.now, input.id ?? "claude-code");
-      return input.scope === "core" ? stopCore(input.payload, input.cwd, input.now) : null;
-    case "SubagentStop":
+      if (input.scope !== "core") return null;
+      const prdBlock = prdStopGate(input.payload, input.cwd, input.id ?? "claude-code", trackFile(sanitizeSessionId(input.payload.session_id) ?? "unknown", defaultStateDir(input.cwd)), input.now);
+      return prdBlock || stopCore(input.payload, input.cwd, input.now);
+    }
+    case "SubagentStop": {
       // G0 counterpart of the SubagentStart branch above — the SAME
       // monotone max-write, never a decrement (see confirm-subagent.ts).
       markSubagentSeen(input.payload.session_id, input.now);
@@ -84,7 +91,13 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       // explore evidence even when sidechain PostToolUse hooks never fired
       // (#43612/#27655/#34692). SubagentStop is main-session-dispatched (reliable).
       harvestSubagentTrack(input.payload, input.cwd, input.now);
-      return trackAgentMemory(input.payload, undefined, input.now);
+      // null = PRD had nothing to say (off, unnamed agent, or genuinely done)
+      // -> normal trackAgentMemory handling; a non-null string (block, or ""
+      // on an already-blocked replay) must be returned AS-IS, never layered
+      // under a stale "agent completed" message.
+      const prdBlock = prdSubagentStopGate(input.payload, input.cwd, input.id ?? "claude-code", trackFile(sanitizeSessionId(input.payload.session_id) ?? "unknown", defaultStateDir(input.cwd)), input.now);
+      return prdBlock !== null ? prdBlock : trackAgentMemory(input.payload, undefined, input.now);
+    }
     case "TeammateIdle":
       return teammateIdleContext(input.payload, input.cwd, undefined, input.now);
     case "PostToolUseFailure":
