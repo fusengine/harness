@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.93] - 2026-09-03
+
+### Added
+
+- **Opt-in multi-agent PRD ownership coordination** (`src/prd/`) — coordinates file/task ownership across multiple sub-agents working from a shared PRD, entirely inert by default: requires both `FUSE_PRD=1` and a routing file (`apex/prd.json`) present before any behavior activates.
+
 ## [0.1.92] - 2026-09-02
 
 ### Fixed
