@@ -1,0 +1,5 @@
+{
+  "auth-refactor": {
+    "jwt-validation": { "status": "done", "modified": ["src/auth/login.ts"], "unchanged": [] }
+  }
+}

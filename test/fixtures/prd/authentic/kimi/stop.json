@@ -1,0 +1,15 @@
+{
+  "provenance": {
+    "source": "live capture — Kimi Code CLI Stop (probe/out/kimi.jsonl line 27). Kimi's documented blocking-event set includes Stop (adapters.md), unlike SubagentStop which is observation-only.",
+    "cli_version": "kimi_code_cli (payload client_type — no separate version field)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "hook_event_name": "Stop",
+    "session_id": "session_fake00000000000000000001",
+    "cwd": "$TMP",
+    "client_type": "kimi_code_cli",
+    "stop_hook_active": false
+  }
+}

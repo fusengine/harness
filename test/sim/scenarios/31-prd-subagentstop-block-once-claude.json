@@ -1,0 +1,36 @@
+{
+  "name": "prd-subagentstop-block-once-claude",
+  "harness": "claude-code",
+  "doc": "TARGET behavior once Lots A/B ship (prd-design.md §2.4, not implemented yet — Lot D only). backend-expert's SubagentStop fires while its own sub-task (jwt-validation) is still 'assigned' in the task PRD and NOT reported 'done' in its own agent report (no prd/agents/backend-expert-prd.json on disk at all here) -> incompleteSubTasks finds a violation -> block-once: first SubagentStop for this session+agent -> blockResponse (Claude/Codex shape {\"decision\":\"block\",\"reason\":...}, adapters/claude/index.ts:40); an IDENTICAL replay of the same SubagentStop for the same session -> already-blocked-once -> empty stdout (let it stop). RED TODAY BY DESIGN: verified live 2026-09-02 against `bun src/cli/bin.ts hook claude-code core` with this exact setup (FUSE_PRD=1, router+task-PRD present, no agent report) — the CURRENT SubagentStop dispatch (harvestSubagentTrack + trackAgentMemory, lifecycle/dispatch.ts's existing SubagentStop case) has no PRD awareness at all and returns `{\"message\":\"Agent backend-expert completed (no code changes)\"}` on BOTH calls (no `decision` key ever, so step 1 fails; not empty either, so step 2 fails too) — a real response is emitted today, just not the PRD gate's.",
+  "env": { "FUSE_PRD": "1" },
+  "setup": [
+    { "path": "$TMP/.claude/apex/prd.json", "content": "{\"auth-refactor\":{\"prd\":\"prd/auth-refactor-prd.json\",\"status\":\"assigned\"}}" },
+    { "path": "$TMP/.claude/apex/prd/auth-refactor-prd.json", "content": "{\"backend-expert\":{\"files\":[\"src/auth/login.ts\"],\"sub-tasks\":{\"jwt-validation\":{\"status\":\"assigned\"}}},\"backend-expert-2\":{\"files\":[\"src/auth/session.ts\"],\"sub-tasks\":{\"session-store\":{\"status\":\"assigned\"}}}}" }
+  ],
+  "steps": [
+    {
+      "scope": "core",
+      "doc": "First SubagentStop for backend-expert, jwt-validation still incomplete -> expected block.",
+      "event": {
+        "hook_event_name": "SubagentStop",
+        "session_id": "sc31",
+        "agent_id": "agent-backend-expert-0001",
+        "agent_type": "backend-expert",
+        "stop_hook_active": false
+      },
+      "expect": { "exit": 0, "stdout": { "jsonPath": "decision", "equals": "block" } }
+    },
+    {
+      "scope": "core",
+      "doc": "Identical replay, same session_id+agent -> already blocked once -> pass through silently (empty stdout), never a permanent stop-loop.",
+      "event": {
+        "hook_event_name": "SubagentStop",
+        "session_id": "sc31",
+        "agent_id": "agent-backend-expert-0001",
+        "agent_type": "backend-expert",
+        "stop_hook_active": false
+      },
+      "expect": { "exit": 0, "stdout": { "empty": true } }
+    }
+  ]
+}

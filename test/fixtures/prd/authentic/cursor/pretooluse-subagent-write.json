@@ -1,0 +1,21 @@
+{
+  "provenance": {
+    "source": "live capture — Cursor preToolUse, the sub-agent's OWN Write. Runs under a session_id/conversation_id that shares ZERO field with the lead's or with subagentStart's own subagent_id/parent_conversation_id (probe/out/cursor.jsonl line 5) — the fixture that evidences PRD design §6 Risk 1 (no correlating field on Cursor).",
+    "cli_version": "Cursor 3.18.25 (payload cursor_version)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "conversation_id": "22222222-0000-4000-8000-000000000002",
+    "generation_id": "22222222-1111-4000-8000-000000000022",
+    "model": "cursor-grok-4.6-medium",
+    "tool_name": "Write",
+    "tool_input": { "file_path": "$TMP/note.txt", "content": "hello" },
+    "tool_use_id": "call-fake0000000000000002\nfc_fake0000000000000002_1",
+    "session_id": "22222222-0000-4000-8000-000000000002",
+    "hook_event_name": "preToolUse",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["$TMP"],
+    "transcript_path": null
+  }
+}

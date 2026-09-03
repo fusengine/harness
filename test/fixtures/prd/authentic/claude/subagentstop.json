@@ -1,0 +1,27 @@
+{
+  "provenance": {
+    "source": "live capture — claude-code SubagentStop (probe/out/claude.jsonl line 7)",
+    "cli_version": "claude-code (no separate CLI version field in the payload)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "session_id": "00000000-1111-4000-8000-000000000001",
+    "transcript_path": "/Users/user/.claude/projects/fake-project/00000000-1111-4000-8000-000000000001.jsonl",
+    "cwd": "$TMP",
+    "scratchpad_dir": "$TMP/scratchpad",
+    "prompt_id": "00000000-2222-4000-8000-000000000001",
+    "permission_mode": "default",
+    "agent_id": "agent0000000000001",
+    "agent_type": "general-purpose",
+    "effort": { "level": "high" },
+    "hook_event_name": "SubagentStop",
+    "stop_hook_active": false,
+    "agent_transcript_path": "/Users/user/.claude/projects/fake-project/00000000-1111-4000-8000-000000000001/subagents/agent-agent0000000000001.jsonl",
+    "last_assistant_message": "<redacted assistant message, 90 chars>",
+    "background_tasks": [
+      { "id": "agent0000000000001", "type": "subagent", "status": "running", "description": "Create note.txt", "agent_type": "general-purpose" }
+    ],
+    "session_crons": []
+  }
+}

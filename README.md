@@ -64,6 +64,9 @@ don't assume either the old or the "everything in one place" story):
 | `harness check` | cli-mode: check staged files in a pre-commit step, exit non-zero on a violation. For harnesses without hooks. |
 | `harness doctor` | Print the version + resolved path of the harness *actually executing*, and compare it to npm's latest — the fast way to catch a stale global (see Pinning). |
 | `harness --version` | Print the running version (bare, on stdout) and exit. |
+| `harness prd status [--json]` | Read-only, works without `FUSE_PRD=1`. Print each task's router status and sub-task progress. |
+| `harness prd validate <task> [agent]` | Requires `FUSE_PRD=1`. Cross-check a task PRD against agent reports and promote matching sub-tasks/router entries to `validated`. |
+| `harness prd compact <task>` | Requires `FUSE_PRD=1`. Collapse a fully-validated task PRD to its compacted shape. |
 
 Every invocation writes a `@fusengine/harness vX.Y.Z` banner to **stderr** (never
 stdout — the hook JSON contract stays clean) so you can see which version ran.
@@ -313,6 +316,7 @@ non-zero exit is swallowed — a broken or absent player can never break a hook
 | `FUSE_LESSONS_THROTTLE_MIN` | Lessons-injection throttle, minutes (default `5`). |
 | `FUSE_ENFORCE_GEMINI_MCP` | **Opt-in (default off).** Blocks hand-written Tailwind UI (`.tsx/.jsx/.vue/.svelte`) until a `mcp__gemini-design__*` call is made this session. Read fresh per call (`src/policy/gemini-mcp-gate.ts`). |
 | `FUSE_DESIGN_GEMINI` | **Opt-in (default off), a *different* gate from the one above.** Enables the design-pipeline's own Gemini gates (`create_frontend` validation + "generate before hand-writing HTML/CSS") — inert unless a design agent is active (`src/policy/design/gates.ts:58-60`, see [docs/design.md](docs/design.md)). |
+| `FUSE_PRD` | **Opt-in (default off).** Set to exactly `1` to activate task/agent PRD ownership coordination — still inert without a `prd.json` router under `<homeSeg>/apex/`. See [PRD coordination](#prd-coordination-opt-in) below and [docs/prd.md](docs/prd.md). |
 | `FUSE_MCP_TTL_SEC` | MCP (Context7/Exa) cache freshness, seconds (default 48h, `src/runtime/mcp-key.ts`). |
 | `FUSE_WEBFETCH_TTL_SEC` | WebFetch cache freshness, seconds (default 24h — pages stale faster than docs). |
 | `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` | G0 cool-down (seconds, default `300`) for the `CONFIRM <code>` mechanism above — no token can be placed within this window of the last SubagentStart/Stop seen for the session. |
@@ -358,6 +362,18 @@ registerGuard(({ tool, command }) =>
     : null);
 ```
 
+## PRD coordination (opt-in)
+
+Set `FUSE_PRD=1` and write a router file so a lead can split one task
+across several sub-agents, each restricted to writing only its own
+report. Full walkthrough, guard behavior, and the CLI: [docs/prd.md](docs/prd.md).
+
+Minimal example — `.claude/apex/prd.json`:
+
+```json
+{ "auth-refactor": { "prd": "prd/auth-refactor-prd.json", "status": "assigned" } }
+```
+
 ## Subpath exports
 
 | Subpath | What |
@@ -386,6 +402,7 @@ registerGuard(({ tool, command }) =>
 | [docs/modules.md](https://github.com/fusengine/harness/blob/main/docs/modules.md) | cache · refs · state · memory · statusline · util |
 | [docs/adapters.md](https://github.com/fusengine/harness/blob/main/docs/adapters.md) | adapters, compatibility, `harness init`/`hook` wiring |
 | [docs/design.md](https://github.com/fusengine/harness/blob/main/docs/design.md) | design-agent pipeline — state machine, gates, opt-in Gemini |
+| [docs/prd.md](https://github.com/fusengine/harness/blob/main/docs/prd.md) | PRD task/agent ownership coordination — opt-in, `FUSE_PRD=1` |
 | [CHANGELOG.md](https://github.com/fusengine/harness/blob/main/CHANGELOG.md) | release history |
 
 Run `bun run docs:api` for the generated typedoc API reference.

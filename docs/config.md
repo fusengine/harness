@@ -27,6 +27,7 @@ float / `<= 0` all fall back to the default.
 | `FUSE_HARNESS_MARKETPLACES` | `fusengine-plugins` | marketplaces auto-scanned for `solid-*` skill refs when `FUSE_HARNESS_REFS` is unset |
 | `FUSE_ENFORCE_GEMINI_MCP` | _(off)_ | opt-in — blocks hand-written Tailwind UI (`.tsx/.jsx/.vue/.svelte`) until a `mcp__gemini-design__*` call is made this session (`policy/gemini-mcp-gate.ts`) |
 | `FUSE_DESIGN_GEMINI` | _(off)_ | opt-in — a **different** gate from the one above: enables the design-pipeline's own Gemini gates (`policy/design/gates.ts`), inert unless a design agent is active — see [design.md](./design.md) |
+| `FUSE_PRD` | _(off)_ | opt-in — set to exactly `1` to activate the PRD task/agent ownership module (`policy/prd/prd-enabled.ts`); still inert without a `prd.json` router under `<homeSeg>/apex/` — see [prd.md](./prd.md) |
 | `FUSE_MCP_TTL_SEC` | `172800` (48h) | Context7/Exa cache freshness (`runtime/mcp-key.ts`) |
 | `FUSE_WEBFETCH_TTL_SEC` | `86400` (24h) | WebFetch cache freshness — pages stale faster than docs |
 | `FUSE_CONFIRM_SUBAGENT_WINDOW_SEC` | `300` | G0 cool-down (seconds) for the `CONFIRM <code>` mechanism (`runtime/confirm/confirm-subagent.ts`) — no confirm token can be placed within this window of the last SubagentStart/SubagentStop seen for the session. Reuses `parseEnvInt` directly (not `resolveTtlSec`, whose default is hardcoded to 120 regardless of key) |

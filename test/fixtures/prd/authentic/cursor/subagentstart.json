@@ -1,0 +1,25 @@
+{
+  "provenance": {
+    "source": "live capture — Cursor subagentStart, the LEAD's conversation_id (probe/out/cursor.jsonl line 2)",
+    "cli_version": "Cursor 3.18.25 (payload cursor_version)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "conversation_id": "11111111-0000-4000-8000-000000000001",
+    "generation_id": "11111111-0000-4000-8000-000000000001",
+    "model": "cursor-grok-4.6-medium",
+    "subagent_id": "call-fake0000000000000001\nfc_fake0000000000000001_0",
+    "subagent_type": "general-purpose",
+    "task": "<redacted task prompt, 340 chars>",
+    "parent_conversation_id": "11111111-0000-4000-8000-000000000001",
+    "tool_call_id": "call-fake0000000000000001\nfc_fake0000000000000001_0",
+    "subagent_model": "cursor-grok-4.6-medium",
+    "is_parallel_worker": false,
+    "session_id": "11111111-0000-4000-8000-000000000001",
+    "hook_event_name": "subagentStart",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["$TMP"],
+    "transcript_path": null
+  }
+}

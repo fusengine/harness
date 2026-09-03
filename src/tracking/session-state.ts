@@ -25,7 +25,25 @@ export interface SessionTrack {
   brainstormRequired?: boolean;
   /** Verification receipts (tsc/test) at PostToolUse; absent/empty reads as unverified in the TaskCompleted gate (backward compat, fail-closed). See {@link Receipt}. */
   receipts?: Receipt[];
+  /** PRD (task/agent ownership coordination) — `agent_id` bound to its resolved agent-report name. Optional: absent on any track predating the PRD module (backward compat). */
+  prdOwners?: Record<string, string>;
+  /** PRD cross-check violations detected at PostToolUse (capped, append-only). */
+  prdViolations?: PrdViolationRecord[];
+  /** PRD SubagentStop/Stop one-shot block markers, keyed `"sessionId:event[:agent]"` -> the epoch-ms the block fired. */
+  prdStopBlocked?: Record<string, number>;
 }
+
+/** One PRD cross-check violation, timestamped for the journal/dedup. */
+export interface PrdViolationRecord {
+  ts: number;
+  task: string;
+  agent: string;
+  sub: string;
+  reason: string;
+}
+
+/** Cap on {@link SessionTrack.prdViolations} (mirrors the `receipts` style bound — oldest evicted first). */
+export const PRD_VIOLATIONS_CAP = 50;
 /** A fresh, empty track. */
 export function emptyTrack(): SessionTrack {
   return { authorizations: {}, refsRead: [], agents: [], trivialEdits: [] };
@@ -91,4 +109,32 @@ export function trivialCount(track: SessionTrack, windowMs: number, now: number)
 /** Set the brainstorm-required flag (from creation-intent detection). Immutable. */
 export function recordBrainstormRequired(track: SessionTrack, required: boolean): SessionTrack {
   return { ...track, brainstormRequired: required };
+}
+
+/** Bind `agentId` to its resolved PRD agent-report `name` (merge; idempotent no-op if already bound to the same name). Immutable. */
+export function recordPrdOwner(track: SessionTrack, agentId: string, name: string): SessionTrack {
+  if (track.prdOwners?.[agentId] === name) return track;
+  return { ...track, prdOwners: { ...track.prdOwners, [agentId]: name } };
+}
+
+/**
+ * Append one PRD cross-check violation. Immutable, uncapped in the mutator
+ * itself — same append-only shape as {@link Receipt} — so the journal diff's
+ * prefix comparison (`tail`, track-diff.ts) never sees an eviction it would
+ * mistake for a bulk rewrite. The {@link PRD_VIOLATIONS_CAP} bound is applied
+ * only when the journal is folded/read (track-journal.ts's `foldEvents`),
+ * mirroring how `trivialEdits`'s sliding window is re-derived at fold time.
+ */
+export function recordPrdViolation(track: SessionTrack, v: PrdViolationRecord): SessionTrack {
+  return { ...track, prdViolations: [...(track.prdViolations ?? []), v] };
+}
+
+/** Record a PRD SubagentStop/Stop one-shot block marker (merge). Immutable. */
+export function recordPrdStopBlocked(track: SessionTrack, key: string, ts: number): SessionTrack {
+  return { ...track, prdStopBlocked: { ...track.prdStopBlocked, [key]: ts } };
+}
+
+/** True when the PRD one-shot block for `key` has already fired. */
+export function prdAlreadyBlocked(track: SessionTrack, key: string): boolean {
+  return track.prdStopBlocked?.[key] !== undefined;
 }

@@ -33,6 +33,8 @@ export interface NormalizedEvent {
   permissionMode?: string;
   /** Codex logical tool-use identity, shared by sibling hook callbacks. */
   toolUseId?: string;
+  /** Sub-agent identifier, if the tool-use came from one (Claude/Codex only — Cursor/Kimi never send this field, confirmed live). */
+  agentId?: string;
   /** Harness-reported working directory used to scope Codex authorization. */
   cwd?: string;
   /** Validated Cursor multi-root workspace paths in wire order. */
@@ -71,6 +73,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
       ...extractCursorEvent(payload),
       sessionId: str(payload.session_id) ?? str(payload.conversation_id) ?? "",
       agentType: str(payload.agent_type),
+      agentId: str(payload.agent_id),
       permissionMode: str(payload.permission_mode),
     };
   }
@@ -83,6 +86,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
     input,
     sessionId: str(payload.session_id) ?? str(payload.conversation_id) ?? "",
     agentType: str(payload.agent_type) ?? str(input.subagent_type),
+    agentId: str(payload.agent_id),
     permissionMode: str(payload.permission_mode),
     toolUseId: str(payload.tool_use_id),
     cwd: str(payload.cwd),

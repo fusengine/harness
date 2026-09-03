@@ -114,6 +114,31 @@ than a new one — this is a heuristic tuned to the observed fan-out latency, no
 a protocol guarantee. See `deny-loop.ts`'s `dedupMs` param and `one-shot.ts`'s
 `burstFirst` for the two consumers.
 
+## PRD coordination (`./runtime/prd`)
+
+Opt-in (`FUSE_PRD=1`), documented in full at [prd.md](./prd.md). Five
+dispatch-point exports, each wired as one call into an existing dispatch
+point, plus two internal helpers (`prd-identity.ts`'s
+`resolvePrdIdentity`, `prd-candidate-files.ts`'s `prdCandidateFiles`) used
+only by `prd-pre-gate.ts` — both re-exported from the `./runtime/prd`
+barrel but not separate call sites:
+
+- `prd-pre-gate.ts`'s `prdPreGate` → one line in `handle-pre.ts`, ahead of
+  the rest of the PRE pipeline — allows an authorized PRD write (bypassing
+  `gate()` entirely) or returns the ownership deny.
+- `prd-post-check.ts`'s `prdPostCheck` → one line in `handle-post.ts`,
+  after the existing per-file loop — runs the cross-check when a task PRD
+  or the router just changed.
+- `prd-subagent-context.ts`'s `prdSubagentContext` → folded into
+  `lifecycle/dispatch.ts`'s `SubagentStart` case — injects the starting
+  agent's own file/sub-task slice.
+- `prd-subagent-stop.ts`'s `prdSubagentStopGate` → `lifecycle/dispatch.ts`'s
+  `SubagentStop` case, ahead of `trackAgentMemory` (returned only when the
+  gate is a no-op) — one-shot block on an incomplete sub-task.
+- `prd-stop-gate.ts`'s `prdStopGate` → `lifecycle/dispatch.ts`'s `Stop`
+  case (`core` scope), before `stopCore` — one-shot block on an
+  unresolved cross-check violation.
+
 ## Sidechain evidence harvest (`SubagentStop`)
 
 Sub-agent `PostToolUse` hooks don't reliably fire on Claude Code (documented

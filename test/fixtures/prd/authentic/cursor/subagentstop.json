@@ -1,0 +1,29 @@
+{
+  "provenance": {
+    "source": "live capture — Cursor subagentStop, back on the LEAD's conversation_id (probe/out/cursor.jsonl line 8)",
+    "cli_version": "Cursor 3.18.25 (payload cursor_version)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "conversation_id": "11111111-0000-4000-8000-000000000001",
+    "generation_id": "11111111-0000-4000-8000-000000000001",
+    "model": "cursor-grok-4.6-medium",
+    "subagent_id": "call-fake0000000000000001\nfc_fake0000000000000001_0",
+    "subagent_type": "general-purpose",
+    "status": "completed",
+    "duration_ms": 17432,
+    "parent_conversation_id": "11111111-0000-4000-8000-000000000001",
+    "message_count": 0,
+    "tool_call_count": 0,
+    "loop_count": 0,
+    "task": "<redacted task prompt, 340 chars>",
+    "description": "Create note.txt file",
+    "session_id": "11111111-0000-4000-8000-000000000001",
+    "hook_event_name": "subagentStop",
+    "cursor_version": "3.18.25",
+    "workspace_roots": ["$TMP"],
+    "transcript_path": "/Users/user/.cursor/projects/fake-project/agent-transcripts/11111111-0000-4000-8000-000000000001/11111111-0000-4000-8000-000000000001.jsonl",
+    "agent_transcript_path": null
+  }
+}

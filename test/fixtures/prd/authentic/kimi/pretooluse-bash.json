@@ -1,0 +1,17 @@
+{
+  "provenance": {
+    "source": "live capture — Kimi Code CLI PreToolUse, Bash (probe/out/kimi.jsonl line 9). No agent_id/agent_type field exists on any Kimi payload observed — structurally excluded per adapters/kimi/index.ts's documented field set.",
+    "cli_version": "kimi_code_cli (payload client_type — no separate version field)",
+    "captured": "2026-09-02",
+    "sanitization": "v1 — see test/fixtures/prd/README.md"
+  },
+  "stdin": {
+    "hook_event_name": "PreToolUse",
+    "session_id": "session_fake00000000000000000001",
+    "cwd": "$TMP",
+    "client_type": "kimi_code_cli",
+    "tool_name": "Bash",
+    "tool_input": { "command": "pwd && ls" },
+    "tool_call_id": "tool_fake0000000000000001"
+  }
+}
