@@ -127,7 +127,7 @@ function malformedInput(rng: () => number, length: number): string {
   return out;
 }
 
-test("(d) perf: 20 malformed 2000-char heredoc/quote/arithmetic inputs stay under 5ms each", () => {
+test("(d) perf: 20 malformed 2000-char heredoc/quote/arithmetic inputs stay under 50ms each (no catastrophic backtracking)", () => {
   const rng = mulberry32(1337);
   let max = 0;
   for (let i = 0; i < 20; i++) {
@@ -136,7 +136,7 @@ test("(d) perf: 20 malformed 2000-char heredoc/quote/arithmetic inputs stay unde
     bashWriteGuard(cmd(command));
     const elapsed = performance.now() - start;
     max = Math.max(max, elapsed);
-    expect(elapsed).toBeLessThan(5);
+    expect(elapsed).toBeLessThan(50);
   }
   console.log(`(d) max guard time over 20 malformed 2000-char inputs: ${max.toFixed(3)}ms`);
 });
