@@ -22,7 +22,7 @@ const WRAP = "(?:env|timeout|nice|nohup|sudo|command|stdbuf|time|ionice|exec|xar
 const WRAP_ARG = "(?:\\w+=\\S+|--?[^\\s-]\\S*|\\d+[smhd]?)";
 
 /**
- * Command-position anchor: line/segment start or a `;&|(` separator, then any
+ * Command-position anchor: line/segment start or a `;&|(` \` separator, then any
  * chain of {@link WRAP} wrappers (each with its own {@link WRAP_ARG} tokens).
  * Anchoring a write motif here makes it fire on a real invocation
  * (`env sed -i x src/a.ts`) while ignoring a quoted/argument MENTION of the same
@@ -37,4 +37,18 @@ const WRAP_ARG = "(?:\\w+=\\S+|--?[^\\s-]\\S*|\\d+[smhd]?)";
  * need a tokenizer, out of scope here; the Write/Edit tool gate stays the
  * backstop for what slips through.
  */
-export const CMD: string = `(?:^|[\\n;&|(])\\s*(?:${WRAP}\\s+(?:${WRAP_ARG}\\s+)*)*`;
+/**
+ * Leading `VAR=value` environment-variable assignments accepted before any
+ * wrapper chain (bypass #4 closure: `BUN_X=1 bun -e …`, `FOO=1 sed -i x
+ * src/a.ts` used to fall through — {@link CMD} anchored only at `^|[;&|(]`
+ * immediately followed by a wrapper/command token, so an env-var prefix at
+ * position 0 was invisible to it). `\S*` allows an empty value (`FOO=`); the
+ * mandatory trailing `\s+` keeps every iteration non-zero-width (no `(X*)*`
+ * catastrophic shape — same reasoning as {@link WRAP_ARG}'s own `\w+=\S+`
+ * alternative). Widening {@link CMD} with this can only make MORE commands
+ * match a mutator/write pattern (recognizing a previously-invisible wrapped
+ * invocation); it can never turn an existing block/ask into an allow.
+ */
+const ENV_PREFIX = "(?:\\w+=\\S*\\s+)*";
+
+export const CMD: string = `(?:^|[\\n;&|(\x60])\\s*${ENV_PREFIX}(?:${WRAP}\\s+(?:${WRAP_ARG}\\s+)*)*`;

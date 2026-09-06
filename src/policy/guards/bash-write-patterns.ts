@@ -1,11 +1,37 @@
 import { CMD } from "./bash-command-anchor";
 
-/** Code-file extensions the write guards police (shared by CODE_REDIRECT and
- *  CODE_COMMAND_WRITE). Case-sensitive, parity with the Python guard's list. */
-const CODE_EXT = "ts|tsx|js|jsx|py|go|rb|rs|java|kt|php|swift|vue|svelte|astro|css|c|cpp|h";
+export {
+  RUBY_WRITES, JS_RUNTIME_WRITES, INLINE_JS_ANCHOR, INLINE_JS_STDIN_ANCHOR, PERL_E_ANCHOR, PERL_WRITES,
+  RUBY_E_ANCHOR, NODE_WRITES,
+} from "./bash-write-inline";
 
-/** Redirect (`>`/`>>`) targeting a code-file extension. */
-export const CODE_REDIRECT: RegExp = new RegExp(`(?:>>?)\\s*[^\\s|;&]*\\.(?:${CODE_EXT})\\b`);
+/** Code-file extensions the write guards police (shared by CODE_REDIRECT and
+ *  CODE_COMMAND_WRITE). Widened (bypass #9 closure, 2026-09-05 challenger)
+ *  with `mts|cts|mjs|cjs` (TS/JS's explicit-module-kind extensions — absent
+ *  before, so `writeFileSync("a.mts")`/`"a.cjs"` fell through as non-code)
+ *  and `dart`, for parity with the extension list in file-size-scope.ts.
+ *  Matched case-insensitively by every consumer below (`i` flag) — parity
+ *  {@link CODE_FILE_LITERAL}'s own bypass #7 closure. */
+const CODE_EXT = "ts|tsx|mts|cts|js|jsx|mjs|cjs|py|go|rb|rs|java|kt|php|swift|dart|vue|svelte|astro|css|c|cpp|h";
+
+/** Redirect (`>`/`>>`) targeting a code-file extension. Case-insensitive
+ *  (bypass #9 closure, 2026-09-05 challenger), for parity with
+ *  {@link CODE_COMMAND_WRITE} and {@link CODE_FILE_LITERAL}: an upper-cased
+ *  extension (`.TS`) still overwrites the same code file on a
+ *  case-insensitive filesystem (APFS default). */
+export const CODE_REDIRECT: RegExp = new RegExp(`(?:>>?)\\s*[^\\s|;&]*\\.(?:${CODE_EXT})\\b`, "i");
+
+/**
+ * A code-file extension named ANYWHERE in an inline script string (typically a
+ * path argument to a write API) — parity {@link CODE_REDIRECT} but without the
+ * leading `>`/`>>`, since the target here is a function-call argument, not a
+ * shell redirect. Reuses {@link CODE_EXT} so both stay in lockstep.
+ */
+// `i` flag (bypass #7 closure): a case-varied extension (`.TS`, `.Rb`) still
+// overwrites the same code file on a case-insensitive filesystem (APFS
+// default) — a bare-case regex used to let `writeFileSync("src/x.TS")` slip
+// past as a "non-code" ask instead of a hard block.
+export const CODE_FILE_LITERAL: RegExp = new RegExp(`\\.(?:${CODE_EXT})\\b`, "i");
 
 /**
  * Interpreters / tools that mutate source in place, plus heredoc-into-file —
@@ -36,16 +62,16 @@ export const CODE_MUTATORS: readonly { re: RegExp; desc: string }[] = [
  * decoy-first-target (`tee log.txt src/x.ts`) can't hide the code write. A tee
  * to a NON-code target (`cmd | tee results.txt`) does not match — it stays a
  * plain ASK_WRITERS ask, never a hard block, so ordinary logging is untouched.
+ * Case-insensitive (bypass #9 closure, 2026-09-05 challenger): a bare-case
+ * match let `tee src/a.TS` fall through to the generic ASK_WRITERS "tee to
+ * file" ask instead of this hard BLOCK, since an upper-cased extension still
+ * overwrites the same code file on a case-insensitive filesystem (APFS
+ * default).
  */
 export const CODE_COMMAND_WRITE: RegExp = new RegExp(
   `${CMD}(?:tee\\s+[^;&|\\n]*?|dd\\b[^|]*\\bof=\\S*)\\.(?:${CODE_EXT})\\b`,
+  "i",
 );
-
-/** File-mutating one-liners via `node -e` / `ruby -e` (parity NODE_WRITES/RUBY_WRITES). */
-export const NODE_WRITES: RegExp =
-  /writeFile|appendFile|createWriteStream|fs\.(?:write|rename|unlink|mkdir|rmdir|copyFile)|execSync|spawnSync|child_process/;
-export const RUBY_WRITES: RegExp =
-  /File\.(?:write|open|delete|rename)|IO\.write|FileUtils|\bsystem\b|\bexec\b|`[^`]/;
 
 /**
  * Command-position anchor for `python3 -c` (same anchored-token shape as the

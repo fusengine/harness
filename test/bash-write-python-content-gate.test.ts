@@ -60,12 +60,14 @@ test("passes python3 -c json.dumps (serialize only, no I/O)", () => {
 
 test("non-regression: node -e read-only vs write", () => {
   expect(bashWriteGuard(cmd("node -e \"console.log(1)\""))).toBeNull();
-  expect(bashWriteGuard(cmd("node -e \"fs.writeFileSync('x.ts','bad')\""))?.kind).toBe("ask");
+  // 2026-09-05 owner decision: inline-script write to a CODE file is a block (was ask), parity with shell redirects.
+  expect(bashWriteGuard(cmd("node -e \"fs.writeFileSync('x.ts','bad')\""))?.kind).toBe("block");
 });
 
 test("non-regression: ruby -e read-only vs write", () => {
   expect(bashWriteGuard(cmd("ruby -e \"puts 1\""))).toBeNull();
-  expect(bashWriteGuard(cmd("ruby -e \"File.write('x.ts','bad')\""))?.kind).toBe("ask");
+  // 2026-09-05 owner decision: inline-script write to a CODE file is a block (was ask), parity with shell redirects.
+  expect(bashWriteGuard(cmd("ruby -e \"File.write('x.ts','bad')\""))?.kind).toBe("block");
 });
 
 test("non-regression: sed/perl/awk/patch/tee-to-code stay blocked", () => {
