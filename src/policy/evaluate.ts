@@ -1,6 +1,6 @@
 import { isFileSizeScoped, resolveSolidRefFramework } from "./file-size-scope";
 import { countLines, evaluateFileSize } from "./file-size";
-import { computeEditResultLines } from "./edit-outcome";
+import { computeEditResultLines, computePatchResultLines } from "./edit-outcome";
 import { resolveMaxLines } from "../config/limits";
 import { matchPatterns, GIT_BLOCKED, RALPH_SAFE, isRalphMode } from "./patterns";
 import { runGuards } from "./guards";
@@ -46,9 +46,16 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
     // A computable Edit outcome bypasses the on-disk-only ceiling below: either
     // the result itself is compliant, or the file was already oversized and
     // this Edit strictly shrinks it (see policy/edit-outcome.ts). Fails closed
-    // to the ceiling whenever the outcome isn't computable.
-    const editResult = ctx.tool === "Edit" && ctx.existingContent !== undefined && ctx.content !== undefined
-      ? computeEditResultLines(ctx.existingContent, ctx.oldString, ctx.content, ctx.isReplaceAll === true)
+    // to the ceiling whenever the outcome isn't computable. `ctx.hunks` (Codex
+    // apply_patch's pre-sized `@@` chunks) takes priority over the single
+    // oldString/content pair — every other caller (Claude Edit, Cursor) leaves
+    // it undefined, so their single-pair path below is untouched.
+    const editResult = ctx.tool === "Edit" && ctx.existingContent !== undefined
+      ? ctx.hunks !== undefined
+        ? computePatchResultLines(ctx.existingContent, ctx.hunks)
+        : ctx.content !== undefined
+          ? computeEditResultLines(ctx.existingContent, ctx.oldString, ctx.content, ctx.isReplaceAll === true)
+          : null
       : null;
     if (editResult !== null && (editResult <= max || editResult < existing)) {
       return { decision: "allow", message: null };
@@ -62,7 +69,7 @@ export function evaluate(ctx: PolicyContext): PolicyResult {
     // content is itself over the limit — the incoming count only ever gates
     // an early "shrunk to compliant" allow, it's never what gets displayed.
     const displayLines = ctx.tool === "Write" ? ctx.existingLines ?? lines : lines;
-    const verdict = evaluateFileSize(lines, max, ctx.filePath, framework, displayLines);
+    const verdict = evaluateFileSize(lines, max, ctx.filePath, framework, displayLines, ctx.target, ctx.patchPath);
     if (lines > 0 && !verdict.ok) {
       return {
         decision: "deny",

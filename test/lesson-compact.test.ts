@@ -4,7 +4,10 @@
  * the current project's MEMORY/LESSON.md, never another project's under the same
  * HOME. Measures the actual char-shrink on a large synthetic file.
  */
-import { test, expect } from "bun:test";
+import { afterAll, test, expect } from "bun:test";
+// This file points HOME at a tmp dir; restore it so later test files (and the children they spawn) keep the real HOME.
+const REAL_HOME = process.env.HOME;
+afterAll(() => { if (REAL_HOME === undefined) delete process.env.HOME; else process.env.HOME = REAL_HOME; });
 import { tmpdir } from "node:os";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

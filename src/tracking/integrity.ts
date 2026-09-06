@@ -20,9 +20,10 @@ import { join } from "node:path";
 import { fuseHarnessHome } from "../runtime/home-state";
 import type { SessionTrack } from "./session-state";
 
-const HARNESS_DIR = fuseHarnessHome();
-const KEY_PATH = join(HARNESS_DIR, ".key");
-const NONCE_PATH = join(HARNESS_DIR, ".nonce");
+/** `~/.fuse-harness`, resolved at CALL time: a HOME change after import (tests, spawned children inheriting the current env) must resolve the same key dir as the child, or its signed events are rejected. */
+const harnessDir = (): string => fuseHarnessHome();
+const keyPath = (): string => join(harnessDir(), ".key");
+const noncePath = (): string => join(harnessDir(), ".nonce");
 
 /** Signed envelope wrapping a JSON-serialised {@link SessionTrack}. */
 export interface TrackEnvelope {
@@ -36,24 +37,24 @@ export interface TrackEnvelope {
 
 /** Load (or create on first use) the per-machine HMAC key stored at mode 0600. */
 export function loadOrCreateKey(): string {
-  mkdirSync(HARNESS_DIR, { recursive: true });
-  if (existsSync(KEY_PATH)) return readFileSync(KEY_PATH, "utf8").trim();
+  mkdirSync(harnessDir(), { recursive: true });
+  if (existsSync(keyPath())) return readFileSync(keyPath(), "utf8").trim();
   // Race-tolerant creation ("wx" crowns ONE creator): before, N concurrent
   // first-time processes (virgin home — CI) each signed with their OWN key.
   const candidate = randomBytes(32).toString("hex");
   try {
-    writeFileSync(KEY_PATH, candidate, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    writeFileSync(keyPath(), candidate, { encoding: "utf8", mode: 0o600, flag: "wx" });
     return candidate;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
   }
   // The winner's 64-byte write is one write(2); bounded re-reads cover the gap.
   for (let i = 0; i < 5; i++) {
-    const existing = readFileSync(KEY_PATH, "utf8").trim();
+    const existing = readFileSync(keyPath(), "utf8").trim();
     if (existing) return existing;
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
   }
-  const key = readFileSync(KEY_PATH, "utf8").trim();
+  const key = readFileSync(keyPath(), "utf8").trim();
   if (!key) throw new Error("fuse: empty .key after write contention");
   return key;
 }
@@ -63,8 +64,8 @@ export function loadOrCreateKey(): string {
  * Never read during {@link verifyTrack} — see module JSDoc for rationale.
  */
 export function writeLastNonce(nonce: number): void {
-  mkdirSync(HARNESS_DIR, { recursive: true });
-  writeFileSync(NONCE_PATH, String(nonce), { encoding: "utf8", mode: 0o600 });
+  mkdirSync(harnessDir(), { recursive: true });
+  writeFileSync(noncePath(), String(nonce), { encoding: "utf8", mode: 0o600 });
 }
 
 /** Compute HMAC-SHA256 over `"${nonce}:${data}"` (nonce: envelope number or journal per-line string). */

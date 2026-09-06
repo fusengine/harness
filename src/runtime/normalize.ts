@@ -1,4 +1,4 @@
-import { parseApplyPatch } from "../adapters/codex/apply-patch";
+import { parseApplyPatch, type PatchHunk } from "../adapters/codex/apply-patch";
 import { extractCursorEvent } from "../adapters/cursor/normalize";
 import { commandToString } from "./command-string";
 import { canonicalizeCodexShellTool } from "./codex-shell-tool";
@@ -10,6 +10,8 @@ export interface NormalizedFile {
   content: string;
   oldString?: string;
   op: "add" | "update" | "delete";
+  /** Codex `apply_patch` Update File only: the pre-sized `@@` chunks (adapters/codex/apply-patch.ts) the SOLID file-size gate uses to judge the file AFTER the patch. Absent for add/delete and for Cursor. */
+  hunks?: PatchHunk[];
 }
 
 /** A hook event normalized across harnesses. */
@@ -98,7 +100,7 @@ export function normalizeEvent(id: string, payload: Record<string, unknown>): No
   // the git guards. Every other tool is untouched below.
   if (tool === "apply_patch") {
     const patch = str(input.command) ?? str(payload.command) ?? "";
-    const files = parseApplyPatch(patch).map((f) => ({ filePath: f.path, content: f.content, op: f.op }));
+    const files = parseApplyPatch(patch).map((f) => (f.hunks ? { filePath: f.path, content: f.content, op: f.op, hunks: f.hunks } : { filePath: f.path, content: f.content, op: f.op }));
     return { ...base, phase: base.phase, files: files.length > 0 ? files : undefined };
   }
   return {

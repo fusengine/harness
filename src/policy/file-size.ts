@@ -78,6 +78,13 @@ export function countFrameworkCodeLines(content: string): number {
  * Evaluate a file's line count against the SOLID limit.
  * @param lines - the file's line count
  * @param max - the limit (defaults to `resolveMaxLines()`)
+ * @param target - Message-rendering target (policy/interfaces/types.ts::PolicyContext.target).
+ *   `"codex"` swaps the Claude-specific remediation (`~/.claude` plugin path,
+ *   `Write` tool) for an `apply_patch`-compatible one; every other value (incl.
+ *   the default `""`) renders the ORIGINAL Claude message, byte-for-byte.
+ * @param patchPath - Codex only: project-relative path recopied verbatim into
+ *   the `*** Update File:` remediation (a bare basename would name a file that
+ *   does not exist at the project root). Falls back to the basename.
  */
 export function evaluateFileSize(
   lines: number,
@@ -85,15 +92,15 @@ export function evaluateFileSize(
   filePath = "",
   framework = "generic",
   displayLines: number = lines,
+  target = "",
+  patchPath = "",
 ): FileSizeVerdict {
   if (lines <= max) return { ok: true, lines, max, message: null };
   const split = splitTarget(max);
   const fname = filePath ? basename(filePath) : "file";
   const ref = SOLID_REF[framework] ?? "generic/";
-  return {
-    ok: false,
-    lines,
-    max,
-    message: `BLOCKED: '${fname}' has ${displayLines} lines (max: ${max}). TO SPLIT: 1) Read SOLID rules: ${PLUGINS_DIR}/${ref} 2) Create new module files (<${split} lines each) 3) Use Write to replace '${fname}' with <${max} lines version.`,
-  };
+  const message = target === "codex"
+    ? `BLOCKED: '${fname}' has ${displayLines} lines (max: ${max}). TO SPLIT: 1) Create new module files (<${split} lines each) 2) Use apply_patch (*** Update File: ${patchPath || fname}) to shrink it to <${max} lines.`
+    : `BLOCKED: '${fname}' has ${displayLines} lines (max: ${max}). TO SPLIT: 1) Read SOLID rules: ${PLUGINS_DIR}/${ref} 2) Create new module files (<${split} lines each) 3) Use Write to replace '${fname}' with <${max} lines version.`;
+  return { ok: false, lines, max, message };
 }

@@ -4,6 +4,17 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.95] - 2026-09-06
+
+### Fixed
+
+- **HMAC key directory resolved lazily** (`src/tracking/integrity.ts`) — it previously captured the journal signing key/nonce directory from `os.homedir()` once at import time. On Linux, `os.homedir()` follows a mutated `HOME` at call time, so a child `bun` process spawned by `test/track-journal-toctou.test.ts` after another test suite temporarily redirected `HOME` signed its journal events with a key under that tmp `HOME`, while the parent verified against the key captured at import — the child events were rejected as a total loss. macOS Bun ignores a mutated `HOME` in `os.homedir()`, which is why this never reproduced locally; `bun test`'s file run order changed with the 2026-08-31 runner image update, which is what turned this red in CI. `integrity.ts` now resolves the key and nonce paths lazily at call time, and `test/lessons.test.ts`, `test/lessons-session.test.ts`, `test/lesson-compact.test.ts` restore `HOME` in `afterAll`.
+- **Codex `apply_patch` SOLID size gate computed the post-patch line count wrong** (`src/policy/edit-outcome.ts`, `src/adapters/codex/apply-patch.ts`) — the gate now simulates the patch on the real file content (`computePatchResultLines`) and reuses the strict-shrink policy already shared with Claude Edit, instead of a hunk-delta arithmetic that inherited a file-vs-hunk final-newline mismatch. 205 to 199 and 205 to 204 stay allowed, 205 to 206 and 199 to 201 are refused, an invalid patch is refused. The Codex guidance message now describes the `apply_patch` procedure instead of telling Codex to switch tools. Claude path unchanged.
+
+### Added
+
+- **Inline-script writes now gated on every target** (`src/policy/guards/bash-write-inline.ts`, `bash-write-lexer*.ts`) — `bun -e` / `node -e` / `tsx -e` / `deno eval` / `ruby -e` / `perl -e` and stdin forms (`bun -`, `node -`, `ruby -`, `perl -`) that write a code file are blocked like redirections, on Claude, Codex, Kimi, and Cursor alike. A new single-pass shell lexer skips quoted strings, heredoc bodies, comments, arithmetic, and tracks command substitution, so commit/PR bodies that merely mention these commands are never blocked (68 canonical Claude Code commit/gh forms verified at main parity; 300-case corpus: 0 loosened vs main). Dead `stripQuoted` removed.
+
 ## [0.1.94] - 2026-09-03
 
 ### Added

@@ -26,6 +26,10 @@ test("shared shell verdict matrix stays stable across Claude, Codex, Cursor, and
     { command: "rg '->between' fichier.php", expected: ["allow", "allow", "allow", "allow"] },
     { command: "echo x > result.ts", expected: ["deny", "deny", "deny", "deny"] },
     { command: "echo x > result.log", expected: ["ask", "deny", "deny", "deny"] },
+    { command: 'bun -e \'require("fs").writeFileSync("src/x.ts","1")\'', expected: ["deny", "deny", "deny", "deny"] },
+    { command: 'bun -e \'require("fs").writeFileSync("out.json","1")\'', expected: ["ask", "deny", "deny", "deny"] },
+    { command: "bun - <<'EOF'\nrequire(\"fs\").writeFileSync(\"src/x.ts\",\"1\")\nEOF", expected: ["deny", "deny", "deny", "deny"] },
+    { command: 'BUN_X=1 bun -e \'require("fs").writeFileSync("src/x.ts","1")\'', expected: ["deny", "deny", "deny", "deny"] },
   ] as const;
   for (const row of cases) {
     const actual = await Promise.all(ids.map(async (id) => decision(id, (await handleHook(id, payload(id, row.command, cwd), { now: 1000, cwd, home })).stdout)));
