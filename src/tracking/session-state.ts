@@ -23,7 +23,7 @@ export interface SessionTrack {
   agents: { name: string; ts: number; quality?: AgentQuality }[];
   trivialEdits: number[];
   brainstormRequired?: boolean;
-  /** Verification receipts (tsc/test) at PostToolUse; absent/empty reads as unverified in the TaskCompleted gate (backward compat, fail-closed). See {@link Receipt}. */
+  /** Verification receipts (static-check/test runs, see `tracking/receipt-runners`) at PostToolUse; absent/empty reads as unverified in the TaskCompleted gate (backward compat, fail-closed). See {@link Receipt}. */
   receipts?: Receipt[];
   /** PRD (task/agent ownership coordination) — `agent_id` bound to its resolved agent-report name. Optional: absent on any track predating the PRD module (backward compat). */
   prdOwners?: Record<string, string>;

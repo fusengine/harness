@@ -73,7 +73,7 @@ export function trackAgentMemory(data: Record<string, unknown>, home: string = h
         // Window = TTL×5, matching the TaskCompleted receipt gate.
         const windowMs = resolveTtlSec(process.env) * 1000 * 5;
         const noReceipt = freshReceiptFromFile(trackFile(sessionId, defaultStateDir(process.cwd())), windowMs, now) === null;
-        const note = noReceipt ? " NO VERIFICATION RECEIPT — run tsc + tests before reporting done." : "";
+        const note = noReceipt ? " NO VERIFICATION RECEIPT — run your static checker + test suite before reporting done." : "";
         return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${present.length} code file(s): ${present.join(", ")}. Run sniper agent now.${note}`);
       }
     }

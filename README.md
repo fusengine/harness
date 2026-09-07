@@ -198,9 +198,45 @@ Features shipped since 0.1.44, each with its own test:
 - **One-shot gate metric** — every gate outcome (deny or its later fix) lands in
   a 7-day sidecar keyed by a content-free op hash, so a deny→allow transition is
   visible (`src/tracking/one-shot.ts`, `test/one-shot.test.ts`).
-- **Verification receipts** — a `tsc`/test run is captured from PostToolUse Bash
-  output; `TaskCompleted` **refuses** a "done" over modified code files without a
-  fresh passing receipt (`src/tracking/receipts.ts`, `test/receipts.test.ts`).
+- **Verification receipts** — a static-check or test run is captured from
+  PostToolUse Bash output, spanning TS/JS (`tsc`, `bun test`/`vitest`/`jest`/
+  `npm|pnpm|yarn test`), Python (`mypy`, `pyright`, `pytest`), Go (`go vet`/
+  `build`/`test`), Rust (`cargo check`/`clippy`/`test`), PHP (`phpstan`,
+  `phpunit`/`pest`/`php artisan test`), Swift (`swift build`/`test`), and Dart/
+  Flutter (`dart`/`flutter test`); `TaskCompleted` **refuses** a "done" over
+  modified code files without a fresh passing receipt. Commands are matched
+  after quote/heredoc stripping (a tool name mentioned in a commit message or
+  heredoc body is never a receipt) — and the recognised runner must be the
+  LAST command of the line: the unquoted text is split into shell list
+  segments on `;`/`&&`/`||`/a lone `&`/newline (never a bare pipe, which still
+  carries the runner's real output forward), and only the LAST segment is
+  searched, so `bun test && git commit -m x` and `bun test || true` both null
+  while `cd x && bun test` and `bun test 2>&1 | tail -5` both still resolve. A
+  zero-test invocation (`--watch`, `--collect-only`, `0 passed; 0 failed`) is
+  never treated as proof, and static checkers (`tsc`, `go vet`/`build`, `cargo
+  check`/`clippy`, `swift build`) parse their OWN diagnostics so a masked exit
+  code doesn't hide a real failure. A residual trade-off: a truncating pipe
+  (`cargo test --no-fail-fast 2>&1 | tail -5`) can still cut away a failing
+  target's own `test result: FAILED` line — `cargo test`'s parser also counts
+  cargo's own trailing `error: N targets failed` line as a fail floor, but a
+  pipe that removes ALL evidence remains an accepted risk, in exchange for
+  correctly resolving genuine `| tail`/`| grep` pipelines instead of nulling
+  every piped command. A receipt needs POSITIVE evidence (a
+  parsed summary or the tool's success line): output suppression
+  (`2>/dev/null`, ANY output redirection after the runner in its own
+  segment — not just `/dev/null` — for a static checker, a stdout redirect for
+  a test runner, or a pipe after a static checker), `--version`/`--help`/other
+  no-run flags, and silent/ambiguous output never count. **Threat model**: a
+  receipt guards against forgetting to verify and against honest shortcuts (a
+  discarded exit code, an informational invocation, a filtered run) — it is
+  NOT a security control against an agent that deliberately fabricates tool
+  output, same caveat as the `CONFIRM` code above.
+  (`src/tracking/receipt-runners.ts`, `src/tracking/receipt-command.ts`,
+  `src/tracking/receipts.ts`, `test/receipt-runners.test.ts`,
+  `test/receipts.test.ts`, `test/receipt-runners-forgery.test.ts`,
+  `test/receipt-runners-hardening.test.ts`,
+  `test/receipt-runners-evidence.test.ts`,
+  `test/receipt-runners-structural.test.ts`).
 - **Decision-time lessons** — a `MEMORY/LESSON.md` bullet tagged with
   `[TRIGGERS tool:… path:… error:… keyword:…]` is injected as `additionalContext`
   the moment a matching call is about to repeat a known mistake, cooldown-guarded
