@@ -68,8 +68,9 @@ export async function handlePost(ctx: PreContext): Promise<HandleOutcome> {
   // Codex multi_agent_v2 `spawn_agent` -> same session track (no-op for every
   // other harness / non-spawn tool / missing `agent_type`; see module doc).
   await recordCodexSpawnEvidence(file, id, event.tool, event.input, opts.now);
-  // Verification receipts (tsc/bun test runs) — structured responses only
-  // (Kimi's string `tool_output` would forge a success receipt; see module).
+  // Verification receipts (static-check/test runs, see receipt-runners) —
+  // structured responses only (Kimi's string `tool_output` would forge a
+  // success receipt; see module).
   await captureBashReceipt(file, event.tool, event.command, payload.tool_result, response, opts.now);
   if (id === "codex") recordCodexPostFailure(event.tool, payload.tool_result ?? response, { now: opts.now, dir: defaultStateDir(opts.cwd), sessionId: event.sessionId });
   // Codex `apply_patch` and Cursor `afterFileEdit` fan into per-file events for

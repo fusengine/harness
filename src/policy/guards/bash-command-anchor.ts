@@ -2,6 +2,12 @@
  * Command-position anchoring for the Bash write guard — the regex prefix that
  * tells a real mutator invocation apart from a quoted/argument mention of the
  * same token. Consumed by bash-write-patterns.ts (CODE_MUTATORS, CODE_COMMAND_WRITE).
+ * {@link WRAP}/{@link WRAP_ARG}/{@link ENV_PREFIX} are also exported for
+ * `src/tracking/receipt-runners.ts`, which composes its OWN anchor from the
+ * same parts minus the backtick separator — a backtick never actually starts
+ * a new command (it opens command substitution), so over-matching it as one
+ * is safe for a write guard (defense-in-depth) but forges a false PROOF of
+ * success for a verification receipt.
  */
 
 /**
@@ -9,7 +15,7 @@
  * (`env sed -i …`, `timeout 5 patch …`, `sudo -n tee …`, `xargs sed -i`). A code
  * mutator behind one is still a code mutator — the wrapper is not a shield.
  */
-const WRAP = "(?:env|timeout|nice|nohup|sudo|command|stdbuf|time|ionice|exec|xargs)";
+export const WRAP = "(?:env|timeout|nice|nohup|sudo|command|stdbuf|time|ionice|exec|xargs)";
 
 /**
  * A wrapper's own leading arg tokens: `VAR=val` assignments, `-f`/`--flag`
@@ -19,7 +25,7 @@ const WRAP = "(?:env|timeout|nice|nohup|sudo|command|stdbuf|time|ionice|exec|xar
  * alternative consumes ≥1 char and is followed by a mandatory `\s+`, so the
  * repeated group is never zero-width (no `(X*)*` catastrophic shape).
  */
-const WRAP_ARG = "(?:\\w+=\\S+|--?[^\\s-]\\S*|\\d+[smhd]?)";
+export const WRAP_ARG = "(?:\\w+=\\S+|--?[^\\s-]\\S*|\\d+[smhd]?)";
 
 /**
  * Command-position anchor: line/segment start or a `;&|(` \` separator, then any
@@ -49,6 +55,6 @@ const WRAP_ARG = "(?:\\w+=\\S+|--?[^\\s-]\\S*|\\d+[smhd]?)";
  * match a mutator/write pattern (recognizing a previously-invisible wrapped
  * invocation); it can never turn an existing block/ask into an allow.
  */
-const ENV_PREFIX = "(?:\\w+=\\S*\\s+)*";
+export const ENV_PREFIX = "(?:\\w+=\\S*\\s+)*";
 
 export const CMD: string = `(?:^|[\\n;&|(\x60])\\s*${ENV_PREFIX}(?:${WRAP}\\s+(?:${WRAP_ARG}\\s+)*)*`;

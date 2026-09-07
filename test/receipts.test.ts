@@ -25,18 +25,18 @@ function session(sid: string): { home: string; stateDir: string; file: string } 
 }
 
 test("classifyReceipt: parses bun test pass/fail counts", () => {
-  expect(classifyReceipt("bun test", " 8 pass\n 0 fail\n", 0, T)).toEqual({ kind: "test", exitCode: 0, pass: 8, fail: 0, ts: T });
+  expect(classifyReceipt("bun test", " 8 pass\n 0 fail\n", 0, T)).toEqual({ kind: "test", tool: "bun test", exitCode: 0, pass: 8, fail: 0, ts: T });
 });
 
-test("classifyReceipt: tsc carries exit code (no counts); non-verification is null", () => {
-  expect(classifyReceipt("bunx tsc --noEmit", "", 0, T)).toEqual({ kind: "tsc", exitCode: 0, ts: T });
+test("classifyReceipt: tsc carries exit code + output-parsed fail count; non-verification is null", () => {
+  expect(classifyReceipt("bunx tsc --noEmit", "", 0, T)).toEqual({ kind: "tsc", tool: "tsc", exitCode: 0, pass: undefined, fail: 0, ts: T });
   expect(classifyReceipt("ls -la", "whatever", 0, T)).toBeNull();
 });
 
 test("captureReceipt: persists a parsed receipt into the signed track", async () => {
   const file = join(tmp("fh-rcpt-cap-"), "track.json");
   await captureReceipt(file, "bun test", " 12 pass\n 3 fail\n", 1, T);
-  expect((await loadTrack(file)).receipts?.[0]).toEqual({ kind: "test", exitCode: 1, pass: 12, fail: 3, ts: T });
+  expect((await loadTrack(file)).receipts?.[0]).toEqual({ kind: "test", tool: "bun test", exitCode: 1, pass: 12, fail: 3, ts: T });
 });
 
 test("validateTaskSolid: a fresh passing receipt lets completion pass", async () => {

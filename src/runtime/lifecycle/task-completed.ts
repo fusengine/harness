@@ -42,8 +42,10 @@ function receiptGate(sid: string, files: string[], now: number, stateDir: string
   const windowMs = resolveTtlSec(process.env) * 1000 * RECEIPT_TTL_MULTIPLIER;
   if (freshReceiptFromFile(trackFile(sid, stateDir), windowMs, now)) return null;
   const stopReason =
-    "VERIFICATION RECEIPT REQUIRED: code files changed but no fresh passing tsc/test receipt " +
-    "exists. Run `bun test` + `tsc --noEmit` (exit 0, 0 failures) and re-complete.";
+    "VERIFICATION RECEIPT REQUIRED: code files changed but no fresh passing verification receipt " +
+    "exists. Run your test suite and static checker (bun test + tsc, pytest + mypy, go test + go vet, " +
+    "cargo test + cargo check, phpunit/pest + phpstan, swift test, dart test) with exit 0 and 0 failures, " +
+    "then re-complete.";
   return JSON.stringify({ continue: false, stopReason });
 }
 
