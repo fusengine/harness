@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.96] - 2026-09-07
+
+### Added
+
+- **Verification receipts for 20 tools across 7 ecosystems** (`src/tracking/receipt-runners.ts`, `receipt-runners-parse.ts`, `receipt-runners-parse-php.ts`, `receipt-runners-parse-static.ts`, `src/tracking/receipt-command.ts`) — the TaskCompleted receipt gate previously only recognised `tsc` and `bun test`/`vitest`/`jest`/`npm test`, matched anywhere in the raw command, so Python, Go, Rust, PHP, Swift and Dart projects could never satisfy it and a commit message merely mentioning `jest` forged a receipt. Now a runners table covers `bun test`, `vitest`, `jest`, `npm`/`pnpm`/`yarn`/`bun run test`, `pytest`, `go test`, `cargo test`, `phpunit`, `pest`, `php artisan test`, `swift test`, `dart`/`flutter test`, plus `tsc`, `mypy`, `pyright`, `phpstan`, `go vet`, `go build`, `cargo check`, `cargo clippy`, `swift build`, each with a per-tool summary parser calibrated on real output (cargo pads `Finished` to 12 columns, `pytest -q` prints an undecorated summary, PHPUnit's OK-but banners count skipped tests in `Tests`). Commands are matched on the quote/heredoc-stripped text, anchored at command position, with the runner required to be the last command of the list; redirected or piped-away output is not evidence, no-run and informational flags never count, and a receipt now needs positive evidence — tests executed above zero with zero failures, the tool's own success line, or documented silence with intact output. A missing exit code means no capture. This is a guard against forgetting to verify and against honest shortcuts, not a security control against deliberate output fabrication. `bash-command-anchor.ts` now exports its parts (`CMD` unchanged); gate messages were generalised for the new tool set. Tests: 1779 to 1837.
+
 ## [0.1.95] - 2026-09-06
 
 ### Fixed
