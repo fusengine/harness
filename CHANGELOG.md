@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.97] - 2026-09-08
+
+### Added
+
+- **Project-aware verification hint** (`src/runtime/lifecycle/receipt-hint.ts`) — the `TaskCompleted` refusal used to list every ecosystem's commands regardless of project. It now names only the commands of the ecosystem detected for the project: root markers in the working directory and in the first two path segments of the files changed in the session (monorepos), plus the extensions of those files. `bun test`/`bunx tsc` on a Bun repo, `npm`/`pnpm`/`yarn test` per lockfile, `pytest` with `mypy`/`pyright` when configured, `go test`/`go vet`, `cargo test`/`cargo check`, `php artisan test`/`phpunit`/`pest` with `phpstan` when configured, `swift test`, `flutter test`/`dart test`; the generic list only when nothing is detected. The `SubagentStop` advisory uses the same hint. A single shared code-extension list (`code-extensions.ts`) now feeds session change tracking, the completion gate, and the hint — Dart files were gated but never tracked, so the Dart branch could not fire; fixed. Paths from session state are confined to the working directory before any disk read; search directories are deduplicated. Verified on 30 real fixture projects through the hook binary. Tests: 1837 to 1857.
+
 ## [0.1.96] - 2026-09-07
 
 ### Added
