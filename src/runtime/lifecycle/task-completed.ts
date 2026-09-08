@@ -8,12 +8,8 @@ import { countLines } from "../../policy/file-size";
 import { loadSessionState, sanitizeSessionId } from "../home-state";
 import { defaultStateDir, trackFile } from "../paths";
 import { freshReceiptFromFile } from "../../tracking/receipts";
-
-/** Code-file extensions audited on task completion (mirrors validate-task-solid.py). */
-const CODE_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".rs", ".java", ".php",
-  ".cpp", ".c", ".rb", ".swift", ".kt", ".dart", ".vue", ".svelte", ".astro",
-]);
+import { receiptHint } from "./receipt-hint";
+import { CODE_EXTENSIONS } from "./code-extensions";
 
 /** Freshness multiple on `FUSE_ENFORCE_TTL_SEC` for receipts (no new env var); a tsc+test run precedes the "done" by more than one edit window. */
 const RECEIPT_TTL_MULTIPLIER = 5;
@@ -37,15 +33,14 @@ function codeFiles(files: string[]): string[] {
  * `{"continue":false,"stopReason":…}`, which halts the teammate with the reason
  * shown to the user. Returns that JSON, or `null` when the session is clear.
  */
-function receiptGate(sid: string, files: string[], now: number, stateDir: string): string | null {
-  if (codeFiles(files).length === 0) return null;
+function receiptGate(sid: string, files: string[], now: number, stateDir: string, cwd: string): string | null {
+  const code = codeFiles(files);
+  if (code.length === 0) return null;
   const windowMs = resolveTtlSec(process.env) * 1000 * RECEIPT_TTL_MULTIPLIER;
   if (freshReceiptFromFile(trackFile(sid, stateDir), windowMs, now)) return null;
   const stopReason =
     "VERIFICATION RECEIPT REQUIRED: code files changed but no fresh passing verification receipt " +
-    "exists. Run your test suite and static checker (bun test + tsc, pytest + mypy, go test + go vet, " +
-    "cargo test + cargo check, phpunit/pest + phpstan, swift test, dart test) with exit 0 and 0 failures, " +
-    "then re-complete.";
+    "exists. " + receiptHint(cwd, code);
   return JSON.stringify({ continue: false, stopReason });
 }
 
@@ -84,7 +79,8 @@ export function validateTaskSolid(payload: Record<string, unknown>, home: string
   if (files.length === 0) return "";
   const max = resolveMaxLines();
   const violations = collectViolations(files, max);
-  if (violations.length === 0) return receiptGate(sid, files, now, stateDir) ?? "";
+  const cwd = typeof payload.cwd === "string" ? payload.cwd : process.cwd();
+  if (violations.length === 0) return receiptGate(sid, files, now, stateDir, cwd) ?? "";
   const taskId = String(payload.task_id ?? "");
   const subject = String(payload.task_subject ?? "");
   const msg =

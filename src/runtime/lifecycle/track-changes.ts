@@ -5,9 +5,7 @@ import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } fr
 import { onceExclusive } from "../inject-dedup";
 import { BURST_DEDUP_MS } from "../burst-window";
 import { sniperRequiredNotice } from "../notices";
-
-/** Code-file extensions tracked for sniper (mirrors track-session-changes.py). */
-const CODE_EXT = /\.(ts|tsx|js|jsx|py|go|rs|java|php|cpp|c|rb|swift|kt|vue|svelte|astro)$/;
+import { isCodeFile } from "./code-extensions";
 
 /** Shape of the `changes` block persisted in per-session state. */
 interface Changes {
@@ -28,7 +26,7 @@ interface Changes {
  * @returns The native hook stdout (possibly empty when not a code file).
  */
 export function trackSessionChanges(sessionIdRaw: unknown, filePath: string, home: string = homedir(), now: number = Date.now()): string {
-  if (!filePath || !CODE_EXT.test(filePath)) return "";
+  if (!filePath || !isCodeFile(filePath)) return "";
   const sid = sanitizeSessionId(sessionIdRaw) ?? "unknown";
   const state = loadSessionState(sid, home);
   const prev = (state.changes as Changes | undefined) ?? { cumulativeCodeFiles: 0, modifiedFiles: [] };

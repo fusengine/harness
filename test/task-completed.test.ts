@@ -55,3 +55,17 @@ test("validateTaskSolid: a session with no tracked files returns empty", () => {
   const home = root();
   expect(validateTaskSolid({ session_id: "s3" }, home)).toBe("");
 });
+
+test("validateTaskSolid: no receipt + a Python project → refusal names pytest, not the generic list", () => {
+  const home = root();
+  const stateDir = root();
+  const cwd = root();
+  writeFileSync(join(cwd, "pyproject.toml"), "[project]\nname = \"x\"\n");
+  const small = join(cwd, "a.py");
+  writeFileSync(small, "x = 1\n");
+  saveSessionState("s-py", { changes: { modifiedFiles: [small] } }, home);
+  const parsed = JSON.parse(validateTaskSolid({ session_id: "s-py", task_id: "t", task_subject: "s", cwd }, home, T, stateDir)) as { continue: boolean; stopReason: string };
+  expect(parsed.continue).toBe(false);
+  expect(parsed.stopReason).toContain("pytest");
+  expect(parsed.stopReason).not.toContain("go test");
+});
