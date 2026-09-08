@@ -204,7 +204,11 @@ Features shipped since 0.1.44, each with its own test:
   `build`/`test`), Rust (`cargo check`/`clippy`/`test`), PHP (`phpstan`,
   `phpunit`/`pest`/`php artisan test`), Swift (`swift build`/`test`), and Dart/
   Flutter (`dart`/`flutter test`); `TaskCompleted` **refuses** a "done" over
-  modified code files without a fresh passing receipt. Commands are matched
+  modified code files without a fresh passing receipt — the refusal names the
+  commands of the detected ecosystem (project markers and the extensions of
+  the files changed in the session), falling back to the full cross-language
+  list only when nothing is detected (`src/runtime/lifecycle/receipt-hint.ts`).
+  Commands are matched
   after quote/heredoc stripping (a tool name mentioned in a commit message or
   heredoc body is never a receipt) — and the recognised runner must be the
   LAST command of the line: the unquoted text is split into shell list

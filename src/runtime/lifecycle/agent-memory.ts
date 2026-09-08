@@ -7,6 +7,7 @@ import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } fr
 import { defaultStateDir, trackFile } from "../paths";
 import { freshReceiptFromFile } from "../../tracking/receipts";
 import { attributeFiles, filesWrittenByAgent } from "./agent-files";
+import { receiptHint } from "./receipt-hint";
 
 /** The `changes` block written by `track-changes.ts` into unified session state. */
 interface Changes {
@@ -20,6 +21,12 @@ function memoryDir(home: string): string {
 }
 
 const SKIP_AGENTS = /(sniper|sniper-faster|explore-codebase|research-expert|claude-code-guide|Explore|Plan)/;
+
+/** Collapse {@link receiptHint}'s full sentence into a short imperative clause for the advisory note. */
+function shortReceiptHint(cwd: string, files: readonly string[]): string {
+  const match = /^Run (.+?) \(exit 0, 0 failures\), then re-complete\.$/.exec(receiptHint(cwd, files));
+  return match ? `run ${match[1]} before reporting done.` : "run your test suite and static checker before reporting done.";
+}
 
 /** Append the agent completion record to `agent-history.jsonl` (best effort). */
 function recordHistory(home: string, agentId: string, agentType: string, ts: string): void {
@@ -73,7 +80,7 @@ export function trackAgentMemory(data: Record<string, unknown>, home: string = h
         // Window = TTL×5, matching the TaskCompleted receipt gate.
         const windowMs = resolveTtlSec(process.env) * 1000 * 5;
         const noReceipt = freshReceiptFromFile(trackFile(sessionId, defaultStateDir(process.cwd())), windowMs, now) === null;
-        const note = noReceipt ? " NO VERIFICATION RECEIPT — run your static checker + test suite before reporting done." : "";
+        const note = noReceipt ? ` NO VERIFICATION RECEIPT — ${shortReceiptHint(hookCwd, present)}` : "";
         return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${present.length} code file(s): ${present.join(", ")}. Run sniper agent now.${note}`);
       }
     }
