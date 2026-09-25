@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.98] - 2026-09-25
+
+### Fixed
+
+- **Release metadata exempt from the doc-research / skill-read gates** (`src/policy/release-metadata-path.ts`, `src/policy/shadcn-skill-gate.ts`, `src/policy/skill-triggers.ts`) — a version bump in `plugins/<x>-expert/.claude-plugin/plugin.json` was denied "No MCP research done for shadcn" by `shadcnSkillGate` (path-routed, framework hard-coded) and by the forced architecture skill in `skillTriggerGate`. A single closed-list predicate, `isReleaseMetadataPath()`, now covers `**/.claude-plugin/plugin.json`, `**/.claude-plugin/marketplace.json` and `**/CHANGELOG.md` (whole-segment match, case-sensitive, `/` or `\`); both gates return early for those paths. The SOLID/file-size gate and every other gate are unchanged; a witness such as `.claude-plugin/hooks.json` stays gated. No adapter, message, output, exit code, config key or public API change. End-to-end coverage through `handleHook` for claude-code, codex, cursor and kimi. Tests: 1858 to 1883.
+
 ## [0.1.97] - 2026-09-08
 
 ### Added
