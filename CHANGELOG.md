@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.99] - 2026-09-28
+
+### Fixed
+
+- **Stop hook says each SOLID / receipt verdict once per session, with an actionable message** (`src/runtime/lifecycle/stop-notice.ts`, `task-completed.ts`, `stop-core.ts`, `dispatch.ts`) — Stop fires every turn and re-checked the session's whole modified-file list, and on Claude Code a Stop `additionalContext` re-opens the turn (up to 8 consecutive), so an unchanged pre-existing oversized file looped agents (measured in a real session: 305 injections of "SOLID VIOLATION in task '' ()"). On `Stop` only, each distinct verdict is now emitted once per session (content-hash dedup via `oncePerWindow`, 24h horizon) and re-armed only when a file's line count or the code-file set changes; the message names the oversized files and the action to take, without the empty "task '' ()". Codex's Stop schema (`deny_unknown_fields`) rejected `hookSpecificOutput`: the `codex` adapter now gets `{"decision":"block","reason":…}`; every other harness keeps `additionalContext`. The `TaskCompleted` path is byte-identical. Verified with real binaries, 6 consecutive Stops on a 565-line file after one Edit: 0.1.98 emits 6/6 (claude-code and codex), 0.1.99 emits 1/6. Tests: 1892 to 1897 (+5, no existing test modified).
+
 ## [0.1.98] - 2026-09-25
 
 ### Fixed
