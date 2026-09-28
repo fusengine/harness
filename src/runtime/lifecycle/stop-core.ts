@@ -24,12 +24,13 @@ import { notify } from "../notifications";
  * @param payload - The raw Stop hook payload.
  * @param cwd - Project root (drives the state dir).
  * @param now - Clock.
+ * @param id - Harness adapter id (defaults to "claude-code").
  * @returns The native hook stdout ("" when the session is clean).
  */
-export function stopCore(payload: Record<string, unknown>, cwd: string, now: number): string {
+export function stopCore(payload: Record<string, unknown>, cwd: string, now: number, id: string = "claude-code"): string {
   cleanupSession(undefined, now);
   // Turn finished — voice the "stop" sound (fire-and-forget, fail-open: never
   // throws, never blocks; a silent no-op when opted out or no sound resolves).
   notify("stop");
-  return validateTaskSolid(payload, homedir(), now, defaultStateDir(cwd), "Stop");
+  return validateTaskSolid(payload, homedir(), now, defaultStateDir(cwd), "Stop", id);
 }
