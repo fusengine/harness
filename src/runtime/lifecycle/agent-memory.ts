@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { contextResponse } from "../../adapters/claude";
+import { contextResponse, systemMessage } from "../../adapters/claude";
 import { resolveTtlSec } from "../../config/ttl";
 import { loadSessionState, sanitizeSessionId, saveSessionState, sessionsDir } from "../home-state";
 import { defaultStateDir, trackFile } from "../paths";
@@ -28,6 +28,22 @@ function shortReceiptHint(cwd: string, files: readonly string[]): string {
   return match ? `run ${match[1]} before reporting done.` : "run your test suite and static checker before reporting done.";
 }
 
+/**
+ * Codex parses SubagentStop stdout with `deny_unknown_fields` (codex-rs/hooks
+ * schema.rs `SubagentStopCommandOutputWire`: continue, stopReason,
+ * suppressOutput, systemMessage, decision, reason only), so `message` and
+ * `hookSpecificOutput` fail the hook. Codex gets the same text as a
+ * `systemMessage`; every other harness keeps its exact bytes.
+ */
+function completedOutput(id: string, text: string): string {
+  return id === "codex" ? systemMessage(text) : JSON.stringify({ message: text });
+}
+
+/** Sniper reminder: Codex-valid `systemMessage`, else the unchanged `additionalContext` response. */
+function reminderOutput(id: string, text: string): string {
+  return id === "codex" ? systemMessage(text) : contextResponse("SubagentStop", text);
+}
+
 /** Append the agent completion record to `agent-history.jsonl` (best effort). */
 function recordHistory(home: string, agentId: string, agentType: string, ts: string): void {
   const dir = memoryDir(home);
@@ -44,15 +60,16 @@ function recordHistory(home: string, agentId: string, agentType: string, ts: str
  * @param data - The raw hook payload.
  * @param home - Home dir (defaults to `~`).
  * @param now - Clock (defaults to `Date.now()`).
- * @returns The native hook stdout (always a JSON message).
+ * @param id - Harness adapter id (defaults to "claude-code": unchanged output).
+ * @returns The native hook stdout (always JSON; Codex-schema-valid when `id` is "codex").
  */
-export function trackAgentMemory(data: Record<string, unknown>, home: string = homedir(), now: number = Date.now()): string {
+export function trackAgentMemory(data: Record<string, unknown>, home: string = homedir(), now: number = Date.now(), id: string = "claude-code"): string {
   mkdirSync(sessionsDir(home), { recursive: true });
   const agentType = String(data.agent_type ?? data.subagent_type ?? "unknown");
   const sessionId = sanitizeSessionId(data.session_id) ?? "unknown";
   const ts = new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z");
   recordHistory(home, String(data.agent_id ?? "unknown"), agentType, ts);
-  if (SKIP_AGENTS.test(agentType)) return JSON.stringify({ message: `Agent ${agentType} completed` });
+  if (SKIP_AGENTS.test(agentType)) return completedOutput(id, `Agent ${agentType} completed`);
   const state = loadSessionState(sessionId, home);
   const changes = state.changes as Changes | undefined;
   const count = changes?.cumulativeCodeFiles ?? 0;
@@ -81,9 +98,9 @@ export function trackAgentMemory(data: Record<string, unknown>, home: string = h
         const windowMs = resolveTtlSec(process.env) * 1000 * 5;
         const noReceipt = freshReceiptFromFile(trackFile(sessionId, defaultStateDir(process.cwd())), windowMs, now) === null;
         const note = noReceipt ? ` NO VERIFICATION RECEIPT — ${shortReceiptHint(hookCwd, present)}` : "";
-        return contextResponse("SubagentStop", `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${present.length} code file(s): ${present.join(", ")}. Run sniper agent now.${note}`);
+        return reminderOutput(id, `SNIPER VALIDATION REQUIRED: Agent '${agentType}' modified ${present.length} code file(s): ${present.join(", ")}. Run sniper agent now.${note}`);
       }
     }
   }
-  return JSON.stringify({ message: `Agent ${agentType} completed (no code changes)` });
+  return completedOutput(id, `Agent ${agentType} completed (no code changes)`);
 }

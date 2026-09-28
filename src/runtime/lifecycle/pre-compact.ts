@@ -34,5 +34,7 @@ export function saveApexState(cwd: string, now: number = Date.now(), id: string 
   for (const old of backups.slice(5)) {
     try { rmSync(join(backupDir, old), { force: true }); } catch { /* best effort */ }
   }
-  return JSON.stringify({ additionalContext: `APEX state saved before compaction. Previous task state preserved in ${seg}/apex/backups/` });
+  const text = `APEX state saved before compaction. Previous task state preserved in ${seg}/apex/backups/`;
+  // Codex's PreCompact output schema (deny_unknown_fields) has no `additionalContext`: use `systemMessage`.
+  return id === "codex" ? JSON.stringify({ systemMessage: text }) : JSON.stringify({ additionalContext: text });
 }

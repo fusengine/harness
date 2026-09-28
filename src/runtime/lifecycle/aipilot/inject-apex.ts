@@ -63,8 +63,10 @@ export async function injectApexSubagentContext(cwd: string, home: string = home
   const agentsPath = join(apexDir, "AGENTS.md");
   const agents = existsSync(agentsPath) ? readText(agentsPath).slice(0, 4000) : "";
   const taskData = await readJsonFile<ApexTaskFile>(join(apexDir, "task.json"));
-  const completed = taskData ? completedTasks(taskData.tasks) : "none";
-  const pending = taskData ? pendingTasks(taskData.tasks) : "none";
+  // A task.json without a `tasks` object (e.g. `{}`) must not crash SubagentStart (Object.entries(undefined)).
+  const tasks = taskData?.tasks && typeof taskData.tasks === "object" ? taskData.tasks : undefined;
+  const completed = tasks ? completedTasks(tasks) : "none";
+  const pending = tasks ? pendingTasks(tasks) : "none";
   const { beforeStart, whenDone } = apexAgentSteps(id);
 
   const context = `## APEX Sub-Agent Instructions

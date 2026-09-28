@@ -96,14 +96,14 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       // on an already-blocked replay) must be returned AS-IS, never layered
       // under a stale "agent completed" message.
       const prdBlock = prdSubagentStopGate(input.payload, input.cwd, input.id ?? "claude-code", trackFile(sanitizeSessionId(input.payload.session_id) ?? "unknown", defaultStateDir(input.cwd)), input.now);
-      return prdBlock !== null ? prdBlock : trackAgentMemory(input.payload, undefined, input.now);
+      return prdBlock !== null ? prdBlock : trackAgentMemory(input.payload, undefined, input.now, input.id ?? "claude-code");
     }
     case "TeammateIdle":
       return teammateIdleContext(input.payload, input.cwd, undefined, input.now);
     case "PostToolUseFailure":
       return failureLessonContext(input.payload, input.cwd, undefined, input.now);
     case "PostCompact":
-      return input.scope === "core" ? postCompactContext(input.payload, input.cwd, import.meta.url, input.now) : "";
+      return input.scope === "core" ? postCompactContext(input.payload, input.cwd, import.meta.url, input.now, input.id ?? "claude-code") : "";
     case "PreCompact":
       return saveApexState(input.cwd, input.now, input.id ?? "claude-code");
     case "SessionEnd":
