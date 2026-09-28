@@ -8,17 +8,20 @@ import { authorizeCodexAction, codexAction } from "./codex-confirm";
 /**
  * Harnesses where `respond.ts` silently downgrades `kind: "ask"` to a hard
  * deny (Codex: `case "codex"`; Kimi: `toKimiResponse` maps `ask` to the same
- * `permissionDecision:"deny"` envelope as `block`). Claude Code keeps native
- * interactive `ask` — this mechanism NEVER applies there.
+ * `permissionDecision:"deny"` envelope as `block`; Cursor: `respond.ts` maps
+ * `ask` to `permission:"deny"` — its `beforeSubmitPrompt` carries `prompt` +
+ * the same `session_id` as `preToolUse`, so the shared submit path arms the
+ * token). Claude Code keeps native interactive `ask` — this mechanism NEVER
+ * applies there.
  */
-const DEGRADES_ASK_TO_DENY: ReadonlySet<string> = new Set(["codex", "kimi"]);
+const DEGRADES_ASK_TO_DENY: ReadonlySet<string> = new Set(["codex", "kimi", "cursor"]);
 
 export type ConfirmVerdict = { allow: true } | { allow: false; prompt: Prompt };
 
 /**
  * Whether/how a CONFIRM token changes an `ask` prompt about to be downgraded
  * to a deny. Returns `null` when this mechanism doesn't apply AT ALL — any
- * harness other than codex/kimi, any prompt kind other than `ask`, no
+ * harness other than codex/kimi/cursor, any prompt kind other than `ask`, no
  * command to key a hash off, or an irreversible command (G4) — in which case
  * the caller's ORIGINAL prompt/response path runs completely unchanged. That
  * `null` fast-path, hit on every claude-code call and every non-`ask` prompt,

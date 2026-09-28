@@ -128,12 +128,16 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     ? await gateCommandCandidates(gateInput, event.commandCandidates!)
     : await gate(gateInput);
   if (prompt) {
-    // CONFIRM <code> flow: ONLY changes anything when Codex/Kimi are about to
-    // downgrade THIS `ask` to a hard deny (confirmGate returns null in every
-    // other case — including every claude-code call, unconditionally, and
-    // every non-`ask` prompt kind — so the line below is byte-identical to
-    // the pre-CONFIRM behavior whenever it applies).
-    const confirm = confirmGate(id, prompt, event.command, event.sessionId, opts.now, opts.home,
+    // CONFIRM <code> flow: ONLY changes anything when Codex/Kimi/Cursor are
+    // about to downgrade THIS `ask` to a hard deny (confirmGate returns null
+    // in every other case — including every claude-code call, unconditionally,
+    // and every non-`ask` prompt kind — so the line below is byte-identical to
+    // the pre-CONFIRM behavior whenever it applies). A multi-candidate Cursor
+    // MCP call is never confirmable: the decisive candidate may differ from
+    // `event.command` (candidate 0), so hashing/G4-checking the latter would
+    // let a token for a benign head unlock e.g. an `rm -rf` in tool_input.
+    const multiCandidate = (event.commandCandidates?.length ?? 0) > 1;
+    const confirm = confirmGate(id, prompt, multiCandidate ? undefined : event.command, event.sessionId, opts.now, opts.home,
       id === "codex" ? { tool: event.tool, cwd: event.cwd ?? opts.cwd, toolUseId: event.toolUseId } : undefined);
     if (confirm?.allow) {
       return allowOutcome(id, event, payload, designCacheDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
