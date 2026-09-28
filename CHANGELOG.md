@@ -4,6 +4,16 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.100] - 2026-09-28
+
+### Added
+
+- **CONFIRM flow on Cursor** (`src/runtime/confirm/confirm-gate.ts`) — Cursor's adapter downgrades `ask` to `permission:"deny"` (`respond.ts`), but Cursor was not in `DEGRADES_ASK_TO_DENY`, so an ask (e.g. `git commit`) was a dead-end deny with no code. Cursor now gets the same `Pour autoriser, réponds : CONFIRM <code>` suffix as Codex/Kimi; the user's reply is armed by the existing shared submit path (`beforeSubmitPrompt` carries `prompt` and the same `session_id`/`conversation_id` as `preToolUse`, measured in real Cursor hook logs). `agent_message` carries the code to the agent (Cursor docs). G4 irreversible commands still never get a code.
+
+### Fixed
+
+- **Multi-candidate MCP calls never confirmable** (`src/runtime/handle-pre.ts`) — a Cursor `beforeMCPExecution` can carry several command candidates; `confirmGate` only saw candidate 0, so a token for a benign head (`ls`) could unlock an `rm -rf` candidate. Those calls (`commandCandidates.length > 1`) now keep the plain deny. Proof on the built dist with the live binary: `git commit` denied with `CONFIRM 0fdd` → `beforeSubmitPrompt` `CONFIRM 0fdd` → `{"permission":"allow"}` once → denied again. claude-code/codex/kimi paths unchanged. Tests: 1897 to 1901 (+4 in the new test file, each verified failing without its fix, no existing test modified).
+
 ## [0.1.99] - 2026-09-28
 
 ### Fixed
