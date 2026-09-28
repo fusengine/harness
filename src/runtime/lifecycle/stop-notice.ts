@@ -4,14 +4,21 @@
  * end of EVERY turn and the checks re-read the session's whole modified-file
  * list, so the same verdict would repeat every turn — and on Claude Code a Stop
  * `additionalContext` re-opens the turn (up to 8 times), which looped agents on
- * an unchanged, often pre-existing oversized file. Each distinct verdict is now
- * emitted ONCE per session and re-emitted only when its content changes (e.g.
- * a file's line count moves). TaskCompleted never goes through here.
+ * an unchanged, often pre-existing oversized file. A SOLID verdict is emitted
+ * ONCE per session and re-emitted only when its content changes (e.g. a file's
+ * line count moves). The receipt refusal follows the lessons (memory) reminder
+ * cadence instead: repeated every {@link throttleMs} while no fresh passing
+ * receipt exists, never on consecutive turns inside that window. Each uses its
+ * OWN dedup sidecar: `oncePerWindow` prunes the shared one with the caller's
+ * window, so a 3 s caller (per-prompt context inject) would erase these keys.
+ * TaskCompleted never goes through here.
  * @packageDocumentation
  */
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { contextResponse } from "../../adapters/claude";
 import { oncePerWindow } from "../inject-dedup";
+import { throttleMs } from "../../memory/state";
 
 /** Dedup horizon for a Stop verdict: longer than any working session. */
 const STOP_ONCE_MS = 24 * 60 * 60 * 1000;
@@ -27,7 +34,21 @@ const STOP_ONCE_MS = 24 * 60 * 60 * 1000;
  */
 export function stopNoticeOnce(sid: string, content: string, stateDir: string, now: number): boolean {
   const digest = createHash("sha1").update(content).digest("hex").slice(0, 16);
-  return oncePerWindow(`stop-notice:${sid}:${digest}`, STOP_ONCE_MS, { now, dir: stateDir });
+  return oncePerWindow(`stop-notice:${sid}:${digest}`, STOP_ONCE_MS, { now, dir: join(stateDir, "stop-notice") });
+}
+
+/**
+ * Receipt-refusal cadence on Stop, same as the lessons (memory) Stop reminder:
+ * true at most once per {@link throttleMs} window (`FUSE_LESSONS_THROTTLE_MIN`,
+ * default 5 min) per session, so an unverified session is reminded periodically,
+ * never on every turn.
+ * @param sid - Sanitized session id.
+ * @param stateDir - Project state dir (holds the dedicated receipt sidecar).
+ * @param now - Clock.
+ * @returns Whether to emit.
+ */
+export function stopReceiptDue(sid: string, stateDir: string, now: number): boolean {
+  return oncePerWindow(`stop-receipt:${sid}`, throttleMs(), { now, dir: join(stateDir, "stop-receipt") });
 }
 
 /**

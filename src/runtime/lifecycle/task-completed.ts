@@ -10,7 +10,7 @@ import { defaultStateDir, trackFile } from "../paths";
 import { freshReceiptFromFile } from "../../tracking/receipts";
 import { receiptHint } from "./receipt-hint";
 import { CODE_EXTENSIONS } from "./code-extensions";
-import { stopNoticeOnce, stopSolidMessage, stopSolidResponse } from "./stop-notice";
+import { stopNoticeOnce, stopReceiptDue, stopSolidMessage, stopSolidResponse } from "./stop-notice";
 
 /** Freshness multiple on `FUSE_ENFORCE_TTL_SEC` for receipts (no new env var); a tsc+test run precedes the "done" by more than one edit window. */
 const RECEIPT_TTL_MULTIPLIER = 5;
@@ -83,12 +83,15 @@ export function validateTaskSolid(payload: Record<string, unknown>, home: string
   const violations = collectViolations(files, max);
   const cwd = typeof payload.cwd === "string" ? payload.cwd : process.cwd();
   if (event === "Stop") {
-    // Stop runs every turn over the same session file list: say each verdict once, re-arm only on change.
-    const verdict = violations.length === 0 ? receiptGate(sid, files, now, stateDir, cwd) : null;
-    if (violations.length === 0 && !verdict) return "";
-    const msg = verdict ?? stopSolidMessage(violations, max);
+    // Stop runs every turn over the same session file list. Receipt refusal: periodic
+    // (lessons-reminder cadence) until a passing receipt lands. SOLID: once, re-armed on change.
+    if (violations.length === 0) {
+      const verdict = receiptGate(sid, files, now, stateDir, cwd);
+      return verdict && stopReceiptDue(sid, stateDir, now) ? verdict : "";
+    }
+    const msg = stopSolidMessage(violations, max);
     if (!stopNoticeOnce(sid, `${msg}\n${codeFiles(files).join("\n")}`, stateDir, now)) return "";
-    return verdict ?? stopSolidResponse(id, msg);
+    return stopSolidResponse(id, msg);
   }
   if (violations.length === 0) return receiptGate(sid, files, now, stateDir, cwd) ?? "";
   const taskId = String(payload.task_id ?? "");

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { saveSessionState } from "../src/runtime/home-state";
 import { validateTaskSolid } from "../src/runtime/lifecycle/task-completed";
 import { resolveMaxLines } from "../src/config/limits";
+import { throttleMs } from "../src/memory/state";
+import { oncePerWindow } from "../src/runtime/inject-dedup";
 
 const root = (): string => mkdtempSync(join(tmpdir(), "fh-stop-once-"));
 const L = resolveMaxLines();
@@ -46,16 +48,35 @@ test("Stop on Codex: same text as decision:block + reason (Codex Stop rejects ho
   expect(String(o.reason)).toContain("Action: split each into modules");
 });
 
-test("Stop: the receipt refusal keeps its exact shape but is emitted once per unchanged file set", () => {
+/** Session `sid` with one small (SOLID-clean) code file and no receipt. */
+function unverified(sid: string): { home: string; stateDir: string } {
   const home = root();
   const small = join(root(), "ok.ts");
   writeFileSync(small, "export const x = 1;\n");
-  saveSessionState("st4", { changes: { modifiedFiles: [small] } }, home);
-  const stateDir = root();
+  saveSessionState(sid, { changes: { modifiedFiles: [small] } }, home);
+  return { home, stateDir: root() };
+}
+
+test("Stop: the receipt refusal keeps its shape and repeats on the lessons cadence (throttleMs), never in bursts", () => {
+  const { home, stateDir } = unverified("st4");
+  const win = throttleMs();
   const parsed = JSON.parse(validateTaskSolid({ session_id: "st4" }, home, T, stateDir, "Stop")) as { continue: boolean; stopReason: string };
   expect(parsed.continue).toBe(false);
   expect(parsed.stopReason).toContain("VERIFICATION RECEIPT REQUIRED");
-  expect(validateTaskSolid({ session_id: "st4" }, home, T + 1, stateDir, "Stop")).toBe("");
+  for (const dt of [1, 60_000, win - 1]) expect(validateTaskSolid({ session_id: "st4" }, home, T + dt, stateDir, "Stop")).toBe("");
+  expect(validateTaskSolid({ session_id: "st4" }, home, T + win, stateDir, "Stop")).toContain("VERIFICATION RECEIPT REQUIRED");
+  expect(validateTaskSolid({ session_id: "st4" }, home, T + win + 1, stateDir, "Stop")).toBe("");
+});
+
+test("Stop: a short-window dedup caller in the same state dir does not reset the Stop cooldowns", () => {
+  const { home, stateDir } = unverified("st5");
+  expect(validateTaskSolid({ session_id: "st5" }, home, T, stateDir, "Stop")).not.toBe("");
+  const big = oversized("st6");
+  expect(validateTaskSolid({ session_id: "st6" }, big.home, T, stateDir, "Stop")).not.toBe("");
+  // a 3 s caller (per-prompt context inject) prunes ITS sidecar with its own window
+  expect(oncePerWindow("probe", 3000, { now: T + 120_000, dir: stateDir })).toBe(true);
+  expect(validateTaskSolid({ session_id: "st5" }, home, T + 120_001, stateDir, "Stop")).toBe("");
+  expect(validateTaskSolid({ session_id: "st6" }, big.home, T + 120_001, stateDir, "Stop")).toBe("");
 });
 
 test("non-regression: TaskCompleted still reports on every call with the same bytes (no dedup there)", () => {
