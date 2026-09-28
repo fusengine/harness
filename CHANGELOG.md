@@ -4,6 +4,12 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.99] - 2026-09-28
+
+### Fixed
+
+- **Stop hook no longer loops on SOLID / receipt verdicts, with an actionable message** (`src/runtime/lifecycle/stop-notice.ts`, `task-completed.ts`, `stop-core.ts`, `dispatch.ts`) — Stop fires every turn and re-checked the session's whole modified-file list, and on Claude Code a Stop `additionalContext` re-opens the turn (up to 8 consecutive), so an unchanged pre-existing oversized file looped agents (measured in a real session: 305 injections of "SOLID VIOLATION in task '' ()"). On `Stop` only: the SOLID verdict is emitted once per session per content (content-hash dedup via `oncePerWindow`, 24h horizon), re-armed only when a file's line count or the code-file set changes; the VERIFICATION RECEIPT REQUIRED refusal is repeated at most once per `throttleMs()` window (`FUSE_LESSONS_THROTTLE_MIN`, default 5 min, the same cadence as the lessons Stop reminder) while no fresh passing receipt exists, silent in between, and stops once a receipt passes (no new config key). The message names the oversized files and the action to take, without the empty "task '' ()". Stop dedup keys live in dedicated sidecars (`<stateDir>/stop-notice/`, `<stateDir>/stop-receipt/`): the shared `inject-dedup.json` is pruned with each caller's window, so the per-prompt 3 s context-inject dedup was erasing the 24h Stop keys. Codex's Stop schema (`deny_unknown_fields`) rejected `hookSpecificOutput`: the `codex` adapter now gets `{"decision":"block","reason":…}`; every other harness keeps `additionalContext`. The `TaskCompleted` path is byte-identical. Verified with real binaries, 6 consecutive Stops on a 565-line file after one Edit: 0.1.98 emits 6/6 (claude-code and codex), 0.1.99 emits 1/6; with `FUSE_LESSONS_THROTTLE_MIN=0.05`, 8 Stops 1 s apart emit the receipt refusal at t=1, 4, 7 s only, on `hook claude-code core` and `hook codex core`. Tests: 1892 to 1898 (+6 in the new test file, no existing test modified).
+
 ## [0.1.98] - 2026-09-25
 
 ### Fixed

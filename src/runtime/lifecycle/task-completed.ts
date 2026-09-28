@@ -10,6 +10,7 @@ import { defaultStateDir, trackFile } from "../paths";
 import { freshReceiptFromFile } from "../../tracking/receipts";
 import { receiptHint } from "./receipt-hint";
 import { CODE_EXTENSIONS } from "./code-extensions";
+import { stopNoticeOnce, stopReceiptDue, stopSolidMessage, stopSolidResponse } from "./stop-notice";
 
 /** Freshness multiple on `FUSE_ENFORCE_TTL_SEC` for receipts (no new env var); a tsc+test run precedes the "done" by more than one edit window. */
 const RECEIPT_TTL_MULTIPLIER = 5;
@@ -69,9 +70,10 @@ function collectViolations(files: string[], max: number): string[] {
  * (Codex never emits `TaskCompleted`) — `event` stamps the real hook name.
  * @param payload - The TaskCompleted/Stop payload (`task_id`, `task_subject`, `session_id`).
  * @param event - The hook event name to stamp on the SOLID-violation response (default `TaskCompleted`).
+ * @param id - Harness adapter id (Stop only: shapes the once-per-session notice; TaskCompleted output is unchanged).
  * @returns The native hook stdout, or `""` when the session is clean.
  */
-export function validateTaskSolid(payload: Record<string, unknown>, home: string = homedir(), now: number = Date.now(), stateDir: string = defaultStateDir(process.cwd()), event: string = "TaskCompleted"): string {
+export function validateTaskSolid(payload: Record<string, unknown>, home: string = homedir(), now: number = Date.now(), stateDir: string = defaultStateDir(process.cwd()), event: string = "TaskCompleted", id: string = "claude-code"): string {
   const sid = sanitizeSessionId(payload.session_id ?? "unknown");
   if (!sid) return "";
   const changes = loadSessionState(sid, home).changes as Changes | undefined;
@@ -80,6 +82,17 @@ export function validateTaskSolid(payload: Record<string, unknown>, home: string
   const max = resolveMaxLines();
   const violations = collectViolations(files, max);
   const cwd = typeof payload.cwd === "string" ? payload.cwd : process.cwd();
+  if (event === "Stop") {
+    // Stop runs every turn over the same session file list. Receipt refusal: periodic
+    // (lessons-reminder cadence) until a passing receipt lands. SOLID: once, re-armed on change.
+    if (violations.length === 0) {
+      const verdict = receiptGate(sid, files, now, stateDir, cwd);
+      return verdict && stopReceiptDue(sid, stateDir, now) ? verdict : "";
+    }
+    const msg = stopSolidMessage(violations, max);
+    if (!stopNoticeOnce(sid, `${msg}\n${codeFiles(files).join("\n")}`, stateDir, now)) return "";
+    return stopSolidResponse(id, msg);
+  }
   if (violations.length === 0) return receiptGate(sid, files, now, stateDir, cwd) ?? "";
   const taskId = String(payload.task_id ?? "");
   const subject = String(payload.task_subject ?? "");
