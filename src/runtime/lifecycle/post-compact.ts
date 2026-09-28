@@ -6,7 +6,7 @@
  * fan out too). Fully fail-open — any error yields "".
  * @packageDocumentation
  */
-import { contextResponse } from "../../adapters/claude";
+import { contextResponse, systemMessage } from "../../adapters/claude";
 import { oncePerWindow } from "../inject-dedup";
 import { defaultStateDir } from "../paths";
 import { renderSnapshot } from "./snapshot";
@@ -24,14 +24,18 @@ const REMINDER = "Context was compacted — reread files before editing (read-st
  * @param cwd - Project root.
  * @param moduleUrl - `import.meta.url` of the caller (locates the running package for the version line).
  * @param now - Clock (defaults to `Date.now()`).
+ * @param id - Harness adapter id (defaults to "claude-code": unchanged output). Codex's
+ *   PostCompact output schema (codex-rs/hooks schema.rs, `deny_unknown_fields`) accepts only
+ *   continue/stopReason/suppressOutput/systemMessage, so Codex gets the text as `systemMessage`.
  * @returns The native hook stdout, or "".
  */
-export function postCompactContext(data: Record<string, unknown>, cwd: string, moduleUrl: string, now: number = Date.now()): string {
+export function postCompactContext(data: Record<string, unknown>, cwd: string, moduleUrl: string, now: number = Date.now(), id: string = "claude-code"): string {
   try {
     const sessionId = typeof data.session_id === "string" ? data.session_id : "unknown";
     if (!oncePerWindow(`postcompact:${sessionId}`, COMPACT_DEDUP_MS, { now, dir: defaultStateDir(cwd) })) return "";
     const snapshot = renderSnapshot(cwd, moduleUrl);
-    return contextResponse("PostCompact", snapshot ? `${REMINDER}\n\n${snapshot}` : REMINDER);
+    const text = snapshot ? `${REMINDER}\n\n${snapshot}` : REMINDER;
+    return id === "codex" ? systemMessage(text) : contextResponse("PostCompact", text);
   } catch {
     return "";
   }

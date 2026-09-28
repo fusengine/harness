@@ -13,6 +13,7 @@ import type { Prompt } from "../prompt/types";
 import type { AuthEntry } from "../freshness/doc-helpers";
 import { skillTriggerGate } from "./skill-triggers";
 import { docConsultedGate } from "./apex";
+import { isReleaseMetadataPath } from "./release-metadata-path";
 
 /** File extensions the shadcn gate polices (source: `\.(tsx|jsx|css|scss|json)$`). */
 const SHADCN_FILE_RE = /\.(tsx|jsx|css|scss|json)$/;
@@ -76,7 +77,7 @@ export function shadcnSkillGate(
   content: string,
   ev: ShadcnEvidence,
 ): Prompt | null {
-  if (!isShadcnWrite(tool, filePath)) return null;
+  if (!isShadcnWrite(tool, filePath) || isReleaseMetadataPath(filePath)) return null;
   if (!shadcnBaseSkillRead(ev.refsRead) && !shadcnMcpConsulted(ev.authorizations, ev.sessionId)) {
     return {
       kind: "block",

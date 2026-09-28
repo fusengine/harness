@@ -8,6 +8,7 @@ import type { Prompt } from "../prompt/types";
 import { CASE_SENSITIVE_FRAMEWORKS, SKILL_TRIGGERS } from "./skill-trigger-patterns";
 import { isShadcnProject } from "./shadcn-project";
 import { resolveSkillPath } from "./skill-path";
+import { isReleaseMetadataPath } from "./release-metadata-path";
 
 export { SKILL_TRIGGERS } from "./skill-trigger-patterns";
 
@@ -76,6 +77,8 @@ export function skillTriggerGate(
   cwd?: string,
   filePath?: string,
 ): Prompt | null {
+  // Release metadata (plugin/marketplace manifest, changelog) carries no framework API: no skill applies.
+  if (filePath && isReleaseMetadataPath(filePath)) return null;
   // Phase 1.5 parity (check-laravel-skill.py:57-62): a forced FuseCore skill is
   // denied on its own, BEFORE domain sub-skills — never merged into their message.
   if (forcedSkill === "fusecore" && !refsRead.some((r) => r.includes("skills/fusecore/"))) {
