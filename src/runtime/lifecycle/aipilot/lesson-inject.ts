@@ -7,6 +7,7 @@
  * FILE keeps full bullets (human source of truth); only this injected view is
  * compressed, so compression applies even under the cap.
  */
+import { splitInlineTag } from "../../../policy/lessons/trigger-tag";
 import { type Block, parse } from "./lesson-parse";
 
 /**
@@ -37,7 +38,10 @@ function stamp(block: Block): string {
 /** Bullet text: raw lines joined, leading "- ", date stamp & TRIGGERS lines stripped. */
 function bodyText(block: Block): string {
   const kept = block.raw.filter((l) => !/^\s*\[TRIGGERS\s/.test(l));
-  return kept.join(" ").replace(/^-\s*/, "").replace(/\[\d{4}-\d{2}-\d{2}[^\]]*\]\s*/, "").trim();
+  const joined = kept.join(" ");
+  // An own-line tag takes precedence (byte-identical to before); only an untagged-by-line block loses its inline tag.
+  const text = kept.length === block.raw.length ? (splitInlineTag(joined)?.text ?? joined) : joined;
+  return text.replace(/^-\s*/, "").replace(/\[\d{4}-\d{2}-\d{2}[^\]]*\]\s*/, "").trim();
 }
 
 /** First sentence of `s` (split on a period + whitespace), whole string if none. */
