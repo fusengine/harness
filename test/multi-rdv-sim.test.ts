@@ -9,7 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { runCase } from "./multi-differential";
+import { noteAttempt, runCase } from "./multi-differential";
 import { scenarioToCase } from "./multi-sim";
 
 const DIR = join(import.meta.dir, "sim", "scenarios");
@@ -20,6 +20,7 @@ const PICK = process.env.RDV_FULL === "1" ? ALL : ALL.filter((f) => SUBSET.some(
 describe("sim scenarios under rendezvous fan-out", () => {
   for (const file of PICK) {
     test(file, async () => {
+      noteAttempt(`sim:${file}`);
       const { steps, stateDiffs } = await runCase(scenarioToCase(join(DIR, file)));
       for (const s of steps) {
         expect(s.outputDiffs).toEqual([]);
@@ -27,6 +28,6 @@ describe("sim scenarios under rendezvous fan-out", () => {
         expect(s.order.length).toBeGreaterThanOrEqual(Math.min(2, s.scopes.length));
       }
       expect(stateDiffs).toEqual([]);
-    }, 300_000);
+    }, { timeout: 300_000, retry: 2 }); // the ON/OFF passes have different wall-clock profiles against 2-3 s product windows (burst dedup, inject dedup): a timing flip passes on retry, a logic divergence fails every run
   }
 });

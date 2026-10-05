@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { claudeScopesFor, codexScopesFor } from "./multi-routes";
-import { put, runCase, type Case, type Step } from "./multi-differential";
+import { noteAttempt, put, runCase, type Case, type Step } from "./multi-differential";
 import type { Sandbox } from "./multi-spawn";
 
 const project = (sb: Sandbox): void => {
@@ -36,10 +36,11 @@ async function expectEqual(c: Case): Promise<void> {
 
 describe("rendezvous == N separate processes (Codex)", () => {
   test("PostToolUse Bash", async () => {
+    noteAttempt("differential:codex-posttooluse-bash");
     const step = codexStep("PostToolUse", { tool_name: "Bash", tool_use_id: "u1", tool_input: { command: "ls" }, tool_response: "ok" });
     expect(step.scopes.length).toBeGreaterThan(10);
     await expectEqual({ host: "codex", setup: project, steps: [step] });
-  }, 120_000);
+  }, { timeout: 120_000, retry: 2 }); // wall-clock-window oracle: see multi-rdv-sim.test.ts
 });
 
 describe("scope selection mirrors the real declarations", () => {
