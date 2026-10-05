@@ -5,7 +5,9 @@ import { solidDetectStart } from "./solid-detect";
 import { subagentCacheContext } from "./subagent-cache";
 import { trackAgentMemory } from "./agent-memory";
 import { harvestSubagentTrack } from "../../freshness/evidence-harvest-io";
+import { mergeCursorChildTrack } from "../../freshness/cursor-child-harvest";
 import { markSubagentSeen } from "../confirm/confirm-subagent";
+import { recordCursorSubagentLink } from "../confirm/cursor-subagent-link";
 import { teammateIdleContext } from "./teammate-idle-check";
 import { failureLessonContext } from "./failure-lesson";
 import { postCompactContext } from "./post-compact";
@@ -70,7 +72,11 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
       // monotone max-write timestamp, NOT a counter — see confirm-subagent.ts's
       // subagentWindowMs doc for why a start/stop counter desyncs unsafely
       // under this same multi-plugin fan-out.
-      markSubagentSeen(input.payload.session_id, input.now);
+      // Cursor sub-agents run under their own conversation_id: this event carries the PARENT (human)
+      // chat's id, so G0 would freeze the human, not the sub-agent — Cursor guards the child conversation
+      // itself instead (handle.ts). Remember the parent chat for CONFIRM inheritance.
+      if (input.id === "cursor") recordCursorSubagentLink(input.payload);
+      else markSubagentSeen(input.payload.session_id, input.now);
       if (input.scope === "rules") return injectRules(resolveRulesRoot(input.id ?? "claude-code", input.cwd), input.event, input.id ?? "claude-code");
       if (input.scope === "aipilot") return "";
       if (input.scope === "lessons") return dispatchLessons("SubagentStart", input.payload, input.cwd, input.now, input.id ?? "claude-code");
@@ -83,14 +89,16 @@ export function dispatchLifecycle(input: LifecycleInput): string | null {
     }
     case "SubagentStop": {
       // G0 counterpart of the SubagentStart branch above — the SAME
-      // monotone max-write, never a decrement (see confirm-subagent.ts).
-      markSubagentSeen(input.payload.session_id, input.now);
+      // monotone max-write, never a decrement (see confirm-subagent.ts). Not on Cursor (see above).
+      if (input.id !== "cursor") markSubagentSeen(input.payload.session_id, input.now);
       if (input.scope === "aipilot") return "";
       // Retroactively harvest the finishing sub-agent's transcript into the session
       // track BEFORE the reminder — so next turn's freshness gate sees research/
       // explore evidence even when sidechain PostToolUse hooks never fired
       // (#43612/#27655/#34692). SubagentStop is main-session-dispatched (reliable).
       harvestSubagentTrack(input.payload, input.cwd, input.now);
+      // Cursor sub-agents run under their own conversation_id: fold the child's evidence into the parent.
+      if (input.id === "cursor") mergeCursorChildTrack(input.payload, input.cwd, input.now);
       // null = PRD had nothing to say (off, unnamed agent, or genuinely done)
       // -> normal trackAgentMemory handling; a non-null string (block, or ""
       // on an already-blocked replay) must be returned AS-IS, never layered

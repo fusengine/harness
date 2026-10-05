@@ -9,31 +9,22 @@
  * requests fixed scanner/chunk buffers while reading to EOF. Buffer alias views,
  * JS objects/strings, and RSS are runtime-dependent, so this is not a physical
  * memory guarantee. Unclassified oversized Cursor input fails closed.
+ *
+ * The raw bounded read lives in `stdin-text.ts` (light: no runtime imports) and
+ * is re-exported here unchanged.
  */
-import { readSync } from "node:fs";
-import { resolveStdinMaxBytes } from "../config/limits";
 import { respond } from "../runtime/respond";
 import { cursorEventContract } from "../adapters/cursor/events";
-import { readCursorBounded } from "./cursor-stdin-reader";
+import { readStdinRead, resolveCursorStdinMaxBytes, traceHook, type StdinRead } from "./stdin-text";
+import { resolveStdinMaxBytes } from "../config/limits";
 export { cursorReaderBounds, readCursorBounded } from "./cursor-stdin-reader";
-
-const hookDebug = process.env.FUSE_HARNESS_DEBUG === "1" && process.env.CI === "true";
-
-/** stderr-only trace, no-op outside the debug flag combination above. */
-export function traceHook(label: string, data: unknown): void {
-  if (hookDebug) process.stderr.write(`[hook-debug] ${label}: ${typeof data === "string" ? data : JSON.stringify(data)}\n`);
-}
-
-/** Result of the bounded stdin read. */
-export type StdinRead =
-  | { kind: "ok"; text: string }
-  | { kind: "oversize"; head: string };
+export { readBounded, resolveCursorStdinMaxBytes, traceHook, type StdinRead } from "./stdin-text";
 
 const MALFORMED_STDIN: unique symbol = Symbol("cursor-malformed-stdin");
 type MalformedStdin = { readonly [MALFORMED_STDIN]: true };
 
 /** Type guard for the oversize variant (narrows the readStdin union). */
-export function isOversize(x: unknown): x is { kind: "oversize"; head: string } {
+export function isOversize(x: unknown): x is { kind: "oversize"; head: string; stalled?: boolean } {
   return typeof x === "object" && x !== null && (x as { kind?: unknown }).kind === "oversize";
 }
 
@@ -42,43 +33,14 @@ export function isMalformedCursorStdin(x: unknown): x is MalformedStdin {
   return typeof x === "object" && x !== null && MALFORMED_STDIN in x;
 }
 
-/** First 4 KiB are the fallback diagnostic probe when no event key is found. */
-const HEAD_BYTES = 4096;
-const CHUNK = 64 * 1024;
-const CURSOR_MAX_STDIN_BYTES = 64 * 1024 * 1024;
-
-/** Resolve and clamp Cursor's stdin cap while preserving other harness limits. */
-export function resolveCursorStdinMaxBytes(env: Record<string, string | undefined> = process.env): number {
-  return Math.min(CURSOR_MAX_STDIN_BYTES, resolveStdinMaxBytes(env));
-}
-
 /**
- * Read a file descriptor to EOF, bounded at `maxBytes` (+1 byte to detect
- * the overflow). Injectable fd so tests never touch process stdin.
- * @param fd - The descriptor to read (0 in production).
- * @param maxBytes - Cap from {@link resolveStdinMaxBytes}.
+ * Turn an already-read {@link StdinRead} into what {@link readStdin} returns:
+ * the oversize marker, an empty object, the parsed payload, or (Cursor only)
+ * the malformed marker.
+ * @param id - Harness id (Cursor distinguishes malformed JSON from empty input).
+ * @param read - The bounded read result.
  */
-export function readBounded(fd: number, maxBytes: number): StdinRead {
-  const buf = Buffer.alloc(CHUNK);
-  const parts: Buffer[] = [];
-  let total = 0;
-  for (;;) {
-    const n = readSync(fd, buf, 0, CHUNK, null);
-    if (n === 0) break;
-    total += n;
-    parts.push(Buffer.from(buf.subarray(0, n)));
-    if (total > maxBytes) {
-      return { kind: "oversize", head: Buffer.concat(parts).subarray(0, HEAD_BYTES).toString("utf8") };
-    }
-  }
-  traceHook("stdin-text-length", total);
-  return { kind: "ok", text: Buffer.concat(parts).toString("utf8") };
-}
-
-/** Read hook stdin; Cursor distinguishes malformed non-empty JSON from historical empty input. */
-export async function readStdin(id?: string): Promise<Record<string, unknown> | StdinRead | MalformedStdin> {
-  const cap = id === "cursor" ? resolveCursorStdinMaxBytes() : resolveStdinMaxBytes();
-  const read = id === "cursor" ? readCursorBounded(0, cap) : readBounded(0, cap);
+export function parseStdinRead(id: string | undefined, read: StdinRead): Record<string, unknown> | StdinRead | MalformedStdin {
   if (read.kind === "oversize") return read;
   const text = read.text.trim();
   if (!text) return {};
@@ -91,6 +53,11 @@ export async function readStdin(id?: string): Promise<Record<string, unknown> | 
   }
 }
 
+/** Read hook stdin; Cursor distinguishes malformed non-empty JSON from historical empty input. */
+export async function readStdin(id?: string): Promise<Record<string, unknown> | StdinRead | MalformedStdin> {
+  return parseStdinRead(id, await readStdinRead(id));
+}
+
 /** Blockable hook events (fail-closed on oversize); others are observation-only. */
 const BLOCKABLE = new Set(["PreToolUse", "UserPromptSubmit", "Stop"]);
 
@@ -100,9 +67,10 @@ const BLOCKABLE = new Set(["PreToolUse", "UserPromptSubmit", "Stop"]);
  * empty string on observation-only events (no crash, no noise).
  * @param id - Harness id (selects the native deny shape via `respond`).
  * @param head - The first bytes of the payload (event-name sniffing).
+ * @param stalled - The payload never completed (partial bound expired) rather than exceeding the cap.
  */
-export function oversizeStdout(id: string, head: string): string {
-  const event = id === "cursor" ? probeEvent(head) : legacyProbeEvent(head);
+export function oversizeStdout(id: string, head: string, stalled = false): string {
+  const event = id === "cursor" ? (probeEvent(head) || (stalled ? legacyProbeEvent(head) : "")) : legacyProbeEvent(head);
   const maxBytes = id === "cursor" ? resolveCursorStdinMaxBytes() : resolveStdinMaxBytes();
   if (id === "cursor" && event) {
     const contract = cursorEventContract(event);
@@ -111,8 +79,10 @@ export function oversizeStdout(id: string, head: string): string {
   if (id !== "cursor" && event && !BLOCKABLE.has(event)) return "";
   return respond(id, {
     kind: "block",
-    title: "Oversize hook payload",
-    reason: `stdin payload exceeds ${maxBytes} bytes — denied uninspected`,
+    title: stalled ? "Incomplete hook payload" : "Oversize hook payload",
+    reason: stalled
+      ? "stdin payload never completed within the partial-payload bound — denied uninspected"
+      : `stdin payload exceeds ${maxBytes} bytes — denied uninspected`,
   }, id === "cursor" ? (event || "preToolUse") : "PreToolUse");
 }
 

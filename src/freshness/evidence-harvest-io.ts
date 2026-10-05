@@ -44,24 +44,43 @@ export function harvestSubagentTrack(payload: Record<string, unknown>, cwd: stri
   const transcriptPath = typeof payload.agent_transcript_path === "string" ? payload.agent_transcript_path : undefined;
   if (!transcriptPath) return;
   const sessionId = typeof payload.session_id === "string" ? payload.session_id : "unknown";
-  const file = trackFile(sessionId, baseDir);
+  updateTrackSync(trackFile(sessionId, baseDir), now, (track) => harvestAgentEvidence(transcriptPath, track, now));
+}
+
+/**
+ * Read a track synchronously in the active storage mode (journal snapshot ⊕ log,
+ * or the signed legacy file); `emptyTrack()` when absent/corrupt.
+ * @param file - The session track file.
+ */
+export function readTrackAnySync(file: string): SessionTrack {
+  return trackJournalEnabled() ? readTrackSync(file, true) : loadTrackSync(file);
+}
+
+/**
+ * Synchronous fail-open track update for lifecycle hooks (cannot float async work).
+ * `mutate` returning the SAME reference means "nothing to write".
+ * @param file - The session track file.
+ * @param now - Event timestamp for journal entries.
+ * @param mutate - Pure transformation of the freshly read track.
+ */
+export function updateTrackSync(file: string, now: number, mutate: (track: SessionTrack) => SessionTrack): void {
   // Journal mode (default): snapshot ⊕ log read, then lock-free signed event
   // appends — same fail-open contract, never a "write skipped" under fan-out.
   if (trackJournalEnabled()) {
     const track = readTrackSync(file, true);
-    const next = harvestAgentEvidence(transcriptPath, track, now);
-    if (next === track) return; // nothing harvested → no write
+    const next = mutate(track);
+    if (next === track) return; // nothing to add → no write
     const log = journalLogPath(file);
     for (const ev of diffTrackEvents(track, next, now)) appendEvent(log, ev.field, ev.op, ev.value, ev.ts);
     return;
   }
   // Locked RMW (legacy kill-switch path, sync variant — this path cannot float
-  // async work): on contention the harvest is skipped like any other write
+  // async work): on contention the update is skipped like any other write
   // error, fail-open.
   const ran = withTrackLockSync(dirname(file), () => {
     const track = loadTrackSync(file);
-    const next = harvestAgentEvidence(transcriptPath, track, now);
-    if (next === track) return; // nothing harvested (or unreadable) → no rewrite
+    const next = mutate(track);
+    if (next === track) return; // nothing to add (or unreadable) → no rewrite
     try {
       const envelope = signTrack(next);
       atomicWrite(file, JSON.stringify(envelope, null, 2));

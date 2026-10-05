@@ -98,7 +98,8 @@ async function handleHookCore(id: string, payload: Record<string, unknown>, opts
   const event = normalizeEvent(id, payload);
   if (id === "cursor") {
     const cursorCwd = cursorProjectCwd(event.cwd, event.workspaceRoots ?? [], event.filePath, opts.cwd);
-    if (cursorCwd !== opts.cwd) opts = { ...opts, cwd: cursorCwd };
+    // Copy property DESCRIPTORS, not values: a spread would run bin.ts's lazy `refsDir` getter here, defeating its laziness.
+    if (cursorCwd !== opts.cwd) opts = Object.defineProperties({}, { ...Object.getOwnPropertyDescriptors(opts), cwd: { value: cursorCwd, enumerable: true, writable: true, configurable: true } }) as HandleOptions;
   }
   // Single passage point (see cursorRawPayloadProjection doc): every raw-payload
   // consumer below this line gets the canonical tool_name/cwd on Cursor; every
@@ -156,7 +157,9 @@ async function handleHookCore(id: string, payload: Record<string, unknown>, opts
   // anything else (field absent, or an unrecognized type) stays `undefined`
   // so the block below is skipped exactly as before promptText existed.
   if (userPrompt !== undefined) {
-    if (id !== "codex") handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
+    // G0 on Cursor: a sub-agent's own conversation (it carries `parent_tool_call_id`) can never arm a CONFIRM.
+    const cursorSubagentPrompt = id === "cursor" && payload.parent_tool_call_id !== undefined;
+    if (id !== "codex" && !cursorSubagentPrompt) handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
     await withTrack(file, (track) => recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
     return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
   }

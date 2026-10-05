@@ -54,3 +54,27 @@ export const DEFAULT_STDIN_MAX_BYTES: number = 16 * 1024 * 1024;
 export function resolveStdinMaxBytes(env: Record<string, string | undefined> = process.env): number {
   return parseEnvInt(env.FUSE_HOOK_STDIN_MAX_BYTES, DEFAULT_STDIN_MAX_BYTES);
 }
+
+/**
+ * Default total wait (ms) for the blocking journal-append lock. Measured:
+ * a compaction of the default 128 KiB log holds `track.lock` ~3 ms, 1 MiB
+ * ~55 ms, 3.5 MiB ~470 ms; 1000 ms covers a compaction of ~5 MiB (40x the
+ * cap) while keeping a hook process lifetime short. Past it the event is
+ * spilled (never lost), see `track-spill.ts`.
+ */
+export const DEFAULT_TRACK_LOCK_BUDGET_MS: number = 1000;
+/** Lower clamp: below this the lock cannot be won under normal contention. */
+const MIN_TRACK_LOCK_BUDGET_MS = 50;
+/** Upper clamp: stays under the 10 s stale-lock TTL so reclamation can still win. */
+const MAX_TRACK_LOCK_BUDGET_MS = 8000;
+
+/**
+ * Resolve the blocking-append lock budget (`FUSE_TRACK_LOCK_BUDGET_MS`,
+ * default 1000 ms; absent/invalid falls back, valid values are clamped to
+ * [50, 8000] so the wait is always finite).
+ * @param env - environment map (defaults to `process.env`)
+ */
+export function resolveTrackLockBudgetMs(env: Record<string, string | undefined> = process.env): number {
+  const n = parseEnvInt(env.FUSE_TRACK_LOCK_BUDGET_MS, DEFAULT_TRACK_LOCK_BUDGET_MS);
+  return Math.min(Math.max(n, MIN_TRACK_LOCK_BUDGET_MS), MAX_TRACK_LOCK_BUDGET_MS);
+}

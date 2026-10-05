@@ -13,35 +13,41 @@
  * only the LEAD's solidReadGate never credited). The Claude-authored transcript
  * is append-only and race-immune, so folding its `.md` Reads back into the track
  * restores the lost evidence; each gate still applies its own TTL/session policy.
+ *
+ * NO WINDOW BOUND: `refsRead` membership is session-scoped for the shadcn/tailwind/
+ * skill-trigger gates (only `solidReadGate` TTLs via `refsReadAt`), so a read older
+ * than the window still changes verdicts. The whole history is therefore folded —
+ * but through the incremental index (bounded memory, delta-only bytes), not a
+ * whole-file read.
  */
-import { readAgentToolUses } from "../runtime/lifecycle/agent-transcript";
+import { loadTranscriptIndex } from "./transcript-index";
 import { recordRefRead, type SessionTrack } from "../tracking/session-state";
 
 /**
  * Fold every `.md` `Read` in the transcript into `track` as a timestamped ref
  * read (immutably). PURE reconciliation — the caller owns the track; each read
- * is stamped with its transcript timestamp (unstamped → `now`, lenient, matching
- * {@link agentsRanFromTranscript}), and an existing MORE-recent stamp is never
- * rolled back. Fail-open: an absent/unreadable transcript returns `track`
+ * is stamped with its latest transcript timestamp (unstamped → `now`, lenient,
+ * matching {@link agentsRanFromTranscript}), and an existing MORE-recent stamp is
+ * never rolled back. Fail-open: an absent/unreadable transcript returns `track`
  * unchanged (same reference).
  * @param track - The current (possibly race-damaged) session track.
  * @param transcriptPath - Claude `transcript_path` for this session.
  * @param now - Fallback epoch-ms for transcript entries the platform left unstamped.
+ * @param stateDir - Per-session state dir holding the incremental index sidecar (optional).
  * @returns The track with transcript `.md` reads merged into `refsRead`/`refsReadAt`.
  */
 export function reconcileRefReadsFromTranscript(
   track: SessionTrack,
   transcriptPath: string | undefined,
   now: number,
+  stateDir?: string,
 ): SessionTrack {
-  const uses = readAgentToolUses(transcriptPath);
-  if (!uses) return track; // unreadable → unchanged (no regression)
+  if (!transcriptPath) return track;
+  const index = loadTranscriptIndex(transcriptPath, stateDir);
+  if (!index) return track; // unreadable → unchanged (no regression)
   let next = track;
-  for (const u of uses) {
-    if (u.name !== "Read") continue;
-    const path = String(u.input?.file_path ?? u.input?.path ?? "");
-    if (!path.endsWith(".md")) continue;
-    const ts = u.ts ?? now;
+  for (const [path, s] of index.refs) {
+    const ts = s.u === true ? Math.max(s.ts ?? now, now) : (s.ts ?? now);
     const prev = next.refsReadAt?.[path];
     if (prev === undefined || prev < ts) next = recordRefRead(next, path, ts);
   }

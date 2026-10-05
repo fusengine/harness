@@ -63,8 +63,14 @@ export async function gateCommandCandidates(input: GateInput, candidates: readon
   return finalizeGate(input, decisive?.prompt ?? null, decisive?.command ?? input.command);
 }
 
-/** Persist one final gate outcome and apply deny-loop enrichment exactly once. */
-function finalizeGate(input: GateInput, prompt: Prompt | null, command: string | undefined): Prompt | null {
+/**
+ * Persist one final gate outcome and apply deny-loop enrichment exactly once.
+ * @param input - The gated tool-use (its `filePath`/`content` key the deny-loop op).
+ * @param prompt - The decisive prompt, or null when every gate allowed.
+ * @param command - The decisive shell command, if any.
+ * @returns The prompt, possibly enriched as a repeated deny.
+ */
+export function finalizeGate(input: GateInput, prompt: Prompt | null, command: string | undefined): Prompt | null {
   const op = { filePath: input.filePath, content: input.content, command };
   const dir = dirname(input.trackFile);
   recordOneShot(prompt, op, { now: input.now, dir, sessionId: input.sessionId });
@@ -76,8 +82,12 @@ function promptRank(prompt: Prompt): number {
   return prompt.kind === "block" ? 3 : prompt.kind === "ask" ? 2 : 1;
 }
 
-/** Stateless guards, then the trivial fast path, then the stateful APEX gates. */
-async function runGates(input: GateInput): Promise<Prompt | null> {
+/**
+ * Stateless guards, then the trivial fast path, then the stateful APEX gates.
+ * @param input - The tool-use to gate.
+ * @returns The first blocking prompt, or null when every gate allowed.
+ */
+export async function runGates(input: GateInput): Promise<Prompt | null> {
   // Pre-commit lint hard-block runs FIRST: evaluate()'s GIT_ASK branch would
   // otherwise short-circuit a `git commit` before the linters get to veto it.
   const precommit = preCommitGate(input.tool, input.command, input.cwd);
@@ -96,11 +106,24 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   const modular = modularGate(input.tool, input.filePath, input.content, input.cwd);
   if (modular) return modular;
   if (!input.filePath) return null;
-  const filePath = input.filePath;
+  return runFileGates(input, input.filePath, existingCodeLines);
+}
+
+/**
+ * The file-keyed tail of {@link runGates}: framework/shadcn/Tailwind/Gemini skill
+ * gates, the APEX-scoped gates, then DRY. Also run per file for a Codex
+ * `apply_patch` (runtime/apply-patch-apex.ts), whose static gates already ran.
+ * @param input - The tool-use to gate (`tool`/`content` of this one file).
+ * @param filePath - The file being written.
+ * @param existingCodeLines - On-disk code-line count of `filePath`, if it exists.
+ * @param opts - `dry: false` skips the DRY grep when the caller already ran it.
+ * @returns The first blocking prompt, or null when every gate allowed.
+ */
+export async function runFileGates(input: GateInput, filePath: string, existingCodeLines: number | undefined, opts: { dry?: boolean } = {}): Promise<Prompt | null> {
   // Reconcile refsRead BEFORE any consumer from two durable, race-immune sources (racy load→save loses lone
   // writes under the fan-out): the transcript restores the LEAD's flushed read, the append-only journal (ref-journal.ts) the TEAMMATE's un-flushed one (lag > TTL).
   const track = reconcileRefReadsFromJournal(
-    reconcileRefReadsFromTranscript(await loadTrack(input.trackFile), input.transcriptPath, input.now),
+    reconcileRefReadsFromTranscript(await loadTrack(input.trackFile), input.transcriptPath, input.now, dirname(input.trackFile)),
     dirname(input.trackFile), input.now,
   );
   const solidOrSkill = frameworkSkillGate(input, track.refsRead, existingCodeLines);
@@ -119,10 +142,10 @@ async function runGates(input: GateInput): Promise<Prompt | null> {
   const geminiBlock = geminiMcpGate(input.tool, filePath, input.content ?? "", { authorizations: track.authorizations, sessionId: input.sessionId });
   if (geminiBlock) return geminiBlock;
   // The freshness/doc/SOLID APEX gates only police code files (require-apex-agents.py parity): non-code and exempt paths skip straight to the DRY check below.
-  if (isApexScoped(input.filePath)) {
+  if (isApexScoped(filePath)) {
     const apex = await apexScopedGate(input, track, input.windowMs ?? DEFAULT_WINDOW_MS);
     if (apex) return apex;
   }
   // DRY duplication (effectful: greps the codebase) — runs once the APEX gates pass.
-  return dryGate(input.tool, input.filePath, input.content, input.cwd);
+  return opts.dry === false ? null : dryGate(input.tool, filePath, input.content, input.cwd);
 }

@@ -85,6 +85,24 @@ export function isSubagentActive(sessionIdRaw: unknown, now: number, home: strin
 }
 
 /**
+ * When the G0 freeze ends for this session (epoch ms), or `null` when no
+ * sub-agent froze it — lets a deny explain why a typed CONFIRM is ignored
+ * ({@link isSubagentActive}'s window, same source of truth).
+ * @param sessionIdRaw - The session id.
+ * @param now - Epoch ms.
+ * @param home - Test-only OS home override.
+ * @param env - Env map for the window override.
+ */
+export function subagentFrozenUntil(sessionIdRaw: unknown, now: number, home: string = homedir(), env: Record<string, string | undefined> = process.env): number | null {
+  const sid = sanitizeSessionId(sessionIdRaw);
+  if (!sid) return null;
+  const seenAt = loadSessionState(sid, home).subagentSeenAt;
+  if (typeof seenAt !== "number") return null;
+  const until = seenAt + subagentWindowMs(env);
+  return now < until ? until : null;
+}
+
+/**
  * Record a SubagentStart OR SubagentStop sighting for this session as a
  * monotone max-write (see {@link subagentWindowMs}'s doc for why this can
  * never desync unsafely under concurrent racy writers). Both events call

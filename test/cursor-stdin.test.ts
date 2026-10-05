@@ -69,6 +69,14 @@ test("Cursor reader exposes independent Buffer allocation requests and scanner c
   });
 });
 
+test("Cursor reader bound counts the grow-on-demand retained sequence (64K, 128K, ... capped at maxBytes)", () => {
+  const K = 1024;
+  // 1 MiB cap: retained 64K+128K+256K+512K+1024K = 1984 KiB, plus one 64 KiB chunk, 4 KiB head, 256 token entries
+  expect(cursorReaderBounds(1024 * K).bufferAllocationRequestBytes).toBe((1984 + 64 + 4) * K + 256);
+  // non-power-of-two cap: 64K then the cap itself
+  expect(cursorReaderBounds(100_000).bufferAllocationRequestBytes).toBe(65_536 + 100_000 + 65_536 + 4096 + 256);
+});
+
 test("oversized Cursor detects a late top-level event independent of key order", () => {
   const payload = JSON.stringify({
     content: "x".repeat(5000),

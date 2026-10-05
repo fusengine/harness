@@ -21,8 +21,13 @@ import { recordAgent, recordRefRead, type SessionTrack } from "../tracking/sessi
 /** Dedup tolerance (ms) against evidence a live sidechain hook may already hold. */
 const DEDUP_MS = 2000;
 
-/** True when an `agents` entry with `name` already sits within ±{@link DEDUP_MS} of `ts`. */
-function agentAlreadyRecorded(track: SessionTrack, name: string, ts: number): boolean {
+/**
+ * True when an `agents` entry with `name` already sits within ±{@link DEDUP_MS} of `ts`.
+ * @param track - The session track.
+ * @param name - Agent evidence name.
+ * @param ts - Candidate timestamp (epoch ms).
+ */
+export function agentAlreadyRecorded(track: SessionTrack, name: string, ts: number): boolean {
   return track.agents.some((a) => a.name === name && Math.abs(a.ts - ts) <= DEDUP_MS);
 }
 

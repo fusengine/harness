@@ -19,7 +19,7 @@
     },
     {
       "scope": "core",
-      "doc": "A small compliant Add File → allowed → empty stdout. The apply_patch gate runs only the pure file gates (protected-path, file-size, DRY), never the stateful APEX freshness gate (its filePath was always undefined, so it never policed apply_patch), so a compliant hunk is silent — unlike a small single-file Write, which the APEX gate blocks on a fresh session.",
+      "doc": "A small Add File that passes the static file gates (protected-path, file-size, DRY) on a FRESH session → APEX freshness deny, exactly like the equivalent single-file Write. Before 2026-10-03 apply_patch skipped the file-keyed skill/APEX gates (undefined filePath) and this step asserted an empty, unpoliced allow; runtime/apply-patch-apex.ts now runs them per patched file (Codex only).",
       "event": {
         "hook_event_name": "PreToolUse",
         "session_id": "sc22b",
@@ -28,7 +28,7 @@
           "command": "*** Begin Patch\n*** Add File: small.ts\n+const a = 1;\n+const b = 2;\n*** End Patch"
         }
       },
-      "expect": { "exit": 0, "stdout": { "empty": true } }
+      "expect": { "exit": 0, "stdout": { "contains": "APEX: explore + research required" } }
     },
     {
       "scope": "core",

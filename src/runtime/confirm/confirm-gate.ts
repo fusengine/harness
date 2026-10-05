@@ -4,6 +4,7 @@ import { isIrreversible } from "./confirm-irreversible";
 import { recordPendingDeny } from "./confirm-pending";
 import { consumeConfirmToken } from "./confirm-state";
 import { authorizeCodexAction, codexAction } from "./codex-confirm";
+import { subagentFrozenUntil } from "./confirm-subagent";
 
 /**
  * Harnesses where `respond.ts` silently downgrades `kind: "ask"` to a hard
@@ -17,6 +18,21 @@ import { authorizeCodexAction, codexAction } from "./codex-confirm";
 const DEGRADES_ASK_TO_DENY: ReadonlySet<string> = new Set(["codex", "kimi", "cursor"]);
 
 export type ConfirmVerdict = { allow: true } | { allow: false; prompt: Prompt };
+
+/** Cursor: how long the sibling pre-hook of the same Shell command may reuse a just-consumed token (see confirm-state.ts `ConsumeGrace`). */
+const CURSOR_SIBLING_GRACE_MS = 10_000;
+
+/**
+ * Deny-message suffix while the G0 sub-agent freeze is on: a CONFIRM typed now
+ * would be ignored silently by placeConfirmToken, so say so and until when.
+ * @param sessionId - The session id.
+ * @param now - Epoch ms.
+ * @param home - Test-only OS home override.
+ */
+function frozenHint(sessionId: string, now: number, home?: string): string {
+  const until = subagentFrozenUntil(sessionId, now, home);
+  return until === null ? "" : `\nConfirmation gelée (sous-agent actif) jusqu'à ${new Date(until).toLocaleTimeString("fr-FR")} — renvoie le code après.`;
+}
 
 /**
  * Whether/how a CONFIRM token changes an `ask` prompt about to be downgraded
@@ -32,6 +48,9 @@ export type ConfirmVerdict = { allow: true } | { allow: false; prompt: Prompt };
  * @param sessionId - `event.sessionId`.
  * @param now - Epoch ms.
  * @param home - Test-only OS home override.
+ * @param codex - Codex action context (Codex path only).
+ * @param cursorGenerationId - Cursor `generation_id` (Cursor only): keys the sibling-pass grace.
+ * @param cursorParentSessionId - Cursor sub-agent only: the parent chat session, whose token it may consume and where its pending deny is mirrored.
  */
 export function confirmGate(
   id: string,
@@ -41,6 +60,8 @@ export function confirmGate(
   now: number,
   home?: string,
   codex?: Readonly<{ tool: string; cwd: string; toolUseId?: string }>,
+  cursorGenerationId?: string,
+  cursorParentSessionId?: string,
 ): ConfirmVerdict | null {
   if (prompt.kind !== "ask" || !DEGRADES_ASK_TO_DENY.has(id) || !command || isIrreversible(command)) return null;
   try {
@@ -54,10 +75,18 @@ export function confirmGate(
       return { allow: false, prompt: { ...prompt, reason: `${prompt.reason}\nPour autoriser, réponds : CONFIRM ${action.code}\n${diagnostic}` } };
     }
     const hash = hashForAction(command);
-    if (consumeConfirmToken(sessionId, hash, now, home)) return { allow: true };
+    // Cursor runs this twice per Shell command (preToolUse + beforeShellExecution): let the sibling pass of the same turn reuse the token.
+    const grace = id === "cursor" && cursorGenerationId ? { ms: CURSOR_SIBLING_GRACE_MS, generationId: cursorGenerationId } : undefined;
+    if (consumeConfirmToken(sessionId, hash, now, home, grace)) return { allow: true };
+    // Cursor sub-agent: the human confirms in the PARENT chat (cursor-subagent-link.ts).
+    const parent = id === "cursor" ? cursorParentSessionId : undefined;
+    if (parent && consumeConfirmToken(parent, hash, now, home, grace)) return { allow: true };
     const code = displayCodeForAction(command);
     recordPendingDeny(sessionId, hash, code, now, home);
-    return { allow: false, prompt: { ...prompt, reason: `${prompt.reason}\nPour autoriser, réponds : CONFIRM ${code}` } };
+    if (parent) recordPendingDeny(parent, hash, code, now, home);
+    // A sub-agent's code is confirmed in the parent chat: show the exact command so the human sees what they approve.
+    const shown = parent ? `\ncommande (sous-agent) : ${command}` : "";
+    return { allow: false, prompt: { ...prompt, reason: `${prompt.reason}\nPour autoriser, réponds : CONFIRM ${code}${shown}${id === "cursor" ? frozenHint(parent ?? sessionId, now, home) : ""}` } };
   } catch {
     // A state-io failure (full disk, unwritable home) must fall back to the
     // plain deny, never crash the hook — same invariant as confirm-submit.ts.
