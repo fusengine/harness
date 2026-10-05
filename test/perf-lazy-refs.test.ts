@@ -132,7 +132,10 @@ test("lazyRefs vs loadRefs property: 120 random trees — same throw/no-throw, s
     const old = await loadRefs(dir).then((r) => ({ ok: r }), (e: { code?: string }) => ({ err: e.code }));
     const now = await lazyRefs(dir).then(async (th) => ({ ok: await th() }), (e: { code?: string }) => ({ err: e.code }));
     if ("err" in old) throwing++;
-    expect({ seed, ...now }).toEqual({ seed, ...old });
+    // loadRefs returns readdir order, which is unspecified and can differ between two calls (seen on Linux CI):
+    // the property is "same refs, same error" — compare the refs as a set, sorted by path.
+    const byPath = (r: { ok?: { filePath: string }[]; err?: string }) => ("ok" in r && r.ok ? { ok: [...r.ok].sort((x, y) => x.filePath.localeCompare(y.filePath)) } : r);
+    expect({ seed, ...byPath(now) }).toEqual({ seed, ...byPath(old) });
   }
   expect(throwing).toBeGreaterThan(10); // the failure shapes were actually exercised
 });

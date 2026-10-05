@@ -17,6 +17,7 @@ export function normalize(text: string, sb: Sandbox): string {
     .replace(/"nonce":"[0-9a-f]+"/g, '"nonce":"<NONCE>"')
     .replace(/\b1[5-9]\d{11}\b/g, "<MS>")
     .replace(/\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d+)?Z?/g, "<ISO>")
+    .replace(/\d{4}-\d\d-\d\d \d\d:\d\d\b/g, "<MINUTE>") // lessons Stop stamp `[YYYY-MM-DD HH:MM]`: two passes can straddle a minute
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<UUID>")
     .replace(/\b[0-9a-f]{32,}\b/g, "<HEX>")
     .replace(/(?:fh-rdv-)[A-Za-z0-9]+/g, "<TMP>");
