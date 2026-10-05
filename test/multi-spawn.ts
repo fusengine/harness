@@ -62,21 +62,25 @@ export interface SpawnOpts {
   measure?: boolean;
 }
 
-/** Spawn one hook process, feed `payload` on stdin, resolve with everything it produced. */
-export function spawnHook(o: SpawnOpts): Promise<Spawned> {
+/**
+ * Start one hook process WITHOUT feeding stdin yet (it boots, then blocks on stdin — the reader waits up to
+ * FUSE_HOOK_STDIN_PARTIAL_MS for a first byte); `feed` writes the payload and closes stdin.
+ * @param o - Spawn options (no payload: pass it to `feed`).
+ * @returns `feed` to send the payload, `done` resolving with everything the process produced.
+ */
+export function startHook(o: Omit<SpawnOpts, "payload">): { feed: (payload: string) => void; done: Promise<Spawned> } {
   const args = [BIN, "hook", o.host, ...(o.scope ? [o.scope] : [])];
   const runtime = process.env.RDV_RUNTIME ?? (process.env.SIM_BIN ? "node" : "bun"); // RDV_RUNTIME=bun runs the built bin like the hosts do
   const cmd = o.measure ? "/usr/bin/time" : runtime;
   const argv = o.measure ? ["-l", runtime, ...args] : args;
   const t0 = Date.now();
-  return new Promise((resolve) => {
-    const child = spawn(cmd, argv, { cwd: o.sb.cwd, env: spawnEnvFor(o.sb, o.env), stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(cmd, argv, { cwd: o.sb.cwd, env: spawnEnvFor(o.sb, o.env), stdio: ["pipe", "pipe", "pipe"] });
+  child.stdin.on("error", () => undefined);
+  const done = new Promise<Spawned>((resolve) => {
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d: Buffer) => { stdout += d.toString("utf8"); });
     child.stderr.on("data", (d: Buffer) => { stderr += d.toString("utf8"); });
-    child.stdin.on("error", () => undefined);
-    child.stdin.end(o.payload);
     child.on("close", (code) => {
       const m = o.measure ? /(\d+)\s+maximum resident set size/.exec(stderr) : null;
       const cpu = o.measure ? /([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys/.exec(stderr) : null;
@@ -85,12 +89,26 @@ export function spawnHook(o: SpawnOpts): Promise<Spawned> {
       resolve({ scope: o.scope, stdout, stderr, exit: code ?? 1, pid: child.pid ?? 0, rssBytes: m ? Number(m[1]) : 0, cpuMs, wallMs: Date.now() - t0 });
     });
   });
+  return { feed: (payload) => void child.stdin.end(payload), done };
 }
 
-/** Run `scopes` one after the other (the order given), rendezvous OFF: today's behaviour. */
+/** Spawn one hook process, feed `payload` on stdin, resolve with everything it produced. */
+export function spawnHook(o: SpawnOpts): Promise<Spawned> {
+  const h = startHook(o);
+  h.feed(o.payload);
+  return h.done;
+}
+
+/**
+ * Run `scopes` one after the other (the order given), rendezvous OFF: today's behaviour. All processes
+ * are STARTED first (they boot together, as a host's real fan-out does) and fed one at a time, so the
+ * step stays inside the product's 2 s burst window like a real sibling burst — booting each one in turn
+ * (~150 ms of bun startup apiece) made a 14-scope step exceed it and turned later siblings into "repeats".
+ */
 export async function runSequential(host: string, scopes: (string | undefined)[], payload: string, sb: Sandbox, env: Record<string, string> = {}): Promise<Spawned[]> {
+  const started = scopes.map((scope) => startHook({ host, scope, sb, env: { ...env, FUSE_HARNESS_RENDEZVOUS: "0" } }));
   const out: Spawned[] = [];
-  for (const scope of scopes) out.push(await spawnHook({ host, scope, payload, sb, env: { ...env, FUSE_HARNESS_RENDEZVOUS: "0" } }));
+  for (const h of started) { h.feed(payload); out.push(await h.done); }
   return out;
 }
 

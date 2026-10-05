@@ -100,19 +100,6 @@ async function passB(c: Case, step: Step, sb: Sandbox): Promise<{ b: Spawned[]; 
   return { b, order, served: claimed, payload };
 }
 
-const attempts = new Map<string, number>();
-
-/**
- * Count an oracle test attempt and warn on every retry, so a divergence that only passed on retry
- * (a wall-clock window flip — or an intermittent rdv race) stays visible in the CI log.
- * @param key - Stable test identity (file + test name).
- */
-export function noteAttempt(key: string): void {
-  const n = (attempts.get(key) ?? 0) + 1;
-  attempts.set(key, n);
-  if (n > 1) console.warn(`[rdv-oracle] RETRY ${n - 1} for "${key}": the previous attempt failed (timing window flip, timeout or intermittent race) — investigate if this recurs`);
-}
-
 /**
  * Run a case in ONE sandbox, twice: pass B (rendezvous ON, concurrent) then —
  * after wiping it back to the initial state — pass A (rendezvous OFF, one

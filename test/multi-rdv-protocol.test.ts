@@ -9,7 +9,7 @@ import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { eventKey } from "../src/cli/rdv/fs";
 import { codexScopesFor } from "./multi-routes";
-import { noteAttempt, put, runCase, type Step } from "./multi-differential";
+import { put, runCase, type Step } from "./multi-differential";
 import { makeSandbox, spawnHook, type Sandbox } from "./multi-spawn";
 
 const project = (sb: Sandbox): void => { put(sb, "package.json", '{"name":"p"}'); put(sb, "src/a.ts", "export const a = 1;\n"); };
@@ -32,14 +32,13 @@ afterEach(() => { for (const b of boxes) rmSync(b.cwd, { recursive: true, force:
 describe("random arrival order and timing", () => {
   for (const trial of [1, 2, 3]) {
     test(`Codex PostToolUse Bash, shuffled scopes + jitter (trial ${trial})`, async () => {
-      noteAttempt(`protocol:random-arrival-${trial}`);
       const payloadFor = codexEvent("PostToolUse", { tool_name: "Bash", tool_use_id: "u", tool_input: { command: "ls" }, tool_response: "ok" });
       const step: Step = { payloadFor, scopes: shuffled(codexScopesFor(payloadFor({ home: "", cwd: "/x" }))), staggerMs: 0, jitterMs: 25 };
       const { steps, stateDiffs } = await runCase({ host: "codex", setup: project, steps: [step] });
       expect(steps[0]?.outputDiffs).toEqual([]);
       expect(steps[0]?.order.length).toBeGreaterThanOrEqual(2);
       expect(stateDiffs).toEqual([]);
-    }, { timeout: 120_000, retry: 2 }); // wall-clock-window oracle: see multi-rdv-sim.test.ts
+    }, 120_000);
   }
 });
 
