@@ -22,6 +22,15 @@ export function normalize(text: string, sb: Sandbox): string {
     .replace(/(?:fh-rdv-)[A-Za-z0-9]+/g, "<TMP>");
 }
 
+/**
+ * Drop a journal `"op":"set"` line identical (after normalisation) to the line just before it: a repeated
+ * set is a no-op by construction (the fold keeps the last value), and whether it is written at all depends
+ * on two scopes landing in the same millisecond (track-diff skips an unchanged value). Appends are kept.
+ */
+function collapseRepeatedSets(body: string): string {
+  return body.split("\n").filter((l, i, all) => !(i > 0 && l === all[i - 1] && l.includes('"op":"set"'))).join("\n");
+}
+
 /** Relative-path -> normalised content for every file under `root` (rdv dir excluded). */
 function walk(root: string, sb: Sandbox, out: Map<string, string>): void {
   const visit = (dir: string): void => {
@@ -37,7 +46,8 @@ function walk(root: string, sb: Sandbox, out: Map<string, string>): void {
       else if (st.isFile()) {
         let body = "";
         try { body = readFileSync(path, "utf8"); } catch { body = "<unreadable>"; }
-        out.set(normalize(rel, sb), normalize(body, sb));
+        const norm = normalize(body, sb);
+        out.set(normalize(rel, sb), name.endsWith(".log") ? collapseRepeatedSets(norm) : norm);
       }
     }
   };
