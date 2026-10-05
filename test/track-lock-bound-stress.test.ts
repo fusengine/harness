@@ -3,7 +3,7 @@
  * while compactions run in a loop. Zero lost, zero duplicated events.
  */
 import { test, expect } from "bun:test";
-import { readdirSync } from "node:fs";
+import { readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { loadTrack } from "../src/tracking/store";
@@ -23,13 +23,22 @@ test("30 processes × 40 appends during repeated compactions: 0 lost, 0 duplicat
       appendEvent(log, "agents", "append", { id: "seed" }, BASE); // pins the .key before the fan-out
       const script = (p: number): string => `import { appendEvent } from ${JSON.stringify(TJOURNAL)};
 for (let i = 0; i < ${EACH}; i++) appendEvent(${JSON.stringify(log)}, "agents", "append", { id: "p${p}-" + i }, ${BASE} + ${p} * 1000 + i);`;
-      let alive = PROCS, spilled = 0;
+      // Contention must not depend on machine speed (a fast CI runner never contended): hold track.lock
+      // ourselves (fresh mtime, far below the 10 s stale TTL) until the first spill is seen, then release.
+      const lock = join(d, "track.lock"), t0 = Date.now();
+      writeFileSync(lock, "held-by-test");
+      let alive = PROCS, spilled = 0, held = true;
       const exits = Array.from({ length: PROCS }, (_, p) => new Promise<number | null>((done) => {
         const c = spawn("bun", ["-e", script(p)], { env: { ...process.env }, stdio: ["ignore", "ignore", "pipe"] });
         c.stderr.on("data", (b: Buffer) => { spilled += b.toString().split("event spilled").length - 1; });
         c.on("close", (code) => { alive--; done(code); });
       }));
-      while (alive > 0) { await maybeCompactJournal(file); await new Promise((r) => setTimeout(r, 5)); }
+      while (alive > 0) {
+        if (held && (spilled > 0 || Date.now() - t0 > 8000)) { unlinkSync(lock); held = false; } // < 10 s stale TTL
+        if (!held) await maybeCompactJournal(file);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      if (held) unlinkSync(lock);
       for (const code of await Promise.all(exits)) expect(code).toBe(0);
       expect(spilled).toBeGreaterThan(0); // the spill path WAS exercised (otherwise this proves nothing)
       console.log(`stress: ${spilled} events spilled, all folded`);
