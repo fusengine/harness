@@ -6,7 +6,10 @@
  * file-attribution (`agent-files.ts`) and retroactive evidence harvesting
  * (`src/freshness/evidence-harvest.ts`) — no duplication.
  */
-import { readText } from "../../util/runtime-io";
+import { forEachJsonlEntry, needles } from "./transcript-scan";
+
+/** Raw-byte prefilter: only lines that can hold a `tool_use` block are parsed. */
+const TOOL_USE: Buffer[] = needles('"tool_use"');
 
 /** A tool_use content block inside a transcript message. */
 interface ToolUseBlock {
@@ -35,7 +38,7 @@ export interface TranscriptToolUse {
 }
 
 /** Parse a raw `timestamp` field to epoch ms; `undefined` when absent or invalid. */
-function parseTs(raw: string | number | undefined): number | undefined {
+export function parseTs(raw: string | number | undefined): number | undefined {
   if (raw === undefined) return undefined;
   if (typeof raw === "number") return raw;
   const ms = Date.parse(raw);
@@ -53,28 +56,20 @@ function parseTs(raw: string | number | undefined): number | undefined {
  */
 export function readAgentToolUses(transcriptPath: string | undefined): TranscriptToolUse[] | null {
   if (!transcriptPath) return null;
-  let text: string;
+  const out: TranscriptToolUse[] = [];
   try {
-    text = readText(transcriptPath);
+    forEachJsonlEntry(transcriptPath, TOOL_USE, (raw) => {
+      const entry = raw as TranscriptLine | null;
+      const content = entry?.message?.content;
+      if (!Array.isArray(content)) return;
+      const ts = parseTs(entry?.timestamp);
+      for (const block of content as ToolUseBlock[]) {
+        if (block?.type !== "tool_use" || !block.name) continue;
+        out.push({ name: block.name, input: block.input, ts });
+      }
+    });
   } catch {
     return null; // fail-open: caller keeps its pre-harvest state
-  }
-  const out: TranscriptToolUse[] = [];
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
-    let entry: TranscriptLine;
-    try {
-      entry = JSON.parse(line) as TranscriptLine;
-    } catch {
-      continue; // tolerate malformed lines
-    }
-    const content = entry.message?.content;
-    if (!Array.isArray(content)) continue;
-    const ts = parseTs(entry.timestamp);
-    for (const block of content as ToolUseBlock[]) {
-      if (block?.type !== "tool_use" || !block.name) continue;
-      out.push({ name: block.name, input: block.input, ts });
-    }
   }
   return out;
 }

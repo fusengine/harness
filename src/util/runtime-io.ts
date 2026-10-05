@@ -30,10 +30,20 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Run `cmd args` in `cwd` and capture stdout text ("" on failure/non-zero). */
-export function spawnCapture(cmd: string, args: string[], cwd: string): string {
+/** Hard ceiling (ms) for one captured subprocess — same as `dev-context.ts` git calls. */
+export const SPAWN_CAPTURE_TIMEOUT_MS = 5000;
+
+/**
+ * Run `cmd args` in `cwd` and capture stdout text ("" on failure/non-zero/timeout). Bounded: stdin ignored, SIGKILL after the timeout.
+ * @param cmd - Executable to run.
+ * @param args - Its arguments.
+ * @param cwd - Working directory.
+ * @param timeoutMs - Hard ceiling in ms (defaults to {@link SPAWN_CAPTURE_TIMEOUT_MS}).
+ * @returns Raw (untrimmed) stdout, or "" on any failure.
+ */
+export function spawnCapture(cmd: string, args: string[], cwd: string, timeoutMs: number = SPAWN_CAPTURE_TIMEOUT_MS): string {
   try {
-    const r = spawnSync(cmd, args, { cwd, encoding: "utf8" });
+    const r = spawnSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, killSignal: "SIGKILL" });
     return r.status === 0 ? (r.stdout ?? "") : "";
   } catch {
     return "";

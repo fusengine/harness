@@ -1,5 +1,5 @@
 import { dirname } from "node:path";
-import { loadRefs } from "../refs/loader";
+import { lazyRefs } from "../refs/lazy";
 import { gate, gateCommandCandidates } from "./gate";
 import { MCP_TTL_MS, mcpPreIntercept } from "./mcp";
 import type { NormalizedEvent } from "./normalize";
@@ -13,9 +13,11 @@ import { solidScopeOutcome } from "./solid-pre";
 import { isAgentTool } from "./is-agent-tool";
 import { allowOutcome } from "./pre-allow";
 import { applyPatchGate } from "./apply-patch-gate";
+import { gatePatchFiles } from "./apply-patch-apex";
 import { isBypassPermissions } from "../adapters/codex/permission-mode";
 import { evaluate } from "../policy/evaluate";
 import { confirmGate } from "./confirm/confirm-gate";
+import { cursorParentSessionId } from "./confirm/cursor-subagent-link";
 import { prdPreGate } from "./prd";
 import type { HandleOptions, HandleOutcome } from "./handle";
 
@@ -104,7 +106,6 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     if (patchPrompt) return { stdout: withDenyNotice(id, respond(id, patchPrompt, event.eventName ?? "PreToolUse"), patchPrompt, event.sessionId, dirname(file), opts.now), exit: 0 };
   }
 
-  const refs = opts.refsDir ? await loadRefs(opts.refsDir) : undefined;
   const gateInput = {
     sessionId: event.sessionId,
     framework,
@@ -113,7 +114,7 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     content: event.content,
     command: event.command,
     cwd: opts.cwd,
-    refs,
+    loadRefs: await lazyRefs(opts.refsDir), // same throw point + error as the former eager load; real scan deferred to the consumer
     isReplaceAll: event.input.replace_all === true,
     oldString: event.oldString,
     agentType: event.agentType,
@@ -124,9 +125,14 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     transcriptPath: typeof payload.transcript_path === "string" ? payload.transcript_path : undefined,
     neverApproval: id === "codex" && isBypassPermissions(event.permissionMode),
   };
-  const prompt = id === "cursor" && (event.commandCandidates?.length ?? 0) > 1
-    ? await gateCommandCandidates(gateInput, event.commandCandidates!)
-    : await gate(gateInput);
+  // Codex `apply_patch` (identity-guarded: codex only) also runs the file-keyed
+  // skill/APEX gates per patched file — before, its undefined `filePath` skipped them.
+  const codexPatch = id === "codex" && event.tool === "apply_patch" && (event.files?.length ?? 0) > 0;
+  const prompt = codexPatch
+    ? await gatePatchFiles(gateInput, event.files!, event.toolUseId)
+    : id === "cursor" && (event.commandCandidates?.length ?? 0) > 1
+      ? await gateCommandCandidates(gateInput, event.commandCandidates!)
+      : await gate(gateInput);
   if (prompt) {
     // CONFIRM <code> flow: ONLY changes anything when Codex/Kimi/Cursor are
     // about to downgrade THIS `ask` to a hard deny (confirmGate returns null
@@ -138,7 +144,9 @@ export async function handlePre(ctx: PreContext): Promise<HandleOutcome> {
     // let a token for a benign head unlock e.g. an `rm -rf` in tool_input.
     const multiCandidate = (event.commandCandidates?.length ?? 0) > 1;
     const confirm = confirmGate(id, prompt, multiCandidate ? undefined : event.command, event.sessionId, opts.now, opts.home,
-      id === "codex" ? { tool: event.tool, cwd: event.cwd ?? opts.cwd, toolUseId: event.toolUseId } : undefined);
+      id === "codex" ? { tool: event.tool, cwd: event.cwd ?? opts.cwd, toolUseId: event.toolUseId } : undefined,
+      id === "cursor" && typeof payload.generation_id === "string" && payload.generation_id ? payload.generation_id : undefined,
+      id === "cursor" ? cursorParentSessionId(payload, opts.home) : undefined);
     if (confirm?.allow) {
       return allowOutcome(id, event, payload, designCacheDir, opts.cwd, { trackFile: file, windowMs: opts.windowMs, now: opts.now }, opts.corpusRoot);
     }

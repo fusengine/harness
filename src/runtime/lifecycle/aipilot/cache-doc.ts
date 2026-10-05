@@ -7,13 +7,16 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
-import { readText, writeText, pathExists, sleep } from "../../../util/runtime-io";
+import { writeText, pathExists, sleep } from "../../../util/runtime-io";
+import { forEachJsonlEntry, needles } from "../transcript-scan";
 import { hashText16, cacheDirFor } from "./cache-base";
 import { transcriptFilePaths, projectRootFromPaths } from "./transcript";
 import { canonicalizeMcpToolName } from "../../mcp-tool-name";
 import type { CacheEntry, CacheIndex } from "./types";
 
 const TOOL_PATTERN = /context7__query-docs|exa__get_code_context|exa__web_search/;
+/** Lossless raw-byte prefilter: a synthesis line holds a `tool_use` block or an assistant role. */
+const SYNTHESIS_LINES: Buffer[] = needles('"tool_use"', '"assistant"');
 const MAX_DOC_SIZE = 20480;
 const MIN_TEXT_SIZE = 200;
 const MAX_DOCS = 15;
@@ -26,15 +29,14 @@ const RETRY_DELAYS = [500, 1000, 2000];
  *   {@link cacheDocFromTranscript} for why this is a defensive, unconfirmed-case cover.
  */
 async function extractSynthesis(path: string, id: string): Promise<{ text: string; libraries: string[] }> {
-  const lines = readText(path).split("\n").filter(Boolean);
   const libraries: string[] = [];
   let synthesis = "";
-  for (const line of lines) {
+  forEachJsonlEntry(path, SYNTHESIS_LINES, (raw) => {
     try {
-      const entry = JSON.parse(line) as { type?: string; role?: string; message?: { content?: unknown } };
+      const entry = raw as { type?: string; role?: string; message?: { content?: unknown } };
       const role = entry?.type ?? entry?.role;
       const contents = entry?.message?.content;
-      if (!Array.isArray(contents)) continue;
+      if (!Array.isArray(contents)) return;
       for (const block of contents) {
         if (block.type === "tool_use" && TOOL_PATTERN.test(canonicalizeMcpToolName(id, block.name ?? ""))) {
           const lib = block.input?.libraryId ?? block.input?.query ?? "";
@@ -45,7 +47,7 @@ async function extractSynthesis(path: string, id: string): Promise<{ text: strin
         }
       }
     } catch { /* skip malformed */ }
-  }
+  });
   return { text: synthesis, libraries };
 }
 

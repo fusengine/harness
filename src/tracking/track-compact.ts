@@ -11,16 +11,20 @@
  *   fresh log at the original path (appendFileSync keeps no fd across calls).
  * @packageDocumentation
  */
-import { existsSync, readFileSync, renameSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import { atomicWrite } from "../util/json-io";
 import { emptyTrack, type SessionTrack } from "./session-state";
 import { computeMac, loadOrCreateKey, signTrack, verifyTrack, writeLastNonce, type TrackEnvelope } from "./integrity";
 import { foldEvents, type TrackEvent } from "./track-journal";
 import { withTrackLock } from "./track-lock";
+import { captureSpills, dropFiles, listCapturedSpills, listSpills, readSpillTexts, releaseSpills } from "./track-spill";
 
 /** Compact when the log exceeds this size (bytes). */
 export const COMPACT_BYTES: number = 128 * 1024;
+
+/** Folded-spill nonces remembered in the snapshot (recovery only needs the last compaction's). */
+const FOLDED_SPILLS_CAP = 2048;
 
 /** The journal log path twin of a track snapshot path. */
 export function journalLogPath(trackPath: string): string {
@@ -42,9 +46,15 @@ export function parseEvents(text: string): TrackEvent[] {
   return out;
 }
 
-/** Read & verify every event of a log; absent/unreadable → [] (fail-open read). */
+/** Read & verify every event of a log PLUS its pending spill files (lock-free overflow, see track-spill.ts); absent/unreadable → [] (fail-open read). Deduped by nonce (an event is never counted twice); order = log, then spills (chronological) — foldEvents sorts stably on ts. */
 export function readEvents(logPath: string): TrackEvent[] {
-  try { return parseEvents(readFileSync(logPath, "utf8")); } catch { return []; }
+  let main: TrackEvent[] = [];
+  try { main = parseEvents(readFileSync(logPath, "utf8")); } catch { /* no log */ }
+  const seen = new Set<string>(), out: TrackEvent[] = [];
+  for (const ev of [...main, ...readSpillTexts(logPath).flatMap(parseEvents)]) {
+    if (!seen.has(ev.nonce)) { seen.add(ev.nonce); out.push(ev); }
+  }
+  return out;
 }
 
 /** Verified legacy snapshot only (fail-closed → emptyTrack), sync. */
@@ -62,38 +72,57 @@ export function readTrackSync(file: string, journal: boolean): SessionTrack {
   return journal ? foldEvents(readEvents(journalLogPath(file)), base) : base;
 }
 
-/** Fold a whole log file into the signed snapshot (signTrack + nonce, unchanged). */
-function foldIntoSnapshot(file: string, logPath: string): void {
-  const envelope = signTrack(foldEvents(readEvents(logPath), readSnapshotSync(file)));
+/** Fold captured files (`.folding` log and/or captured spills) into the signed snapshot (signTrack + nonce, unchanged). Raw read, no spill discovery. */
+function foldIntoSnapshot(file: string, captured: string[]): void {
+  const base = readSnapshotSync(file);
+  const done = new Set(base.foldedSpills ?? []);
+  const seen = new Set<string>(), events: TrackEvent[] = [], spillNonces: string[] = [];
+  for (const p of captured) {
+    const isSpill = p.includes(".spill."); // the `.folding` LOG capture has no `.spill.` in its name
+    for (const e of parseEvents(readFileSync(p, "utf8"))) {
+      if (seen.has(e.nonce) || (isSpill && done.has(e.nonce))) continue; // idempotent re-fold of a crashed compaction
+      seen.add(e.nonce); events.push(e);
+      if (isSpill) spillNonces.push(e.nonce);
+    }
+  }
+  const folded = foldEvents(events, base);
+  // same atomic write as the events; the cap never truncates below one whole fold
+  if (spillNonces.length) folded.foldedSpills = [...(base.foldedSpills ?? []), ...spillNonces].slice(-Math.max(FOLDED_SPILLS_CAP, spillNonces.length));
+  const envelope = signTrack(folded);
   atomicWrite(file, JSON.stringify(envelope, null, 2));
   writeLastNonce(envelope.nonce);
 }
 
-/** Rename-atomic compaction: rename captures the WHOLE log, fold, unlink. A crash leaves `.folding` (recovered first next run); on fold failure BEFORE commit the log is renamed back — never a lost event, and never an event in BOTH snapshot and log (no double-count). */
+/** Rename-atomic compaction: rename captures the WHOLE log (and every pending spill), fold, unlink. A crash leaves `.folding` captures (recovered first next run); on fold failure BEFORE commit they are renamed back — never a lost event, and never an event in BOTH snapshot and log (no double-count). Spills are deleted only AFTER the snapshot is durably written. */
 function compactSync(file: string): void {
   const log = journalLogPath(file), folding = `${log}.folding`;
-  if (existsSync(folding)) { foldIntoSnapshot(file, folding); unlinkSync(folding); } // crashed compaction recovery
-  renameSync(log, folding); // atomic capture; the next append recreates a fresh log
+  const left = [...(existsSync(folding) ? [folding] : []), ...listCapturedSpills(log)];
+  if (left.length) { foldIntoSnapshot(file, left); dropFiles(left); } // crashed compaction recovery
+  const hasLog = existsSync(log);
+  if (hasLog) renameSync(log, folding); // atomic capture; the next append recreates a fresh log
+  const spills = captureSpills(log);
+  const captured = [...(hasLog ? [folding] : []), ...spills];
+  if (!captured.length) return;
   let committed = false;
   try {
-    foldIntoSnapshot(file, folding);
+    foldIntoSnapshot(file, captured);
     committed = true; // the snapshot now HOLDS the events: never return them to the log
-    unlinkSync(folding);
+    dropFiles(captured);
   } catch (err) {
-    if (!committed) { try { renameSync(folding, log); } catch { /* keep .folding for recovery */ } }
-    else { try { unlinkSync(folding); } catch { /* residue iff unlink itself failed */ } }
+    if (!committed) { if (hasLog) { try { renameSync(folding, log); } catch { /* keep .folding for recovery */ } } releaseSpills(spills); }
+    else dropFiles(captured); // residue iff unlink itself failed
     throw err;
   }
 }
 
 /** Trigger compaction past the cap (`FUSE_TRACK_COMPACT_BYTES` overrides {@link COMPACT_BYTES}), under the existing lock (skipped on contention). */
 export async function maybeCompactJournal(file: string): Promise<void> {
-  try {
-    const cap = Number(process.env.FUSE_TRACK_COMPACT_BYTES) || COMPACT_BYTES;
-    if (statSync(journalLogPath(file)).size < cap) return;
-  } catch {
-    return; // no log yet
-  }
+  const cap = Number(process.env.FUSE_TRACK_COMPACT_BYTES) || COMPACT_BYTES;
+  let size = -1; // no log yet
+  try { size = statSync(journalLogPath(file)).size; } catch { /* spills may still be pending */ }
+  const lp = journalLogPath(file);
+  // pending spills or crashed-compaction captures always trigger an absorb/recovery
+  if (size < cap && !listSpills(lp).length && !listCapturedSpills(lp).length && !existsSync(`${lp}.folding`)) return;
   await withTrackLock(dirname(file), async () => {
     try { compactSync(file); } catch { /* rare path: the next trigger retries */ }
   });

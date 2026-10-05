@@ -8,6 +8,7 @@
  */
 import { closeSync, mkdirSync, openSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { resolveTrackLockBudgetMs } from "../config/limits";
 import { LOCK_FAILED, LOCK_RETRY_TOTAL_MS, LOCK_TTL_MS } from "./track-lock";
 
 export { LOCK_FAILED } from "./track-lock";
@@ -54,24 +55,39 @@ export function withTrackLockSync<T>(dir: string, fn: () => T): T | typeof LOCK_
 }
 
 /**
- * Blocking twin of {@link withTrackLockSync}: NEVER skips — spins (1 ms step)
- * until the lock is acquired. Used by the journal append path (track-journal
- * `appendEvent`): an append must wait out an in-flight compaction (same
- * `track.lock`), never race its rename/fold/unlink, never be skipped — a lost
- * write is not an option. The stale-lock TTL (dead-process reclamation) is the
- * only anti-deadlock guard. Do NOT use on paths that may already hold the lock.
+ * Blocking twin of {@link withTrackLockSync}: waits out an in-flight
+ * compaction (same `track.lock`) so an append never races its
+ * rename/fold/unlink. The wait is FINITE: `budgetMs` of total spin (capped
+ * jittered backoff, the last sleep clamped to the remaining budget) — a hook
+ * process must die by itself, never pile up behind a busy lock. On expiry it
+ * returns {@link LOCK_FAILED} WITHOUT running `fn`; the caller MUST NOT drop
+ * the work (track-journal spills the event to a lock-free file instead).
+ * Stale-lock reclamation (dead holder) still applies. Do NOT use where the
+ * lock may already be held.
+ * @param dir - The track state directory (lockfile lives inside).
+ * @param fn - The critical section (keep it minimal).
+ * @param budgetMs - Total wait budget (default: `FUSE_TRACK_LOCK_BUDGET_MS`, 1000).
+ * @returns `fn`'s result, or {@link LOCK_FAILED} when the budget expired.
  */
-export function withTrackLockSyncBlocking<T>(dir: string, fn: () => T): T {
+export function withTrackLockSyncBlocking<T>(
+  dir: string,
+  fn: () => T,
+  budgetMs: number = resolveTrackLockBudgetMs(),
+): T | typeof LOCK_FAILED {
   mkdirSync(dir, { recursive: true });
   const lock = join(dir, "track.lock");
-  for (;;) {
+  const deadline = performance.now() + budgetMs;
+  for (let attempt = 0; ; attempt++) {
     try {
       const fd = openSync(lock, "wx");
       closeSync(fd);
       break;
     } catch {
       if (isStale(lock)) { try { unlinkSync(lock); } catch { /* raced */ } }
-      sleepSync(1);
+      const left = deadline - performance.now();
+      if (left <= 0) return LOCK_FAILED;
+      const step = Math.min(1 << Math.min(attempt, 3), 8); // 1,2,4,8,8… ms
+      sleepSync(Math.max(1, Math.min(Math.ceil(Math.random() * step), Math.ceil(left))));
     }
   }
   try {

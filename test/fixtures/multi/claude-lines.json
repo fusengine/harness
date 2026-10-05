@@ -1,0 +1,471 @@
+[
+  {
+    "plugin": "ai-pilot",
+    "event": "SubagentStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code aipilot"
+  },
+  {
+    "plugin": "ai-pilot",
+    "event": "PreToolUse",
+    "matcher": "Task",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "ai-pilot",
+    "event": "SubagentStop",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code aipilot"
+  },
+  {
+    "plugin": "ai-pilot",
+    "event": "SessionEnd",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code aipilot"
+  },
+  {
+    "plugin": "ai-pilot",
+    "event": "PostToolUse",
+    "matcher": "TaskCreate|TaskUpdate|Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code aipilot"
+  },
+  {
+    "plugin": "cartographer",
+    "event": "SessionStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code carto || true"
+  },
+  {
+    "plugin": "cartographer",
+    "event": "PostToolUse",
+    "matcher": "Edit|Write",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code carto || true"
+  },
+  {
+    "plugin": "changelog-watcher",
+    "event": "PostToolUse",
+    "matcher": "mcp__.*exa|WebFetch|WebSearch",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code changelog"
+  },
+  {
+    "plugin": "claude-rules",
+    "event": "SessionStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code rules"
+  },
+  {
+    "plugin": "claude-rules",
+    "event": "SubagentStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code rules"
+  },
+  {
+    "plugin": "claude-rules",
+    "event": "UserPromptSubmit",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code rules"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit|Bash|WebFetch|mcp__context7__query-docs|mcp__exa__web_search_exa|mcp__exa__get_code_context_exa",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "SessionStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "UserPromptSubmit",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "SubagentStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "SubagentStop",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "TeammateIdle",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "TaskCompleted",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "PostToolUseFailure",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Stop",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core --sound stop"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Stop",
+    "matcher": "",
+    "group": 1,
+    "command": "bun --env-file=$HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/core-guards/hooks/harness-quiet.env $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Stop",
+    "matcher": "",
+    "group": 2,
+    "command": null
+  },
+  {
+    "plugin": "core-guards",
+    "event": "PermissionRequest",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core --sound permission"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "PreCompact",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "SessionEnd",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "InstructionsLoaded",
+    "matcher": null,
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Notification",
+    "matcher": "permission_prompt",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core --sound permission"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Notification",
+    "matcher": "idle_prompt",
+    "group": 1,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core --sound human"
+  },
+  {
+    "plugin": "core-guards",
+    "event": "Notification",
+    "matcher": "elicitation_dialog",
+    "group": 2,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code core --sound human"
+  },
+  {
+    "plugin": "design-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit|mcp__fuse-browser__browser_navigate|mcp__fuse-browser__browser_screenshot|mcp__gemini-design__create_frontend",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "design-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "design-expert",
+    "event": "SubagentStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "design-expert",
+    "event": "SubagentStop",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "fuse-lessons",
+    "event": "UserPromptSubmit",
+    "matcher": null,
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code lessons || true"
+  },
+  {
+    "plugin": "fuse-lessons",
+    "event": "SessionStart",
+    "matcher": null,
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code lessons || true"
+  },
+  {
+    "plugin": "fuse-lessons",
+    "event": "SubagentStart",
+    "matcher": null,
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code lessons || true"
+  },
+  {
+    "plugin": "fuse-lessons",
+    "event": "Stop",
+    "matcher": null,
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code lessons || true"
+  },
+  {
+    "plugin": "fuse-lessons",
+    "event": "PostToolUse",
+    "matcher": "Write|Edit|MultiEdit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code lessons || true"
+  },
+  {
+    "plugin": "go-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "go-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "laravel-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "laravel-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "nextjs-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "nextjs-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "php-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "php-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "react-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "react-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "rust-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "rust-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "security-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code security"
+  },
+  {
+    "plugin": "security-expert",
+    "event": "PostToolUse",
+    "matcher": "Read|mcp__.*context7|mcp__.*exa",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code security"
+  },
+  {
+    "plugin": "seo",
+    "event": "PostToolUse",
+    "matcher": "Write|Edit|MultiEdit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code seo || true"
+  },
+  {
+    "plugin": "shadcn-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "shadcn-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "solid",
+    "event": "SessionStart",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code solid"
+  },
+  {
+    "plugin": "solid",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code solid"
+  },
+  {
+    "plugin": "solid",
+    "event": "PostToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code solid"
+  },
+  {
+    "plugin": "swift-apple-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "swift-apple-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "tailwindcss",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "tailwindcss",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code tailwindcss"
+  },
+  {
+    "plugin": "tanstack-start-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "tanstack-start-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "typescript-expert",
+    "event": "PreToolUse",
+    "matcher": "Write|Edit",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  },
+  {
+    "plugin": "typescript-expert",
+    "event": "PostToolUse",
+    "matcher": "",
+    "group": 0,
+    "command": "bun $HOME/.claude/plugins/marketplaces/fusengine-plugins/plugins/node_modules/@fusengine/harness/dist/cli/bin.mjs hook claude-code"
+  }
+]

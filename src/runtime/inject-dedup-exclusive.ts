@@ -68,6 +68,27 @@ function sweepExclusiveDir(dir: string, now: number, windowMs: number): void {
 }
 
 /**
+ * Read-only peek: whether `key` is currently held (claimed by {@link onceExclusive}
+ * within `windowMs`). Never creates nor sweeps a marker; any fs error reads as
+ * "not held", so the caller falls back to its normal path.
+ * @param key - The dedup key passed to {@link onceExclusive}.
+ * @param windowMs - Window in ms the claim stays valid.
+ * @param opts - Optional clock + state-dir overrides (same as {@link onceExclusive}).
+ * @returns True when a live claim for `key` exists.
+ */
+export function exclusiveHeld(key: string, windowMs: number, opts: OnceOpts = {}): boolean {
+  const now = opts.now ?? Date.now();
+  try {
+    const raw = readFileSync(join(opts.dir ?? defaultStateDir(), EXCLUSIVE_SUBDIR, lockFileName(key)), "utf8");
+    if (raw === "") return true; // created by a concurrent claimer that has not written its stamp yet
+    const createdAt = Number(raw);
+    return Number.isFinite(createdAt) && now - createdAt < windowMs;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Cooldown gate via exclusive marker-file creation. Returns `true` exactly
  * once per `key` within `windowMs` across ALL concurrent processes sharing
  * `opts.dir` (the caller MAY emit), `false` for every other concurrent or

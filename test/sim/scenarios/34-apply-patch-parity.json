@@ -19,7 +19,7 @@
     },
     {
       "scope": "core",
-      "doc": "One envelope carrying add+update+delete+move, ALL compliant → allow (empty stdout). Proves the fan-out doesn't blanket-deny a mixed-op patch when every hunk is clean, and that delete/move hunks contribute no content to judge.",
+      "doc": "One envelope carrying add+update+delete+move, every hunk compliant with the static gates (no SOLID/DRY/protected deny). On this FRESH session the first code file (`fresh.ts`, an add → Write) then hits the APEX freshness gate, as the same single-file Write would. Before 2026-10-03 apply_patch skipped the file-keyed skill/APEX gates and this step asserted an empty allow; runtime/apply-patch-apex.ts now runs them per patched file (Codex only). The static no-blanket-deny property stays covered by test/codex-apply-patch-apex.test.ts (allow verdicts in the differential).",
       "event": {
         "hook_event_name": "PreToolUse",
         "session_id": "sc34b",
@@ -28,7 +28,7 @@
           "command": "*** Begin Patch\n*** Add File: fresh.ts\n+const a = 1;\n*** Update File: keep.ts\n@@\n+const b = 2;\n*** Delete File: gone.ts\n*** Update File: renamed-old.ts\n*** Move to: renamed-new.ts\n@@\n+const c = 3;\n*** End Patch"
         }
       },
-      "expect": { "exit": 0, "stdout": { "empty": true } }
+      "expect": { "exit": 0, "stdout": { "contains": "APEX: explore + research required" } }
     },
     {
       "scope": "core",

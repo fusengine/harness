@@ -7,21 +7,24 @@ import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { readJsonFile, writeJsonFile } from "../../../util/json-io";
-import { readText, pathExists } from "../../../util/runtime-io";
+import { pathExists } from "../../../util/runtime-io";
+import { forEachJsonlEntry, needles } from "../transcript-scan";
 import { cacheDirFor, projectHash, fileChecksum } from "./cache-base";
 import { logCacheEvent } from "./analytics";
 import { transcriptFilePaths, projectRootFromPaths } from "./transcript";
 import { scanSourceFiles } from "./source-scan";
 import type { TestCache, TestResult } from "./types";
 
+/** Lossless raw-byte prefilter: only `tool_use` / `tool_result` / `text` blocks are read. */
+const LINTER_LINES: Buffer[] = needles('"tool_use"', '"tool_result"', '"text"');
+
 /** Extract linter-related command/output text from a JSONL transcript. */
 async function extractLinterOutput(path: string): Promise<string> {
-  const text = readText(path);
   const outputs: string[] = [];
-  for (const line of text.split("\n").filter(Boolean)) {
+  forEachJsonlEntry(path, LINTER_LINES, (entry) => {
     try {
-      const content = (JSON.parse(line) as { message?: { content?: unknown } })?.message?.content;
-      if (!Array.isArray(content)) continue;
+      const content = (entry as { message?: { content?: unknown } })?.message?.content;
+      if (!Array.isArray(content)) return;
       for (const block of content) {
         if (block.type === "tool_use" && block.name === "Bash") {
           const cmd = block.input?.command ?? "";
@@ -30,7 +33,7 @@ async function extractLinterOutput(path: string): Promise<string> {
         if (block.type === "tool_result" || block.type === "text") outputs.push(block.text ?? block.content ?? "");
       }
     } catch { /* skip malformed */ }
-  }
+  });
   return outputs.join("\n");
 }
 

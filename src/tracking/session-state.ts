@@ -31,6 +31,8 @@ export interface SessionTrack {
   prdViolations?: PrdViolationRecord[];
   /** PRD SubagentStop/Stop one-shot block markers, keyed `"sessionId:event[:agent]"` -> the epoch-ms the block fired. */
   prdStopBlocked?: Record<string, number>;
+  /** Nonces of spill events already folded into this snapshot (capped, newest last) — makes a crashed-compaction re-fold idempotent (track-compact). */
+  foldedSpills?: string[];
 }
 
 /** One PRD cross-check violation, timestamped for the journal/dedup. */

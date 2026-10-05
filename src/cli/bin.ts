@@ -6,57 +6,29 @@
  *   harness hook <id>      runtime: read a hook payload on stdin, route to the adapter, print the response
  *   harness changelog      fetch + diff the Claude Code changelog, print a JSON summary (changelog-watcher)
  *   harness codex-rules    generate a Codex execpolicy .rules (Starlark) file from security.ts; stdout or --out <path>
+ *
+ * `hook` is the hot path (one process per event): only the modules it needs are
+ * imported statically; every other command is loaded on demand via `import()`.
  */
 import { detectHarness, type HarnessId } from "../detect/harness";
-import { initFor, writeInitFile } from "../init/run";
-import { scanChangelog } from "../changelog/fetch";
-import { runSecurityScan } from "../runtime/lifecycle/security/scan";
-import { buildCodexRules } from "../codex-rules";
-import { writeFileSync } from "node:fs";
-import { handleHook } from "../runtime/handle";
-import { resolveTtlSec } from "../config/ttl";
-import { loadDotenv } from "../config/dotenv";
-import { discoverRefs } from "../refs/discover";
-import { homedir } from "node:os";
-import { checkStaged, stagedContent, stagedFiles } from "./run";
-import { runDoctor, runningVersion, versionBanner } from "./doctor";
-import { parseScope } from "./scope";
-import { isMalformedCursorStdin, isOversize, oversizeStdout, readStdin, traceHook } from "./hook-io";
-import { maybePlaySound } from "./hook-sound";
-import { runPrd } from "./prd";
 
 const cmd = process.argv[2];
 
 if (cmd === "--version" || cmd === "-v") {
+  const { runningVersion, versionBanner } = await import("./doctor");
   process.stderr.write(versionBanner(import.meta.url) + "\n");
   process.stdout.write(runningVersion(import.meta.url).version + "\n");
   process.exit(0);
 } else if (cmd === "doctor") {
+  const { runDoctor, versionBanner } = await import("./doctor");
   process.stderr.write(versionBanner(import.meta.url) + "\n");
   process.exit(await runDoctor(import.meta.url));
 } else if (cmd === "hook") {
-  const id = process.argv[3] ?? detectHarness().id;
-  loadDotenv(id as HarnessId);
-  const scope = parseScope(process.argv[4]);
-  if (maybePlaySound(process.argv)) process.exit(0);
-  const marketplaces = (process.env.FUSE_HARNESS_MARKETPLACES ?? "fusengine-plugins").split(",").map((s) => s.trim()).filter(Boolean);
-  const refsDir = process.env.FUSE_HARNESS_REFS || discoverRefs(homedir(), process.cwd(), marketplaces) || undefined;
-  traceHook("args", { id, scope });
-  let outcome: Awaited<ReturnType<typeof handleHook>>;
-  try {
-    const stdin = await readStdin(id);
-    if (isOversize(stdin)) {
-      const stdout = oversizeStdout(id, stdin.head);
-      if (stdout) process.stdout.write(stdout);
-      process.exit(0);
-    }
-    if (isMalformedCursorStdin(stdin)) process.exit(1);
-    outcome = await handleHook(id, stdin, { now: Date.now(), cwd: process.cwd(), refsDir, windowMs: resolveTtlSec(process.env) * 1000, scope });
-  } catch (e) { traceHook("handleHook-threw", e instanceof Error ? `${e.message}\n${e.stack}` : String(e)); throw e; }
-  traceHook("outcome", { stdoutLength: outcome.stdout.length, exit: outcome.exit });
-  if (outcome.stdout) process.stdout.write(outcome.stdout);
-  process.exit(outcome.exit);
+  // Light entry: decides rendezvous vs legacy BEFORE the heavy runtime is imported (see hook-entry.ts).
+  const { hookEntry } = await import("./hook-entry");
+  await hookEntry(process.argv);
 } else if (cmd === "init") {
+  const { initFor, writeInitFile } = await import("../init/run");
   const id = (process.argv[3] as HarnessId | undefined) ?? detectHarness().id;
   const files = initFor(id);
   if (!files) {
@@ -68,6 +40,7 @@ if (cmd === "--version" || cmd === "-v") {
   process.exit(0);
 } else if (cmd === "changelog") {
   try {
+    const { scanChangelog } = await import("../changelog/fetch");
     process.stdout.write(JSON.stringify(await scanChangelog()) + "\n");
     process.exit(0);
   } catch (e) {
@@ -75,12 +48,15 @@ if (cmd === "--version" || cmd === "-v") {
     process.exit(1);
   }
 } else if (cmd === "scan") {
+  const { runSecurityScan } = await import("../runtime/lifecycle/security/scan");
   const dir = process.argv[3] ?? process.cwd();
   process.stdout.write(JSON.stringify(runSecurityScan(dir), null, 2) + "\n");
   process.exit(0);
 } else if (cmd === "prd") {
+  const { runPrd } = await import("./prd");
   process.exit(await runPrd(process.argv.slice(3), process.cwd(), process.env));
 } else if (cmd === "codex-rules") {
+  const [{ buildCodexRules }, { writeFileSync }] = await Promise.all([import("../codex-rules"), import("node:fs")]);
   const outIdx = process.argv.indexOf("--out");
   const outPath = outIdx !== -1 ? process.argv[outIdx + 1] : undefined;
   const rules = buildCodexRules();
@@ -92,6 +68,7 @@ if (cmd === "--version" || cmd === "-v") {
   }
   process.exit(0);
 } else {
+  const { checkStaged, stagedContent, stagedFiles } = await import("./run");
   const files = stagedFiles();
   if (files.length === 0) process.exit(0);
   const violations = checkStaged(files, stagedContent);

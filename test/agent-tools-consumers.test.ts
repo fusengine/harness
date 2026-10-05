@@ -29,7 +29,7 @@ test("activity: every AGENT_TOOLS name takes the agent-tracking branch", () => {
 test("wiring: both consumers import the canonical module (no local re-declaration)", () => {
   const evidence = readFileSync(new URL("../src/freshness/agent-evidence-record.ts", import.meta.url), "utf8");
   const activity = readFileSync(new URL("../src/runtime/activity.ts", import.meta.url), "utf8");
-  const transcript = readFileSync(new URL("../src/freshness/agent-evidence.ts", import.meta.url), "utf8");
+  const transcript = readFileSync(new URL("../src/freshness/transcript-index-record.ts", import.meta.url), "utf8");
   expect(evidence).toContain('from "../runtime/is-agent-tool"');
   expect(activity).toContain('from "./is-agent-tool"');
   expect(transcript).toContain('from "../runtime/is-agent-tool"');

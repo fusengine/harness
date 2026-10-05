@@ -51,9 +51,12 @@ test("NEGATIVE: apply_patch adding a 150-line file triggers the SOLID deny (was 
   expect((JSON.parse(out.stdout) as { systemMessage?: string }).systemMessage).toBe(`${figures.cross} SOLID file-size limit`);
 });
 
-test("apply_patch: small add allowed; one oversized hunk among many blocks the whole patch (OR)", async () => {
+test("apply_patch: small add passes the static gates; one oversized hunk among many blocks the whole patch (OR)", async () => {
+  // A small add clears the static file gates (no SOLID deny). On this fresh session it then hits the
+  // APEX freshness gate like the same single-file Write would (apply-patch-apex.ts, since 2026-10-03).
   const ok = await handleHook("codex", hook(wrap(addFile("small.ts", 3))), { now: 1000, cwd: root() });
-  expect(ok.stdout).not.toContain('"deny"');
+  expect(ok.stdout).not.toContain("SOLID file-size");
+  expect(ok.stdout).toContain("APEX: explore + research required");
   const mixed = await handleHook("codex", hook(wrap(`${addFile("small.ts", 3)}${addFile("huge.ts", OVERSIZED_N)}`)), { now: 1000, cwd: root() });
   expect(deny(mixed.stdout)).toBe("deny");
 });

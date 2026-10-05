@@ -13,7 +13,8 @@ import { appendFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { computeMac, loadOrCreateKey } from "./integrity";
-import { withTrackLockSyncBlocking } from "./track-lock-sync";
+import { LOCK_FAILED, withTrackLockSyncBlocking } from "./track-lock-sync";
+import { spillEvent } from "./track-spill";
 import { emptyTrack, PRD_VIOLATIONS_CAP, type PrdViolationRecord, type SessionTrack } from "./session-state";
 import type { AuthEntry } from "../freshness/doc-helpers";
 import type { SessionTarget } from "../policy/apex-authorization";
@@ -39,12 +40,24 @@ export function signEvent(field: string, op: TrackEvent["op"], value: unknown, t
   return { v: 1, field, op, value, ts, nonce, mac: computeMac(loadOrCreateKey(), data, nonce) };
 }
 
-/** Append one signed event line under the BLOCKING track lock (same `track.lock` as the compaction — an append can never straddle rename/fold/unlink; never skipped). Fail-open on I/O error. */
+/**
+ * Append one signed event under the BOUNDED blocking track lock (same
+ * `track.lock` as the compaction — an append can never straddle
+ * rename/fold/unlink). If the lock stays busy past the budget
+ * (`FUSE_TRACK_LOCK_BUDGET_MS`), the event is SPILLED to its own lock-free
+ * file ({@link spillEvent}) that every reader folds and the compactor
+ * absorbs — the hook never waits unboundedly and the event is never lost.
+ * Fail-open (`false`) only on a genuine I/O error.
+ */
 export function appendEvent(logPath: string, field: string, op: TrackEvent["op"], value: unknown, ts: number): boolean {
   try {
     const ev = signEvent(field, op, value, ts);
     if (!ev) return false;
-    withTrackLockSyncBlocking(dirname(logPath), () => appendFileSync(logPath, JSON.stringify(ev) + "\n", "utf8"));
+    const r = withTrackLockSyncBlocking(dirname(logPath), () => appendFileSync(logPath, JSON.stringify(ev) + "\n", "utf8"));
+    if (r === LOCK_FAILED) {
+      process.stderr.write(`harness: track lock busy past budget, event spilled (${logPath})\n`);
+      spillEvent(logPath, ev);
+    }
     return true;
   } catch { return false; }
 }
