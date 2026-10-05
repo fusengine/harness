@@ -83,8 +83,14 @@ function wipe(sb: Sandbox): void {
 async function passB(c: Case, step: Step, sb: Sandbox): Promise<{ b: Spawned[]; order: number[]; served: number; payload: string }> {
   if (step.delayMs) await new Promise((r) => setTimeout(r, step.delayMs));
   const payload = JSON.stringify(step.payloadFor(sb));
-  // No steal/budget decline in the oracle: those paths run scopes CONCURRENTLY (today's race), tested apart in multi-rdv-failure.
-  const env = { FUSE_HARNESS_RDV_STEAL_MS: "20000", FUSE_HARNESS_RDV_BUDGET_MS: "30000", FUSE_HARNESS_RDV_HARD_MS: "60000", ...c.env?.(sb) };
+  // No steal/budget/slow decline and no late arrival in the oracle: those paths hand the scope back to run
+  // on its own (today's behaviour). Late arrival and steal are tested in multi-rdv-failure/-protocol; the
+  // slow/budget hand-back is not. Wall-clock thresholds are raised so machine load (slow scopes recorded in
+  // stats.json, spawn spread beyond the 150 ms idle window) cannot trigger them here.
+  const env = {
+    FUSE_HARNESS_RDV_STEAL_MS: "20000", FUSE_HARNESS_RDV_BUDGET_MS: "30000", FUSE_HARNESS_RDV_HARD_MS: "60000",
+    FUSE_HARNESS_RDV_SLOW_MS: "600000", FUSE_HARNESS_RDV_QUIET_MS: "1500", ...c.env?.(sb),
+  };
   const b = await runConcurrent(c.host, step.scopes, payload, sb, step.staggerMs ?? 8, env, step.jitterMs ?? 0);
   const { pids, claimed } = leaderOrder(sb, c.host, payload);
   const order = pids.map((p) => b.findIndex((x) => x.pid === p)).filter((i) => i >= 0);

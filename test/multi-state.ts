@@ -28,8 +28,10 @@ function walk(root: string, sb: Sandbox, out: Map<string, string>): void {
     for (const name of readdirSync(dir).sort()) {
       const path = join(dir, name);
       const rel = relative(root, path);
-      // the rendezvous dir itself and bun's own transpiler cache (written under HOME) are not harness state
-      if (rel.startsWith(join(".fuse-harness", "rdv")) || rel.startsWith(join("Library", "Caches")) || rel.startsWith(".bun")) continue;
+      // the rendezvous dir itself and bun's own transpiler cache (written under HOME) are not harness state;
+      // inject-dedup.json is a wall-clock window cache (entries pruned after their 2–3 s window), so its key set depends on
+      // how long each pass took — its observable effect (a suppressed notice) is compared via stdout instead
+      if (rel.startsWith(join(".fuse-harness", "rdv")) || rel.startsWith(join("Library", "Caches")) || rel.startsWith(".bun") || name === "inject-dedup.json") continue;
       const st = lstatSync(path);
       if (st.isDirectory()) visit(path);
       else if (st.isFile()) {
