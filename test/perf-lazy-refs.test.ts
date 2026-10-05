@@ -13,6 +13,12 @@ import type { GateInput } from "../src/runtime/gate-input";
 
 const NOW = 1_700_000_000_000;
 const tmp = (p: string): string => mkdtempSync(join(tmpdir(), p));
+/** A temp cwd that is its OWN project root (`.git`), so `projectRoot` never falls back to the real repo (and its armed MEMORY/LESSON.md). */
+const projectTmp = (p: string): string => {
+  const d = tmp(p);
+  mkdirSync(join(d, ".git"));
+  return d;
+};
 const FM = "---\nname: srp\nlevel: principle\nappliesTo: '**/*.ts'\n---\nbody\n";
 
 /** A refs dir whose scan THROWS (a directory named `bad.md` -> readFile EISDIR). */
@@ -51,7 +57,7 @@ function events(cwd: string, sid: string): Record<string, Record<string, unknown
 }
 
 test("lazy refs: an unreadable refs dir fails EVERY event exactly like the old eager load (same rejection, even for Bash)", async () => {
-  const cwd = tmp("fh-lazyrefs-cwd-");
+  const cwd = projectTmp("fh-lazyrefs-cwd-");
   const bad = brokenRefs();
   const oldBehaviour = await settle(loadRefs(bad)); // what main's handle-pre line 107 did
   expect(oldBehaviour).toBe("throw:EISDIR");
@@ -59,7 +65,7 @@ test("lazy refs: an unreadable refs dir fails EVERY event exactly like the old e
 });
 
 test("lazy refs: a valid refs dir changes no outcome for any event (vs no refs dir at all)", async () => {
-  const cwd = tmp("fh-lazyrefs-cwd1-");
+  const cwd = projectTmp("fh-lazyrefs-cwd1-");
   const good = goodRefs();
   const [withRefs, without] = [events(cwd, "s-good"), events(cwd, "s-none")];
   for (const name of Object.keys(withRefs)) {
@@ -68,7 +74,7 @@ test("lazy refs: a valid refs dir changes no outcome for any event (vs no refs d
 });
 
 test("lazy refs: reaching the refs consumers with an unreadable refs dir is still a rejection (and PRE-gate denies come first)", async () => {
-  const cwd = tmp("fh-lazyrefs-cwd2-");
+  const cwd = projectTmp("fh-lazyrefs-cwd2-");
   const ev = pre("Write", { file_path: join(cwd, "src", "new.ts"), content: "export const n = 1;\n".repeat(40) });
   await withTrack(trackFile("s-lazy", defaultStateDir(cwd)), (t) => ["subagent-explore-codebase", "subagent-research-expert"].reduce((acc, n) => recordAgent(acc, n, NOW, "sufficient"), t));
   await expect(run(ev, brokenRefs(), cwd)).rejects.toMatchObject({ code: "EISDIR" });

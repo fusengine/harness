@@ -5,6 +5,7 @@
  * (cap→archive) and lesson-inject (compressed SessionStart block) — one source
  * of truth so the three stages can never disagree on what a "bullet" is.
  */
+import { splitInlineTag } from "../../../policy/lessons/trigger-tag";
 
 /** Bullet count above which the oldest lessons are archived out of LESSON.md. */
 export const CAP = 50;
@@ -15,8 +16,8 @@ export const DAY_MS = 86400000;
 /** Case-sensitive decision-time tag line (`[TRIGGERS …]`) — opus-lessons format. */
 export const TRIG: RegExp = /^\[TRIGGERS\s+.+\]$/;
 
-/** A bullet plus any continuation lines (e.g. a `[TRIGGERS …]` line). */
-export interface Block { raw: string[]; ts: number; tokens: Set<string>; }
+/** A bullet plus any continuation lines (e.g. a `[TRIGGERS …]` line); `start` = 0-based line of its `- ` line. */
+export interface Block { raw: string[]; ts: number; tokens: Set<string>; start: number; }
 
 /** Epoch ms for a `[YYYY-MM-DD HH:MM]` stamp; `NaN` if absent or out of range. */
 export function parseTs(line: string): number {
@@ -53,9 +54,34 @@ export function citedPaths(text: string): string[] {
   return [...out].filter((p) => p.includes("/") && /\.\w{1,5}$/.test(p));
 }
 
-/** True when a block carries a `[TRIGGERS …]` continuation line. */
+/**
+ * A block's text as ONE string: every raw line trimmed (so CRLF `\r` and
+ * indentation never leak), joined by a space. Shared by the trigger index and
+ * the curation so both see the same end-of-block for an inline tag.
+ * @param b - A parsed bullet block.
+ * @returns The joined, trimmed text (bullet marker included).
+ */
+export function blockText(b: Block): string {
+  return b.raw.map((l) => l.trim()).join(" ");
+}
+
+/**
+ * The block's decision-time tag: the own-line `[TRIGGERS …]` continuation line
+ * verbatim, else a trailing inline tag (end of {@link blockText}) re-expressed
+ * as `[TRIGGERS body]`.
+ * @param b - A parsed bullet block.
+ * @returns The tag string, or `undefined` when the block is untagged.
+ */
+export function triggerLine(b: Block): string | undefined {
+  const own = b.raw.find((l) => TRIG.test(l.trim()));
+  if (own) return own;
+  const inline = splitInlineTag(blockText(b));
+  return inline ? `[TRIGGERS ${inline.body}]` : undefined;
+}
+
+/** True when a block carries a `[TRIGGERS …]` tag (own-line or trailing inline). */
 export function hasTrigger(b: Block): boolean {
-  return b.raw.some((l) => TRIG.test(l.trim()));
+  return triggerLine(b) !== undefined;
 }
 
 /** Split content into a verbatim preamble and one Block per `- ` bullet. */
@@ -67,7 +93,7 @@ export function parse(content: string): { preamble: string; blocks: Block[] } {
   const preamble = lines.slice(0, i).join("\n");
   for (; i < lines.length; i++) {
     const l = lines[i] ?? "", last = blocks[blocks.length - 1];
-    if (/^-\s/.test(l)) blocks.push({ raw: [l], ts: parseTs(l), tokens: tokenize(l) });
+    if (/^-\s/.test(l)) blocks.push({ raw: [l], ts: parseTs(l), tokens: tokenize(l), start: i });
     else if (l.trim() && last) last.raw.push(l);
   }
   return { preamble, blocks };

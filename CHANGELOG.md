@@ -4,6 +4,13 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.102] - 2026-10-05
+
+### Fixed
+
+- **Inline trailing `[TRIGGERS …]` tags recognised** (`src/policy/lessons/trigger-tag.ts` (new), `trigger-index.ts`, `src/runtime/lifecycle/aipilot/lesson-parse.ts`, `lesson-inject.ts`, `curate-lessons.ts`). A tag placed inline at the end of a lesson bullet (the form every lesson actually uses) was never recognised, so 0 decision-time lessons were armed and the cap-archive did not protect tagged bullets (the oldest lesson kept getting archived). Inline trailing tags now count for arming, archive protection and dedup carry-over, and are stripped from the SessionStart injection. Inline keyword values may contain spaces; the widening applies only to the inline path. Own-line tags are byte-identical to before (HEAD-vs-tree differential: 20,862 cases, 0 diffs). Test: `lesson-inline-triggers`.
+- **Test isolation**: `cursor-authentic-fixtures` and `perf-lazy-refs` now put a `.git` in their temp cwd, so they no longer fall back to the real repo's `MEMORY/LESSON.md`.
+
 ## [0.1.101] - 2026-10-05
 
 ### Added
