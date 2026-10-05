@@ -4,6 +4,19 @@ All notable changes to `@fusengine/harness`. Format: [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [0.1.101] - 2026-10-05
+
+### Added
+
+- **APEX gates police Codex `apply_patch` per file** (`src/runtime/apply-patch-apex.ts`, `gate.ts`, `gate-apex.ts`, `gate-input.ts`, `inject-dedup-exclusive.ts` `exclusiveHeld`) — each file of an `apply_patch` envelope goes through the APEX freshness gates; the trivial-edit budget is charged once per sibling fan-out. Sim scenarios 22 and 34 now expect explore+research before `apply_patch`. Tests: `codex-apply-patch-apex`, `codex-apply-patch-fanout`.
+
+### Fixed
+
+- **Hook process lifetime bounded** (`src/cli/hook-entry.ts`, `hook-legacy.ts`, `hook-run.ts`, `rdv/`, `stdin-*.ts`, `cursor-stdin-reader.ts`, `hook-io.ts`, `bin.ts`) — the stdin reader was reworked so hook processes can no longer run away and pile up (they had crashed the host). The same work also touched transcript index/sidecar, lazy refs, track spill, sub-agent transcript scan, the aipilot cache, `config/limits.ts` and `util/runtime-io.ts`.
+- **Cursor CONFIRM sibling pass** (`src/runtime/confirm/confirm-state.ts` `ConsumeGrace`, `confirm-gate.ts`) — Cursor fires `preToolUse` and `beforeShellExecution` for the same Shell command; a consumed token now allows exactly one sibling pass in the same `generation_id` within 10 s. Test: `confirm-cursor-sibling`.
+- **Cursor sub-agent evidence merged into the parent session** at `subagentStop` via `child_conversation_id` (`src/freshness/child-evidence-merge.ts`, `cursor-child-harvest.ts`, `evidence-harvest-io.ts`, `evidence-harvest.ts`) — docs are credited only for frameworks in the child track; the stamp is never regressed nor freshened by another session. Test: `cursor-child-evidence`.
+- **CONFIRM typed in Cursor's parent chat unlocks a sub-agent's denied command** (`src/runtime/confirm/cursor-subagent-link.ts`, `confirm-gate.ts`, `handle-pre.ts`) — `subagentStart` `tool_call_id` is linked to the child's `parent_tool_call_id` (hashed key); the gate consumes the parent token, mirrors the pending deny and shows the command. The G0 sub-agent freeze no longer lands on Cursor's parent (human) chat (`dispatch.ts`), and a prompt from a Cursor sub-agent conversation can never arm a CONFIRM (`handle.ts`). Claude/Codex/Kimi G0 unchanged. Test: `confirm-cursor-subagent`.
+
 ## [0.1.100] - 2026-09-28
 
 ### Added
