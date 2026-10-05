@@ -7,7 +7,7 @@
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { CAP, DAY_MS, STALE_DAYS, TRIG, type Block, citedPaths, jaccard, parse } from "./lesson-parse";
+import { CAP, DAY_MS, STALE_DAYS, type Block, citedPaths, hasTrigger, jaccard, parse, triggerLine } from "./lesson-parse";
 import { formatArchive, splitAtCap } from "./lesson-archive";
 
 const SIM_THRESHOLD = 0.8;
@@ -33,7 +33,12 @@ function dedup(blocks: Block[]): { kept: Block[]; fused: string[] } {
     if (!hit) { kept.push(b); continue; }
     const [win, drop] = (b.ts > hit.ts || Number.isNaN(hit.ts)) ? [b, hit] : [hit, b];
     if (win !== hit) kept[kept.indexOf(hit)] = win;
-    if (!win.raw.some((l) => TRIG.test(l.trim()))) { const t = drop.raw.find((l) => TRIG.test(l.trim())); if (t) win.raw.push(t); }
+    if (!hasTrigger(win)) {
+      // Carry the tag over in its ORIGINAL form: an own-line tag as its own line, an inline tag inline (its keywords may hold spaces).
+      const t = triggerLine(drop);
+      if (t && drop.raw.includes(t)) win.raw.push(t);
+      else if (t) win.raw[win.raw.length - 1] = `${win.raw[win.raw.length - 1] ?? ""} ${t}`;
+    }
     fused.push(`merged: kept ${(win.raw[0] ?? "").slice(0, 60)} · dropped ${(drop.raw[0] ?? "").slice(0, 60)}`);
   }
   return { kept, fused };

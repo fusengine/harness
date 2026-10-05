@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handleHook } from "../src/runtime/handle";
@@ -50,6 +50,7 @@ test("every fixture on disk has exactly one matching case (no drift between the 
 for (const testCase of FIXTURE_CASES) {
   test(`Cursor fixture ${testCase.relPath}: handleHook stdout/exit${testCase.isMcp ? " (MCP: bytes only)" : " + normalized extraction"}`, async () => {
     const cwd = mkdtempSync(join(tmpdir(), "cursor-authentic-fixture-"));
+    mkdirSync(join(cwd, ".git")); // own project root: never fall back to the real repo's armed MEMORY/LESSON.md
     try {
       const rawStdin = loadFixture(testCase.relPath);
       const stdin = rebase(rawStdin, cwd);
