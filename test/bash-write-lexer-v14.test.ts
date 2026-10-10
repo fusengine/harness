@@ -130,6 +130,8 @@ function buildToken2000(rng: () => number): string {
 
 test("(perf) unquotedShellText on 20 malformed 2000-char inputs stays under 5ms each", () => {
   const rng = splitmix32(4242);
+  // Warm the JIT first (JSC tiers up after ~6 calls): the budget bounds steady-state complexity, not cold start.
+  for (let w = 0; w < 10; w++) unquotedShellText(buildToken2000(splitmix32(w + 1)));
   for (let i = 0; i < 20; i++) {
     const input = buildToken2000(rng);
     const start = performance.now();

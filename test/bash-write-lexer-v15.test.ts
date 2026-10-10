@@ -115,6 +115,8 @@ function buildToken2000(rng: () => number): string {
 
 test("(perf) unquotedShellText on 20 malformed 2000-char inputs stays under 5ms each", () => {
   const rng = splitmix32(1515);
+  // Warm the JIT first (JSC tiers up after ~6 calls): the budget bounds steady-state complexity, not cold start.
+  for (let w = 0; w < 10; w++) unquotedShellText(buildToken2000(splitmix32(w + 1)));
   for (let i = 0; i < 20; i++) {
     const input = buildToken2000(rng);
     const start = performance.now();
@@ -145,6 +147,8 @@ test("(perf) 500 unterminated heredocs across 50000 lines stays under 50ms", () 
     for (let j = 0; j < 99; j++) lines.push(`body line ${i}-${j}`);
   }
   const input = `echo "$(${lines.join("\n")}`;
+  // Warm the JIT on a small unterminated heredoc: the budget bounds complexity, not cold start.
+  for (let w = 0; w < 10; w++) anchorText(`echo "$(cmd${w} <<'MARK${w}'\nbody`);
   const start = performance.now();
   expect(() => anchorText(input)).not.toThrow();
   expect(performance.now() - start).toBeLessThan(50);
