@@ -31,13 +31,14 @@ test("consumed confirmation text cannot re-arm without a new denial", async () =
   expect(JSON.parse(replay.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
 });
 
-test("modified command invalidates the armed action", async () => {
+test("modified command denies with mismatch but the armed action stays valid", async () => {
   const home = temp("confirm-home"), cwd = temp("confirm-cwd"), s = sid("mismatch"), opts = { now: 1000, cwd, home };
   const denied = await handleHook("codex", pre(s, "git commit -m a", "tool-a", cwd), opts);
   await handleHook("codex", submit(s, `CONFIRM ${codeFrom(denied.stdout)}`), { ...opts, now: 1100 });
   expect((await handleHook("codex", pre(s, "git commit -m b", "tool-b", cwd), { ...opts, now: 1200 })).stdout).toContain("rejection: mismatch");
+  // A token armed by the human is NOT erased by the denial of another command (multi-pending).
   const original = await handleHook("codex", pre(s, "git commit -m a", "tool-a", cwd), { ...opts, now: 1300 });
-  expect(JSON.parse(original.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(original.stdout).not.toContain('"permissionDecision":"deny"');
 });
 
 test("argv/string transport is canonical and a different cwd invalidates", async () => {

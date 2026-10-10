@@ -28,7 +28,7 @@ const SHELL_BINS = new Set(["bash", "sh", "zsh", "dash"]);
 const SED_INPLACE = /(^|\s)(-i\b|--in-place\b)/;
 
 /** Split a command string on `&&`, `||`, `;`, `|`, and newlines — each side scanned independently. */
-function segments(command: string): string[] {
+export function segments(command: string): string[] {
   return command.split(/&&|\|\||[;|\n]/);
 }
 
@@ -39,7 +39,7 @@ function beforeRedirect(segment: string): string {
 }
 
 /** Naive shell tokenizer: whitespace-split, stripping one matching layer of quotes per token. */
-function tokenize(segment: string): string[] {
+export function tokenize(segment: string): string[] {
   const tokens = segment.match(/(?:"[^"]*"|'[^']*'|\S+)/g) ?? [];
   return tokens.map((t) => (/^(['"]).*\1$/.test(t) ? t.slice(1, -1) : t));
 }

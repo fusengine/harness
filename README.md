@@ -68,6 +68,8 @@ don't assume either the old or the "everything in one place" story):
 | `harness prd validate <task> [agent]` | Requires `FUSE_PRD=1`. Cross-check a task PRD against agent reports and promote matching sub-tasks/router entries to `validated`. |
 | `harness prd compact <task>` | Requires `FUSE_PRD=1`. Collapse a fully-validated task PRD to its compacted shape. |
 
+The [`motion` scope](docs/motion.md) adds owner-approved stills/draft gates for the motion render pipeline.
+
 Every invocation writes a `@fusengine/harness vX.Y.Z` banner to **stderr** (never
 stdout — the hook JSON contract stays clean) so you can see which version ran.
 

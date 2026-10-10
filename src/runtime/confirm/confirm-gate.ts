@@ -82,8 +82,8 @@ export function confirmGate(
     const parent = id === "cursor" ? cursorParentSessionId : undefined;
     if (parent && consumeConfirmToken(parent, hash, now, home, grace)) return { allow: true };
     const code = displayCodeForAction(command);
-    recordPendingDeny(sessionId, hash, code, now, home);
-    if (parent) recordPendingDeny(parent, hash, code, now, home);
+    recordPendingDeny(sessionId, hash, code, command, now, home);
+    if (parent) recordPendingDeny(parent, hash, code, command, now, home);
     // A sub-agent's code is confirmed in the parent chat: show the exact command so the human sees what they approve.
     const shown = parent ? `\ncommande (sous-agent) : ${command}` : "";
     return { allow: false, prompt: { ...prompt, reason: `${prompt.reason}\nPour autoriser, réponds : CONFIRM ${code}${shown}${id === "cursor" ? frozenHint(parent ?? sessionId, now, home) : ""}` } };

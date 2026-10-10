@@ -1,6 +1,7 @@
 import type { Prompt } from "../../prompt/types";
 import type { GuardContext } from "./context";
 import { shellOutputRedirects } from "./bash-write-redirects";
+import { MOTION_KEY_FRAGMENT, MOTION_STORE_FRAGMENT } from "../motion/store";
 
 /**
  * Path fragments that mark a location as internal/generated state.
@@ -17,6 +18,9 @@ export const PROTECTED_FRAGMENTS: readonly string[] = [
   ".claude/apex/",
   ".harness/track",
   ".harness/memory/state",
+  // Motion approvals/pending/budget live here: the agent must never write its own approval.
+  `${MOTION_STORE_FRAGMENT}/`,
+  `${MOTION_KEY_FRAGMENT}/`,
   // Precondition of the neverApproval exemption (evaluate.ts): blocks a Codex
   // agent from self-elevating via its own allow rule — sandbox_mode never
   // covers the user's ~/.codex/, only a project-local one.

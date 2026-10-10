@@ -1,54 +1,51 @@
 import { homedir } from "node:os";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { LOCK_FAILED, withTrackLockSync } from "../../tracking/track-lock-sync";
-import { atomicWrite } from "../../util/json-io";
-import { sanitizeSessionId, sessionsDir } from "../home-state";
+import { sanitizeSessionId } from "../home-state";
 import { commandToString } from "../command-string";
 import { displayCodeForAction, hashForAction } from "./confirm-code";
 import { isSubagentActive } from "./confirm-subagent";
 import type { CodexPromptOrigin } from "./codex-prompt-origin";
+import type { ConfirmSubmitOutcome } from "./confirm-outcome";
+import {
+  codexConfirmLockDir, loadCodexConfirmState, saveCodexConfirmState, upsertCodexEntry,
+  type CodexAction, type CodexReceipt,
+} from "./codex-confirm-state";
 
 const TTL_MS = 5 * 60 * 1000;
 const STATE_VERSION = 1;
 
 type RejectReason = "no-token" | "mismatch" | "expired" | "already-consumed" | "missing-tool-use-id" | "state-io";
-type Action = Readonly<{ hash: string; code: string; command: string; ts: number }>;
-type Receipt = Action & Readonly<{ toolUseId: string }>;
-type CodexState = Readonly<{ codexConfirmPending?: Action; codexConfirmToken?: Action; codexConfirmReceipt?: Receipt }>;
-
-function statePath(sid: string, home: string): string {
-  return join(sessionsDir(home), `codex-confirm-${sid}.json`);
-}
-
-function lockDir(sid: string, home: string): string {
-  return join(sessionsDir(home), ".confirm-locks", sid);
-}
-
-function loadState(sid: string, home: string): CodexState {
-  const path = statePath(sid, home);
-  if (!existsSync(path)) return {};
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed as CodexState : {};
-}
-
-function saveState(sid: string, state: CodexState, home: string): void {
-  mkdirSync(sessionsDir(home), { recursive: true, mode: 0o700 });
-  atomicWrite(statePath(sid, home), JSON.stringify(state, null, 2));
-}
 
 /** Canonical identity of one Codex shell action and its display token. */
-export function codexAction(tool: string, cwd: string, command: unknown, now: number): Action | null {
+export function codexAction(tool: string, cwd: string, command: unknown, now: number): CodexAction | null {
   const canonicalCommand = commandToString(command);
   if (!canonicalCommand) return null;
   const identity = JSON.stringify({ version: STATE_VERSION, harness: "codex", tool, cwd: resolve(cwd), command: canonicalCommand });
   return { hash: hashForAction(identity), code: displayCodeForAction(identity), command: canonicalCommand, ts: now };
 }
 
-/** Atomically authorize or reject a Codex action, recording the current denial when needed. */
+/** The session's pending denials, newest first (feedback listing). Pendings never expire — only the cap evicts. */
+export function listCodexPendingDenies(sessionIdRaw: unknown, now: number, home: string = homedir()): readonly CodexAction[] {
+  const sid = sanitizeSessionId(sessionIdRaw);
+  if (!sid) return [];
+  try {
+    return loadCodexConfirmState(sid, home).pending.slice().reverse();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Atomically authorize or reject a Codex action. A matching fresh receipt
+ * (same hash + same tool_use_id) re-allows idempotently; a matching armed
+ * token is consumed exactly once (G1/G2/G3). On denial the action is APPENDED
+ * to the pending list (cap {@link MAX_CODEX_CONFIRM_ENTRIES}, oldest evicted) —
+ * never erasing the other pendings, the armed tokens, or the receipts.
+ */
 export function authorizeCodexAction(
   sessionIdRaw: unknown,
-  action: Action,
+  action: CodexAction,
   toolUseId: string | undefined,
   now: number,
   home: string = homedir(),
@@ -56,31 +53,46 @@ export function authorizeCodexAction(
   const sid = sanitizeSessionId(sessionIdRaw);
   if (!sid) return { allow: false, reason: "state-io" };
   try {
-    const result = withTrackLockSync(lockDir(sid, home), () => {
-      const state = loadState(sid, home);
-      const token = state.codexConfirmToken;
-      const receipt = state.codexConfirmReceipt;
-      const receiptExpired = receipt !== undefined && now - receipt.ts > TTL_MS;
-      if (!receiptExpired && receipt?.hash === action.hash && receipt.toolUseId === toolUseId && toolUseId) return { allow: true } as const;
+    const result = withTrackLockSync(codexConfirmLockDir(sid, home), () => {
+      const buckets = loadCodexConfirmState(sid, home);
+      const receipts = buckets.receipts.filter((r) => now - r.ts <= TTL_MS);
+      const receipt = receipts.find((r) => r.hash === action.hash);
+      if (receipt && toolUseId && receipt.toolUseId === toolUseId) return { allow: true } as const;
+
+      const freshTokens = buckets.tokens.filter((t) => now - t.ts <= TTL_MS);
+      const token = freshTokens.find((t) => t.hash === action.hash);
 
       let reason: RejectReason = "no-token";
       if (token) {
-        if (token.hash !== action.hash) reason = "mismatch";
-        else if (now - token.ts > TTL_MS) reason = "expired";
-        else if (!toolUseId) reason = "missing-tool-use-id";
+        if (!toolUseId) reason = "missing-tool-use-id";
         else {
-          const { codexConfirmToken: _token, codexConfirmPending: _pending, ...rest } = state;
-          saveState(sid, { ...rest, codexConfirmReceipt: { ...action, toolUseId } satisfies Receipt }, home);
+          const consumed: CodexReceipt = { ...action, toolUseId };
+          saveCodexConfirmState(sid, {
+            pending: buckets.pending,
+            tokens: freshTokens.filter((t) => t.hash !== action.hash),
+            // One receipt per hash, newest wins (upsert) — a stale same-hash
+            // receipt must not shadow the fan-out twin of a LATER confirmation.
+            receipts: upsertCodexEntry(receipts, consumed),
+          }, home);
           return { allow: true } as const;
         }
-      } else if (receipt?.hash === action.hash) reason = receiptExpired ? "expired" : "already-consumed";
+      } else {
+        // Deny-reason parity with the former single slot: computed from the
+        // NEWEST token, even an expired one (different hash → mismatch, same
+        // hash → expired) — never degraded to "no-token" while a token exists.
+        const newest = buckets.tokens.reduce<CodexAction | undefined>((acc, t) => (!acc || t.ts > acc.ts ? t : acc), undefined);
+        if (newest) reason = newest.hash === action.hash ? "expired" : "mismatch";
+        else if (buckets.receipts.some((r) => r.hash === action.hash)) reason = receipt ? "already-consumed" : "expired";
+      }
 
       if (reason === "missing-tool-use-id") return { allow: false, reason } as const;
-      const pending = state.codexConfirmPending;
-      const stablePending = pending?.hash === action.hash ? pending : action;
-      const { codexConfirmToken: _token, codexConfirmReceipt: _receipt, ...withoutReceipt } = state;
-      const rest = receiptExpired ? withoutReceipt : { ...withoutReceipt, codexConfirmReceipt: receipt };
-      saveState(sid, { ...rest, codexConfirmPending: stablePending }, home);
+      // Pendings never expire (only the cap-10 eviction removes them); the
+      // 5-minute TTL applies to armed tokens and receipts only.
+      saveCodexConfirmState(sid, {
+        pending: upsertCodexEntry(buckets.pending, action),
+        tokens: freshTokens,
+        receipts,
+      }, home);
       return { allow: false, reason } as const;
     });
     return result === LOCK_FAILED ? { allow: false, reason: "state-io" } : result;
@@ -90,8 +102,12 @@ export function authorizeCodexAction(
 }
 
 /**
- * Atomically arm the last Codex denial, consuming its pending record exactly once.
- * A classified root prompt may bypass G0; classified subagent/unknown prompts fail closed.
+ * Atomically arm the pending Codex denial whose code was typed, consuming that
+ * pending record exactly once (lookup code → full hash; the hash alone then
+ * authorizes). A refusal empties ALL pendings and tokens of the session (G5).
+ * A classified root prompt may bypass G0; classified subagent/unknown prompts
+ * fail closed with NO outcome (an agent relaying a code is not a human
+ * confirmation). Returns what happened so the caller can ack it visibly.
  */
 export function submitCodexConfirmation(
   sessionIdRaw: unknown,
@@ -99,28 +115,34 @@ export function submitCodexConfirmation(
   now: number,
   home: string = homedir(),
   origin?: CodexPromptOrigin,
-): void {
+): ConfirmSubmitOutcome | null {
   const sid = sanitizeSessionId(sessionIdRaw);
-  if (!sid) return;
+  if (!sid) return null;
   const refusal = /\b(non|no|stop|annule|cancel|abort|nope|laisse tomber|pas maintenant)\b/i.test(text);
   const typedCode = text.trim().match(/^confirm[ _-]*([0-9a-f]{4})$/i)?.[1];
   try {
-    withTrackLockSync(lockDir(sid, home), () => {
-      const state = loadState(sid, home);
-      if (origin !== undefined && origin !== "root") return;
+    const outcome = withTrackLockSync(codexConfirmLockDir(sid, home), (): ConfirmSubmitOutcome | null => {
+      const buckets = loadCodexConfirmState(sid, home);
+      if (origin !== undefined && origin !== "root") return null;
       if (refusal) {
-        const { codexConfirmPending: _pending, codexConfirmToken: _token, ...rest } = state;
-        saveState(sid, rest, home);
-        return;
+        saveCodexConfirmState(sid, { pending: [], tokens: [], receipts: buckets.receipts }, home);
+        return { kind: "refused" };
       }
-      if (!typedCode) return;
-      if (origin === undefined && isSubagentActive(sid, now, home)) return;
-      const pending = state.codexConfirmPending;
-      if (!pending || pending.code.toLowerCase() !== typedCode.toLowerCase()) return;
-      const { codexConfirmPending: _pending, ...rest } = state;
-      saveState(sid, { ...rest, codexConfirmToken: { ...pending, ts: now } }, home);
+      if (!typedCode) return null;
+      if (origin === undefined && isSubagentActive(sid, now, home)) return { kind: "frozen", code: typedCode };
+      const matches = buckets.pending.filter((p) => p.code.toLowerCase() === typedCode.toLowerCase());
+      const chosen = matches[matches.length - 1]; // newest pending wins on a 4-hex collision
+      if (!chosen) return { kind: "unknown-code", code: typedCode };
+      saveCodexConfirmState(sid, {
+        pending: buckets.pending.filter((p) => p !== chosen),
+        tokens: upsertCodexEntry(buckets.tokens, { ...chosen, ts: now }),
+        receipts: buckets.receipts,
+      }, home);
+      return { kind: "armed", code: chosen.code, command: chosen.command };
     });
+    return outcome === LOCK_FAILED ? null : outcome;
   } catch {
     // Submission is advisory state wiring; hook execution must remain available.
+    return null;
   }
 }
