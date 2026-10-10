@@ -12,6 +12,7 @@ import type { PluginScope } from "../runtime/lifecycle";
 const VALID_SCOPES = new Set<string>([
   "solid", "rules", "carto", "security", "changelog",
   "aipilot", "lessons", "seo", "memory", "tailwindcss",
+  "motion",
 ]);
 
 /**

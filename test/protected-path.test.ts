@@ -26,6 +26,14 @@ test("`.git` scoping: real .git segment blocks, foo.git/.github do not", () => {
   expect(protectedPathGuard({ tool: "Write", filePath: "/x/.github/workflows/ci.yml" })).toBeNull();
 });
 
+test("motion store: .fuse-harness/motion/ blocked on Write AND Bash redirect; cache/x stays allowed", () => {
+  expect(protectedPathGuard({ tool: "Write", filePath: "/h/.fuse-harness/motion/p/approvals.json" })?.kind).toBe("block");
+  expect(protectedPathGuard({ tool: "Bash", command: "echo '{}' > /h/.fuse-harness/motion/p/approvals.json" })?.kind).toBe("block");
+  expect(protectedPathGuard({ tool: "Bash", command: "cat /h/.fuse-harness/motion/p/approvals.json > out.txt" })).toBeNull();
+  expect(protectedPathGuard({ tool: "Write", filePath: "/h/.fuse-harness/cache/x" })).toBeNull();
+  expect(protectedPathGuard({ tool: "Bash", command: "echo 1 > /h/.fuse-harness/cache/x" })).toBeNull();
+});
+
 test("cache: only the sessions subtree is protected (safe_paths parity)", () => {
   expect(protectedPathGuard({ tool: "Write", filePath: "/x/.fuse-harness/cache/lessons/roots.json" })).toBeNull();
   expect(protectedPathGuard({ tool: "Write", filePath: "/x/.fuse-harness/cache/sessions/s.json" })?.kind).toBe("block");

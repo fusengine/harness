@@ -52,18 +52,37 @@ permanently; the PostToolUse cross-check is the only enforcement there.
 
 ## `CONFIRM <code>` — recourse for a degraded `ask`
 
-Both harnesses above downgrade `ask` to a hard `deny`: Kimi's binary
-short-circuits on `hookSpecificOutput?.permissionDecision !== "deny"`, and
-Codex fails a hook open on the unsupported `ask` shape. Claude Code is
-unaffected — its native `ask` still shows an interactive confirmation, and
-this mechanism never touches it (`src/runtime/confirm/confirm-gate.ts`'s
-`DEGRADES_ASK_TO_DENY` set is `{"codex", "kimi"}` only).
+The harnesses above downgrade `ask` to a hard `deny`: Kimi's binary
+short-circuits on `hookSpecificOutput?.permissionDecision !== "deny"`, Codex
+fails a hook open on the unsupported `ask` shape, and Cursor maps `ask` to
+`permission:"deny"`. Claude Code is unaffected — its native `ask` still shows
+an interactive confirmation, and this mechanism never touches it
+(`src/runtime/confirm/confirm-gate.ts`'s `DEGRADES_ASK_TO_DENY` set is
+`{"codex", "kimi", "cursor"}`).
 
 When an `ask` about to be degraded carries a command, the deny message gets a
 short 4-hex-char code appended. Retyping `CONFIRM <code>` in the next prompt
 authorizes that **exact** action once — parsed in `src/runtime/confirm/confirm-submit.ts`
 (`handleConfirmSubmit`, wired from `UserPromptSubmit` in `handle.ts`) via a
 `CONFIRM_RE` tolerant of `confirm4f2a`/`Confirm-4f2a`/`confirm_4f2a`.
+
+A session can hold **several pending codes at once** (cap 10, the oldest is
+evicted beyond that): a new denial never erases a code already given, and an
+armed token survives the denial of an unrelated command. A pending code
+**never expires** — on the shared path (kimi/cursor) only the cap-10 eviction
+removes it and arming keeps it listed (an expired token re-arms by retyping
+the code); codex consumes it at arming, as before. The 5-minute TTL applies
+to the ARMED token and the receipt only. Every prompt that is exactly
+`CONFIRM <code>` gets a **visible acknowledgement** on the hosts with a
+verified UserPromptSubmit channel — kimi (raw stdout) and codex
+(`additionalContext` envelope): `[fuse-harness] CONFIRM xxxx accepté pour :
+<commande> (valable 5 min)`, or `inconnu` followed by the codes
+still pending. An incidental code inside a longer prompt still arms, but
+silently (byte-identical output). Cursor has a channel (`user_message`) but
+through a separate envelope path — no emission yet; claude-code keeps its
+native interactive `ask`; gemini-cli, cline and hermes have no verified
+channel. On all of these, and on any prompt without a code, the output is
+byte-identical.
 
 Guardrails (`src/runtime/confirm/confirm-state.ts`, `confirm-subagent.ts`, `confirm-irreversible.ts`):
 
@@ -86,7 +105,9 @@ Guardrails (`src/runtime/confirm/confirm-state.ts`, `confirm-subagent.ts`, `conf
   token: destructive git (`push --force`, `reset --hard`, `branch -D`,
   `clean -fd`, …, reusing `GIT_BLOCKED`) and any `rm -rf`/`-fr` variant.
 - **G5** — an explicit refusal (`non`/`no`/`stop`/`cancel`/`annule`/…) in the
-  next prompt drops any pending token.
+  next prompt drops the session's armed tokens. The pending denies SURVIVE on
+  the shared path (kimi/cursor) — a code can simply be retyped later; codex
+  clears its pending too (pre-existing per-path difference, kept).
 
 **Scope, stated plainly**: this closes a recourse gap for an honest mistake or
 a change of mind under a harness that can't show an interactive prompt — it is
@@ -138,7 +159,10 @@ timeout = 30
 > config** — do not add `id`, `name`, `type`, `enabled`, or anything else.
 
 Scoped wiring is also available — the second argument selects the plugin scope
-(`core` when omitted; unknown values now warn on stderr). The `solid` scope
+(`core` when omitted or explicit; unknown values warn on stderr and fall back
+to `core`). Accepted plugin scopes are `solid`, `rules`, `carto`, `security`,
+`changelog`, `aipilot`, `lessons`, `seo`, `memory`, `tailwindcss`, and `motion`
+([`VALID_SCOPES`](../src/cli/scope.ts)). The `solid` scope
 carries the PreToolUse file-size deny (`FUSE_SOLID_MAX_LINES`, default 100)
 without the core-only APEX freshness gates:
 
@@ -147,6 +171,19 @@ without the core-only APEX freshness gates:
 event = "PreToolUse"
 matcher = "Write|Edit"
 command = "npx -y @fusengine/harness hook kimi solid"
+timeout = 30
+```
+
+The `motion` scope carries owner-approved stills/draft render gates, sensitive
+source-write checks, a critic sandbox, and render accounting — see
+[motion.md](./motion.md) for the project contract, required lifecycle hooks,
+and host limitations. Its PreToolUse wiring follows the same format:
+
+```toml
+[[hooks]]
+event = "PreToolUse"
+matcher = "Bash|Write|Edit|Read|MultiEdit|NotebookEdit|CronCreate|CronDelete|ScheduleWakeup|RemoteTrigger|SendMessage"
+command = "npx -y @fusengine/harness hook kimi motion"
 timeout = 30
 ```
 

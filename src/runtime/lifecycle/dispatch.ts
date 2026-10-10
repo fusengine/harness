@@ -25,7 +25,7 @@ import { sanitizeSessionId } from "../home-state";
 import { defaultStateDir, trackFile } from "../paths";
 
 /** Which plugin's hooks.json invoked the harness (selects SessionStart behavior). */
-export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss";
+export type PluginScope = "core" | "solid" | "rules" | "carto" | "security" | "changelog" | "aipilot" | "lessons" | "seo" | "memory" | "tailwindcss" | "motion";
 
 /** Inputs the lifecycle dispatcher needs (clock + roots injected). */
 export interface LifecycleInput {

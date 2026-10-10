@@ -8,6 +8,12 @@ test("parseScope: valid scopes pass through without a warning", () => {
   expect(warnings).toEqual([]);
 });
 
+test("parseScope: motion is a valid scope, no warning", () => {
+  const warnings: string[] = [];
+  expect(parseScope("motion", (m) => warnings.push(m))).toBe("motion");
+  expect(warnings).toEqual([]);
+});
+
 test("parseScope: unknown scope warns and falls back to core", () => {
   const warnings: string[] = [];
   expect(parseScope("my-plugin", (m) => warnings.push(m))).toBe("core");

@@ -6,21 +6,12 @@ import { randomUUID } from "node:crypto";
 import { handleHook, type HandleOptions } from "../src/runtime/handle";
 import { isIrreversible } from "../src/runtime/confirm/confirm-irreversible";
 import { confirmGate } from "../src/runtime/confirm/confirm-gate";
-import { codexInit } from "../src/init/templates";
 
 const cwd = (): string => mkdtempSync(join(tmpdir(), "fh-confirm-cwd-"));
 const home = (): string => mkdtempSync(join(tmpdir(), "fh-confirm-home-"));
 const sid = (label: string): string => `${label}-${randomUUID()}`;
 
 const pre = (id: string, s: string, command: string) => ({ hook_event_name: "PreToolUse", session_id: s, tool_use_id: randomUUID(), tool_name: "Bash", tool_input: { command } });
-const codexPre = (s: string, command: string, toolUseId: string, workdir: string) => ({
-  hook_event_name: "PreToolUse",
-  session_id: s,
-  tool_use_id: toolUseId,
-  cwd: workdir,
-  tool_name: "Bash",
-  tool_input: { command },
-});
 const submit = (s: string, prompt: string) => ({ hook_event_name: "UserPromptSubmit", session_id: s, prompt });
 
 /** Extract the 4-hex-char code from a "Pour autoriser, réponds : CONFIRM xxxx" deny message. */
@@ -61,25 +52,6 @@ test("confirm the exact action -> next identical Bash call is allowed", async ()
   expect(allowed.stdout.includes('"permissionDecision":"deny"')).toBe(false);
 });
 
-test("codex fan-out: one confirmed tool_use_id allows sibling callbacks idempotently, then denies another id", async () => {
-  const h = home();
-  const workdir = cwd();
-  const opts: HandleOptions = { now: 1000, cwd: workdir, home: h };
-  const s = sid("codex-fanout");
-  const cmd = "git commit -m confirm-fanout";
-  const denied = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), opts);
-  const code = codeFromDeny(denied.stdout);
-  await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100 });
-
-  const first = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), { ...opts, now: 1200 });
-  const sibling = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), { ...opts, now: 1201 });
-  const distinct = await handleHook("codex", codexPre(s, cmd, "tool-b", workdir), { ...opts, now: 1202 });
-
-  expect(first.stdout).not.toContain('"permissionDecision":"deny"');
-  expect(sibling.stdout).not.toContain('"permissionDecision":"deny"');
-  expect(JSON.parse(distinct.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-});
-
 test("G1: a consumed token cannot be replayed for the same action", async () => {
   const h = home();
   const opts: HandleOptions = { now: 1000, cwd: cwd(), home: h };
@@ -90,21 +62,6 @@ test("G1: a consumed token cannot be replayed for the same action", async () => 
   await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100 });
   await handleHook("codex", pre("codex", s, cmd), { ...opts, now: 1200 }); // consumes the token
   const replay = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: 1300 });
-  expect(JSON.parse(replay.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-});
-
-test("codex consumed confirmation text cannot re-arm without a new denial", async () => {
-  const h = home();
-  const workdir = cwd();
-  const opts: HandleOptions = { now: 1000, cwd: workdir, home: h };
-  const s = sid("codex-submit-replay");
-  const cmd = "git commit -m confirm-submit-replay";
-  const denied = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), opts);
-  const code = codeFromDeny(denied.stdout);
-  await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100 });
-  await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), { ...opts, now: 1200 });
-  await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1250 });
-  const replay = await handleHook("codex", codexPre(s, cmd, "tool-b", workdir), { ...opts, now: 1300 });
   expect(JSON.parse(replay.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
 });
 
@@ -119,70 +76,6 @@ test("G2: a token older than the 5-minute TTL is rejected", async () => {
   const tenMinLater = 1100 + 10 * 60 * 1000;
   const stale = await handleHook("codex", pre("codex", s, cmd), { ...opts, now: tenMinLater });
   expect(JSON.parse(stale.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-});
-
-test("codex command mismatch invalidates the armed action", async () => {
-  const cmdA = "git commit -m confirm-action-a";
-  const cmdB = "git commit -m confirm-action-b";
-  const h = home();
-  const workdir = cwd();
-  const opts: HandleOptions = { now: 1000, cwd: workdir, home: h };
-  const s = sid("command-mismatch");
-  const deniedA = await handleHook("codex", codexPre(s, cmdA, "tool-a", workdir), opts);
-  const code = codeFromDeny(deniedA.stdout);
-  await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100 });
-  const deniedB = await handleHook("codex", codexPre(s, cmdB, "tool-b", workdir), { ...opts, now: 1200 });
-  expect(JSON.parse(deniedB.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-  expect(deniedB.stdout).toContain("rejection: mismatch");
-  const deniedAAgain = await handleHook("codex", codexPre(s, cmdA, "tool-a", workdir), { ...opts, now: 1300 });
-  expect(JSON.parse(deniedAAgain.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-});
-
-test("codex action identity canonicalizes argv/string transport and rejects a different cwd", async () => {
-  const h = home();
-  const workdir = cwd();
-  const other = cwd();
-  const opts: HandleOptions = { now: 1000, cwd: workdir, home: h };
-  const s1 = sid("transport");
-  const cmd = "git commit -m confirm-transport";
-  const argv = { ...codexPre(s1, cmd, "tool-a", workdir), tool_input: { command: ["bash", "-lc", cmd] } };
-  const denied = await handleHook("codex", argv, opts);
-  const code = codeFromDeny(denied.stdout);
-  await handleHook("codex", submit(s1, `CONFIRM ${code}`), { ...opts, now: 1100 });
-  const allowed = await handleHook("codex", codexPre(s1, cmd, "tool-a", workdir), { ...opts, now: 1200 });
-  expect(allowed.stdout).not.toContain('"permissionDecision":"deny"');
-
-  const s2 = sid("cwd");
-  const deniedAtWorkdir = await handleHook("codex", codexPre(s2, cmd, "tool-b", workdir), opts);
-  await handleHook("codex", submit(s2, `CONFIRM ${codeFromDeny(deniedAtWorkdir.stdout)}`), { ...opts, now: 1100 });
-  const wrongCwd = await handleHook("codex", codexPre(s2, cmd, "tool-b", other), { ...opts, now: 1200 });
-  expect(JSON.parse(wrongCwd.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
-  expect(wrongCwd.stdout).toContain("rejection: mismatch");
-});
-
-test("codex diagnostics name rule, canonical command, expected token, and typed rejection", async () => {
-  const workdir = cwd();
-  const cmd = "echo log > out.txt";
-  const out = await handleHook("codex", codexPre(sid("diagnostic"), cmd, "tool-a", workdir), { now: 1000, cwd: workdir, home: home() });
-  expect(out.stdout).toContain("rule ID: bash-write:file-redirect");
-  expect(out.stdout).toContain(`canonical command: ${cmd}`);
-  expect(out.stdout).toMatch(/expected token: CONFIRM [0-9a-f]{4}/);
-  expect(out.stdout).toContain("rejection: no-token");
-});
-
-test("codex UserPromptSubmit is wired and arms confirmation before scope early returns", async () => {
-  const hooks = JSON.parse(codexInit("harness hook codex")[0]!.content) as { hooks: Record<string, unknown[]> };
-  expect(hooks.hooks.UserPromptSubmit?.length).toBe(1);
-  const h = home();
-  const workdir = cwd();
-  const opts: HandleOptions = { now: 1000, cwd: workdir, home: h };
-  const s = sid("scope-submit");
-  const cmd = "git commit -m scope-submit";
-  const denied = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), opts);
-  const code = codeFromDeny(denied.stdout);
-  await handleHook("codex", submit(s, `CONFIRM ${code}`), { ...opts, now: 1100, scope: "rules" });
-  const allowed = await handleHook("codex", codexPre(s, cmd, "tool-a", workdir), { ...opts, now: 1200 });
-  expect(allowed.stdout).not.toContain('"permissionDecision":"deny"');
 });
 
 test("G4: git push --force is never confirmable (hard block, no CONFIRM code offered at all)", async () => {

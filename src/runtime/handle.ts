@@ -21,72 +21,15 @@ import { promptText } from "./prompt-text";
 import { handleConfirmSubmit } from "./confirm/confirm-submit";
 import { submitCodexConfirmation } from "./confirm/codex-confirm";
 import { codexPromptOrigin } from "./confirm/codex-prompt-origin";
+import { confirmFeedbackText, confirmPendingLines, mergeConfirmFeedback } from "./confirm/confirm-feedback";
+import type { ConfirmSubmitOutcome } from "./confirm/confirm-outcome";
+import { motionHook } from "./motion";
+import { rawEventName, cursorRawPayloadProjection } from "./handle-payload";
 import { cursorProjectCwd } from "../adapters/cursor/context";
 import { toCursorLifecycleResponse } from "../adapters/cursor/respond";
 import type { HandleOptions, HandleOutcome } from "./handle-types";
 import type { NormalizedEvent } from "./normalize";
 export type { HandleOptions, HandleOutcome } from "./handle-types";
-
-/** Raw Claude hook event name from a payload (empty when absent). */
-function rawEventName(payload: Record<string, unknown>): string {
-  return typeof payload.hook_event_name === "string" ? payload.hook_event_name : "";
-}
-
-/**
- * `payload.tool_input` parsed into an object when it's a JSON STRING —
- * Cursor's real wire format for `beforeMCPExecution`/`afterMCPExecution`
- * (ground truth), unlike every other harness (and Cursor's own
- * `preToolUse`/`postToolUse`), which always sends it as an object already.
- * `undefined` when `tool_input` is already an object, absent, or fails to
- * parse into one (fail-open — the caller then keeps the original value).
- * @param payload - The raw hook payload.
- */
-function cursorParsedToolInput(payload: Record<string, unknown>): Record<string, unknown> | undefined {
-  const raw = payload.tool_input;
-  if (typeof raw !== "string") return undefined;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * `id === "cursor"` only: project the already-resolved canonical `tool_name`
- * (`event.tool`, normalized by {@link normalizeEvent}) and `cwd` (the project
- * root resolved via `cursorProjectCwd`, already applied to `opts.cwd`) onto a
- * shallow payload copy — the single passage point for every downstream
- * consumer that reads `payload.tool_name`/`payload.cwd`/`payload.tool_input`
- * RAW instead of `event.tool`/`opts.cwd`/`event.input` (lifecycle-bridge's
- * `failure-lesson.ts`/`agent-memory.ts`, handle-scope-async's aipilot/memory
- * dispatchers — including `doc-cache-gate.ts`'s `libraryOf`, which never
- * `JSON.parse`s a string `tool_input` itself — and the seo scope's
- * `post-tool-use.ts`). `tool_input` is additionally replaced by its parsed
- * object form via {@link cursorParsedToolInput} when Cursor sent it as a
- * JSON string (`beforeMCPExecution`/`afterMCPExecution`). Cursor's own wire
- * values ("Shell", `MCP:<tool>`, a bare `workspace_roots` array with no
- * `cwd` field, a stringified `tool_input`, …) are preserved under
- * `cursor_tool_name`/`cursor_cwd`/`cursor_tool_input` so nothing is lost.
- * Every other harness id is untouched (returns the SAME object,
- * byte-identical).
- * @param payload - The raw hook payload.
- * @param event - The already-normalized event (`event.tool` is canonical).
- * @param cwd - The resolved project root for this invocation.
- * @param id - Harness adapter id.
- */
-function cursorRawPayloadProjection(payload: Record<string, unknown>, event: NormalizedEvent, cwd: string, id: string): Record<string, unknown> {
-  if (id !== "cursor") return payload;
-  const parsedToolInput = cursorParsedToolInput(payload);
-  return {
-    ...payload,
-    cursor_tool_name: payload.tool_name,
-    cursor_cwd: payload.cwd,
-    tool_name: event.tool,
-    cwd,
-    ...(parsedToolInput ? { cursor_tool_input: payload.tool_input, tool_input: parsedToolInput } : {}),
-  };
-}
 
 /**
  * The full hook handler: on a PRE event it gates the tool-use (stateless guards
@@ -105,10 +48,15 @@ async function handleHookCore(id: string, payload: Record<string, unknown>, opts
   // consumer below this line gets the canonical tool_name/cwd on Cursor; every
   // other harness id gets `payload` back untouched (byte-identical object).
   const hookPayload = cursorRawPayloadProjection(payload, event, opts.cwd, id);
+  // `motion` scope: its own gates only; the core pipeline below (design/lifecycle/UPS/pre/post) would be duplicated.
+  if (opts.scope === "motion") return motionHook(id, hookPayload, event, opts);
   const rawPrompt = payload.prompt;
   const userPrompt = typeof rawPrompt === "string" || Array.isArray(rawPrompt) ? promptText(rawPrompt) : undefined;
+  // CONFIRM outcome of this UserPromptSubmit, if any — acked visibly at the
+  // single UPS stdout return below (never for a prompt without a code).
+  let confirmOutcome: ConfirmSubmitOutcome | null = null;
   if (id === "codex" && rawEventName(payload) === "UserPromptSubmit" && userPrompt !== undefined) {
-    submitCodexConfirmation(event.sessionId, userPrompt, opts.now, opts.home, codexPromptOrigin(payload));
+    confirmOutcome = submitCodexConfirmation(event.sessionId, userPrompt, opts.now, opts.home, codexPromptOrigin(payload));
   }
   // Fresh slate for this invocation's capFragment tally — one hook event is
   // exactly one lifecycle branch below (see dispatchLifecycle), so a single
@@ -159,9 +107,12 @@ async function handleHookCore(id: string, payload: Record<string, unknown>, opts
   if (userPrompt !== undefined) {
     // G0 on Cursor: a sub-agent's own conversation (it carries `parent_tool_call_id`) can never arm a CONFIRM.
     const cursorSubagentPrompt = id === "cursor" && payload.parent_tool_call_id !== undefined;
-    if (id !== "codex" && !cursorSubagentPrompt) handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
+    if (id !== "codex" && !cursorSubagentPrompt) confirmOutcome = handleConfirmSubmit(event.sessionId, userPrompt, opts.now, opts.home);
     await withTrack(file, (track) => recordBrainstormRequired(track, detectCreationIntent(userPrompt)));
-    return { stdout: promptSubmitContext(userPrompt, opts.cwd, id), exit: 0 };
+    // Visible CONFIRM ack (hosts with a verified UPS channel only); no code
+    // typed → "" → mergeConfirmFeedback returns the context stdout unchanged.
+    const feedback = confirmOutcome ? confirmFeedbackText(confirmOutcome, confirmPendingLines(id, event.sessionId, opts.now, opts.home)) : "";
+    return { stdout: mergeConfirmFeedback(id, feedback, promptSubmitContext(userPrompt, opts.cwd, id)), exit: 0 };
   }
 
   if (event.phase === "post") {
